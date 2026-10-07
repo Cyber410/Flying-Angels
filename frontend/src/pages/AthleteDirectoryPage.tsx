@@ -335,13 +335,7 @@ function AthleteDirectoryPage() {
      RESET PAGINATION
      ================================================== */
 
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [
-    searchTerm,
-    selectedAgeGroups,
-    selectedEventFilters,
-  ]);
+
 
   /* ==================================================
      LOAD EVENTS FOR FILTERING
@@ -402,53 +396,58 @@ function AthleteDirectoryPage() {
      ================================================== */
 
   const toggleAgeGroup = (
-    ageGroup: string
-  ) => {
-    setSelectedAgeGroups(
-      (currentGroups) =>
-        currentGroups.includes(ageGroup)
-          ? currentGroups.filter(
-              (group) =>
-                group !== ageGroup
-            )
-          : [
-              ...currentGroups,
-              ageGroup,
-            ]
-    );
-  };
+  ageGroup: string
+) => {
+  setSelectedAgeGroups(
+    (currentGroups) =>
+      currentGroups.includes(ageGroup)
+        ? currentGroups.filter(
+            (group) =>
+              group !== ageGroup
+          )
+        : [
+            ...currentGroups,
+            ageGroup,
+          ]
+  );
 
-  const toggleEventFilter = (
-    eventName: string
-  ) => {
-    setSelectedEventFilters(
-      (currentEvents) =>
-        currentEvents.includes(eventName)
-          ? currentEvents.filter(
-              (event) =>
-                event !== eventName
-            )
-          : [
-              ...currentEvents,
-              eventName,
-            ]
-    );
-  };
+  setCurrentPage(1);
+};
 
-  const clearFilters = () => {
-    setSelectedAgeGroups([]);
-    setSelectedEventFilters([]);
-    setAgeDropdownOpen(false);
-    setEventFilterDropdownOpen(false);
-  };
+const toggleEventFilter = (
+  eventName: string
+) => {
+  setSelectedEventFilters(
+    (currentEvents) =>
+      currentEvents.includes(eventName)
+        ? currentEvents.filter(
+            (event) =>
+              event !== eventName
+          )
+        : [
+            ...currentEvents,
+            eventName,
+          ]
+  );
 
-  const clearAll = () => {
-    setSearchTerm("");
-    setSelectedAgeGroups([]);
-    setSelectedEventFilters([]);
-    setAgeDropdownOpen(false);
-    setEventFilterDropdownOpen(false);
-  };
+  setCurrentPage(1);
+};
+const clearFilters = () => {
+  setSelectedAgeGroups([]);
+  setSelectedEventFilters([]);
+  setAgeDropdownOpen(false);
+  setEventFilterDropdownOpen(false);
+  setCurrentPage(1);
+};
+
+const clearAll = () => {
+  setSearchTerm("");
+  setSelectedAgeGroups([]);
+  setSelectedEventFilters([]);
+  setAgeDropdownOpen(false);
+  setEventFilterDropdownOpen(false);
+  setCurrentPage(1);
+};
 
   /* ==================================================
      ADD ATHLETE
@@ -678,11 +677,12 @@ function AthleteDirectoryPage() {
                 className="search-input"
                 placeholder="Search by athlete name..."
                 value={searchTerm}
-                onChange={(event) =>
-                  setSearchTerm(
-                    event.target.value
-                  )
-                }
+               onChange={(event) => {
+  setSearchTerm(
+    event.target.value
+  );
+  setCurrentPage(1);
+}}
               />
             </div>
 

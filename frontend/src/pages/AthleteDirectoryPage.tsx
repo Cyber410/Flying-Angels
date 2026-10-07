@@ -1,19 +1,47 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Header from "../components/header";
-import { EVENT_OPTIONS } from "../data/athleteOptions";
-import { useAthletes } from "../context/AthleteContext";
-
+import type { Athlete } from "../types/athlete";
+import {
+  createAthlete,
+  getAthleteById,
+  getAthletes,
+} from "../services/athleteService";
 import "./AthleteDirectoryPage.css";
+
+type NewEvent = {
+  eventName: string;
+};
+
+const EVENT_OPTIONS = [
+  "60M",
+  "100M",
+  "200M",
+  "400M",
+  "800M",
+  "1500M",
+  "60M HURDLES",
+  "80M HURDLES",
+  "100M HURDLES",
+  "110M HURDLES",
+  "LONG JUMP",
+  "HIGH JUMP",
+  "SHOT PUT",
+];
+
+const ATHLETES_PER_PAGE = 10;
 
 function calculateAge(dateOfBirth: string) {
   const today = new Date();
   const birthDate = new Date(`${dateOfBirth}T00:00:00`);
 
-  let age = today.getFullYear() - birthDate.getFullYear();
+  let age =
+    today.getFullYear() -
+    birthDate.getFullYear();
 
   const monthDifference =
-    today.getMonth() - birthDate.getMonth();
+    today.getMonth() -
+    birthDate.getMonth();
 
   if (
     monthDifference < 0 ||
@@ -26,7 +54,13 @@ function calculateAge(dateOfBirth: string) {
   return age;
 }
 
-function getAgeGroup(dateOfBirth: string) {
+function getAgeGroup(
+  dateOfBirth: string | null
+) {
+  if (!dateOfBirth) {
+    return "";
+  }
+
   const age = calculateAge(dateOfBirth);
 
   if (age >= 5 && age <= 14) {
@@ -47,9 +81,24 @@ function getAgeGroup(dateOfBirth: string) {
 function AthleteDirectoryPage() {
   const navigate = useNavigate();
 
-  const { athletes, addAthlete } = useAthletes();
+  const [athletes, setAthletes] =
+    useState<Athlete[]>([]);
 
-  const [searchTerm, setSearchTerm] = useState("");
+  const [isLoading, setIsLoading] =
+    useState(true);
+
+  const [loadError, setLoadError] =
+    useState("");
+
+  const [searchTerm, setSearchTerm] =
+    useState("");
+
+  const [currentPage, setCurrentPage] =
+    useState(1);
+
+  /* ==================================================
+     FILTERS
+     ================================================== */
 
   const [filtersOpen, setFiltersOpen] =
     useState(false);
@@ -57,14 +106,39 @@ function AthleteDirectoryPage() {
   const [ageDropdownOpen, setAgeDropdownOpen] =
     useState(false);
 
-  const [eventDropdownOpen, setEventDropdownOpen] =
-    useState(false);
+  const [
+    selectedAgeGroups,
+    setSelectedAgeGroups,
+  ] = useState<string[]>([]);
 
-  const [selectedAgeGroups, setSelectedAgeGroups] =
-    useState<string[]>([]);
+  const [
+    eventFilterDropdownOpen,
+    setEventFilterDropdownOpen,
+  ] = useState(false);
 
-  const [selectedEvents, setSelectedEvents] =
-    useState<string[]>([]);
+  const [
+    selectedEventFilters,
+    setSelectedEventFilters,
+  ] = useState<string[]>([]);
+
+  const [
+    athleteEventMap,
+    setAthleteEventMap,
+  ] = useState<Record<number, string[]>>({});
+
+  const [
+    eventsLoaded,
+    setEventsLoaded,
+  ] = useState(false);
+
+  const [
+    eventsLoading,
+    setEventsLoading,
+  ] = useState(false);
+
+  /* ==================================================
+     ADD ATHLETE
+     ================================================== */
 
   const [addModalOpen, setAddModalOpen] =
     useState(false);
@@ -75,125 +149,467 @@ function AthleteDirectoryPage() {
   const [newLastName, setNewLastName] =
     useState("");
 
-  const [newDateOfBirth, setNewDateOfBirth] =
+  const [
+    newDateOfBirth,
+    setNewDateOfBirth,
+  ] = useState("");
+
+  const [newGender, setNewGender] =
     useState("");
 
-  const [newHometown, setNewHometown] =
-    useState("");
+  const [
+    newFlyStatus,
+    setNewFlyStatus,
+  ] = useState("");
 
-  const [newTeam, setNewTeam] =
+  const [
+    newFlyaStatus,
+    setNewFlyaStatus,
+  ] = useState("");
+
+  const [newNote, setNewNote] =
     useState("");
 
   const [newEvents, setNewEvents] =
-    useState<string[]>([]);
+    useState<NewEvent[]>([]);
 
-  const toggleAgeGroup = (ageGroup: string) => {
-    setSelectedAgeGroups((currentGroups) =>
-      currentGroups.includes(ageGroup)
-        ? currentGroups.filter(
-            (group) => group !== ageGroup
-          )
-        : [...currentGroups, ageGroup]
+  const [
+    eventDropdownOpen,
+    setEventDropdownOpen,
+  ] = useState(false);
+
+  const [isAdding, setIsAdding] =
+    useState(false);
+
+  const [addError, setAddError] =
+    useState("");
+
+  /* ==================================================
+     DATE OF BIRTH OPTIONS
+     ================================================== */
+
+  const birthDateParts = newDateOfBirth
+    ? newDateOfBirth.split("-")
+    : ["", "", ""];
+
+  const birthYear =
+    birthDateParts[0] ?? "";
+
+  const birthMonth =
+    birthDateParts[1] ?? "";
+
+  const birthDay =
+    birthDateParts[2] ?? "";
+
+  const today = new Date();
+  const currentYear = today.getFullYear();
+
+  const youngestBirthYear =
+    currentYear - 5;
+
+  const birthYears = Array.from(
+    {
+      length:
+        youngestBirthYear - 1940 + 1,
+    },
+    (_, index) =>
+      youngestBirthYear - index
+  );
+
+  const months = [
+    { value: "01", label: "January" },
+    { value: "02", label: "February" },
+    { value: "03", label: "March" },
+    { value: "04", label: "April" },
+    { value: "05", label: "May" },
+    { value: "06", label: "June" },
+    { value: "07", label: "July" },
+    { value: "08", label: "August" },
+    { value: "09", label: "September" },
+    { value: "10", label: "October" },
+    { value: "11", label: "November" },
+    { value: "12", label: "December" },
+  ];
+
+  const updateBirthDate = (
+    year: string,
+    month: string,
+    day: string
+  ) => {
+    if (!year && !month && !day) {
+      setNewDateOfBirth("");
+      return;
+    }
+
+    setNewDateOfBirth(
+      `${year}-${month}-${day}`
     );
   };
 
-  const toggleEvent = (event: string) => {
-    setSelectedEvents((currentEvents) =>
-      currentEvents.includes(event)
-        ? currentEvents.filter(
-            (selectedEvent) =>
-              selectedEvent !== event
-          )
-        : [...currentEvents, event]
+  const isAtLeastFiveYearsOld = (
+    dateOfBirth: string
+  ) => {
+    const birthDate = new Date(
+      `${dateOfBirth}T00:00:00`
     );
+
+    const fifthBirthday = new Date(
+      birthDate.getFullYear() + 5,
+      birthDate.getMonth(),
+      birthDate.getDate()
+    );
+
+    return fifthBirthday <= new Date();
   };
 
-  const toggleNewAthleteEvent = (event: string) => {
+  /* ==================================================
+     ADD ATHLETE EVENT FUNCTIONS
+     ================================================== */
+
+  const toggleEvent = (
+    eventName: string
+  ) => {
+    setNewEvents((currentEvents) => {
+      const isSelected =
+        currentEvents.some(
+          (event) =>
+            event.eventName === eventName
+        );
+
+      if (isSelected) {
+        return currentEvents.filter(
+          (event) =>
+            event.eventName !== eventName
+        );
+      }
+
+      return [
+        ...currentEvents,
+        {
+          eventName,
+        },
+      ];
+    });
+  };
+
+  const removeEvent = (
+    eventName: string
+  ) => {
     setNewEvents((currentEvents) =>
-      currentEvents.includes(event)
-        ? currentEvents.filter(
-            (selectedEvent) =>
-              selectedEvent !== event
-          )
-        : [...currentEvents, event]
+      currentEvents.filter(
+        (event) =>
+          event.eventName !== eventName
+      )
+    );
+  };
+
+  /* ==================================================
+     LOAD ATHLETES
+     ================================================== */
+
+  useEffect(() => {
+    async function loadAthletes() {
+      try {
+        setIsLoading(true);
+        setLoadError("");
+
+        const data =
+          await getAthletes();
+
+        setAthletes(data);
+      } catch (error) {
+        console.error(error);
+
+        setLoadError(
+          "Athlete information could not be loaded."
+        );
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    loadAthletes();
+  }, []);
+
+  /* ==================================================
+     RESET PAGINATION
+     ================================================== */
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [
+    searchTerm,
+    selectedAgeGroups,
+    selectedEventFilters,
+  ]);
+
+  /* ==================================================
+     LOAD EVENTS FOR FILTERING
+     The directory API does not include event data.
+     We therefore load each athlete's existing profile
+     only when the Filters panel is first opened.
+     ================================================== */
+
+  const loadAthleteEvents =
+    async () => {
+      if (
+        eventsLoaded ||
+        eventsLoading ||
+        athletes.length === 0
+      ) {
+        return;
+      }
+
+      try {
+        setEventsLoading(true);
+
+        const profiles =
+          await Promise.all(
+            athletes.map((athlete) =>
+              getAthleteById(athlete.id)
+            )
+          );
+
+        const eventMap: Record<
+          number,
+          string[]
+        > = {};
+
+        profiles.forEach((profile) => {
+          eventMap[profile.id] = (
+            profile.events ?? []
+          ).map((event) =>
+            event.categoryName
+              .trim()
+              .toUpperCase()
+          );
+        });
+
+        setAthleteEventMap(eventMap);
+        setEventsLoaded(true);
+      } catch (error) {
+        console.error(
+          "Unable to load athlete events for filtering.",
+          error
+        );
+      } finally {
+        setEventsLoading(false);
+      }
+    };
+
+  /* ==================================================
+     FILTER FUNCTIONS
+     ================================================== */
+
+  const toggleAgeGroup = (
+    ageGroup: string
+  ) => {
+    setSelectedAgeGroups(
+      (currentGroups) =>
+        currentGroups.includes(ageGroup)
+          ? currentGroups.filter(
+              (group) =>
+                group !== ageGroup
+            )
+          : [
+              ...currentGroups,
+              ageGroup,
+            ]
+    );
+  };
+
+  const toggleEventFilter = (
+    eventName: string
+  ) => {
+    setSelectedEventFilters(
+      (currentEvents) =>
+        currentEvents.includes(eventName)
+          ? currentEvents.filter(
+              (event) =>
+                event !== eventName
+            )
+          : [
+              ...currentEvents,
+              eventName,
+            ]
     );
   };
 
   const clearFilters = () => {
     setSelectedAgeGroups([]);
-    setSelectedEvents([]);
+    setSelectedEventFilters([]);
     setAgeDropdownOpen(false);
-    setEventDropdownOpen(false);
+    setEventFilterDropdownOpen(false);
   };
 
   const clearAll = () => {
     setSearchTerm("");
     setSelectedAgeGroups([]);
-    setSelectedEvents([]);
+    setSelectedEventFilters([]);
     setAgeDropdownOpen(false);
-    setEventDropdownOpen(false);
+    setEventFilterDropdownOpen(false);
   };
+
+  /* ==================================================
+     ADD ATHLETE
+     ================================================== */
 
   const resetAddForm = () => {
     setNewFirstName("");
     setNewLastName("");
     setNewDateOfBirth("");
-    setNewHometown("");
-    setNewTeam("");
+    setNewGender("");
+    setNewFlyStatus("");
+    setNewFlyaStatus("");
+    setNewNote("");
     setNewEvents([]);
+    setEventDropdownOpen(false);
+    setAddError("");
   };
 
   const closeAddModal = () => {
+    if (isAdding) {
+      return;
+    }
+
     setAddModalOpen(false);
     resetAddForm();
   };
 
-  const handleAddAthlete = (
+  const handleAddAthlete = async (
     event: React.FormEvent<HTMLFormElement>
   ) => {
     event.preventDefault();
 
     if (
       !newFirstName.trim() ||
-      !newLastName.trim() ||
-      !newDateOfBirth
+      !newLastName.trim()
     ) {
       return;
     }
 
-    addAthlete({
-      firstName: newFirstName.trim(),
-      lastName: newLastName.trim(),
-      dateOfBirth: newDateOfBirth,
-      hometown: newHometown.trim(),
-      team: newTeam.trim(),
-      events: newEvents,
-    });
+    if (
+      birthYear &&
+      birthMonth &&
+      birthDay &&
+      !isAtLeastFiveYearsOld(
+        newDateOfBirth
+      )
+    ) {
+      setAddError(
+        "Athletes must be at least 5 years old."
+      );
+      return;
+    }
 
-    closeAddModal();
+    try {
+      setIsAdding(true);
+      setAddError("");
+
+      const createdAthlete =
+        await createAthlete({
+          firstName:
+            newFirstName.trim(),
+          lastName:
+            newLastName.trim(),
+          dateOfBirth:
+            birthYear &&
+            birthMonth &&
+            birthDay
+              ? newDateOfBirth
+              : null,
+          gender:
+            newGender.trim(),
+          note:
+            newNote.trim(),
+          flyStatus:
+            newFlyStatus.trim(),
+          flyaStatus:
+            newFlyaStatus.trim(),
+          events: newEvents.map((event) => ({
+            eventName: event.eventName,
+            result: "",
+          })),
+        });
+
+      setAthletes(
+        (currentAthletes) => [
+          ...currentAthletes,
+          createdAthlete,
+        ]
+      );
+
+      /*
+       * The event-filter cache was created before
+       * this athlete existed, so force it to reload
+       * next time the directory filters need it.
+       */
+      setEventsLoaded(false);
+
+      setAddModalOpen(false);
+      resetAddForm();
+
+      navigate(
+        `/athletes/${createdAthlete.id}`
+      );
+    } catch (error) {
+      console.error(error);
+
+      setAddError(
+        "The athlete could not be added. Please check the information and try again."
+      );
+    } finally {
+      setIsAdding(false);
+    }
   };
 
-  const filteredAthletes = athletes.filter(
-    (athlete) => {
+  /* ==================================================
+     FILTER ATHLETES
+     ================================================== */
+
+  const filteredAthletes =
+    athletes.filter((athlete) => {
       const fullName =
         `${athlete.firstName} ${athlete.lastName}`.toLowerCase();
 
-      const matchesSearch = fullName.includes(
-        searchTerm.trim().toLowerCase()
-      );
+      const matchesSearch =
+        fullName.includes(
+          searchTerm
+            .trim()
+            .toLowerCase()
+        );
 
-      const athleteAgeGroup = getAgeGroup(
-        athlete.dateOfBirth
-      );
+      const athleteAgeGroup =
+        getAgeGroup(
+          athlete.dateOfBirth
+        );
 
       const matchesAgeGroup =
-        selectedAgeGroups.length === 0 ||
-        selectedAgeGroups.includes(athleteAgeGroup);
+        selectedAgeGroups.length ===
+          0 ||
+        selectedAgeGroups.includes(
+          athleteAgeGroup
+        );
 
+      const athleteEvents =
+        athleteEventMap[
+          athlete.id
+        ] ?? [];
+
+      /*
+       * Multiple selected events use OR logic.
+       * Example:
+       * 100M + 200M shows an athlete who
+       * participates in either event.
+       */
       const matchesEvent =
-        selectedEvents.length === 0 ||
-        selectedEvents.some((event) =>
-          athlete.events.includes(event)
+        selectedEventFilters.length ===
+          0 ||
+        selectedEventFilters.some(
+          (selectedEvent) =>
+            athleteEvents.includes(
+              selectedEvent.toUpperCase()
+            )
         );
 
       return (
@@ -201,17 +617,38 @@ function AthleteDirectoryPage() {
         matchesAgeGroup &&
         matchesEvent
       );
-    }
+    });
+
+  /* ==================================================
+     PAGINATION
+     ================================================== */
+
+  const totalPages = Math.ceil(
+    filteredAthletes.length /
+      ATHLETES_PER_PAGE
   );
+
+  const startIndex =
+    (currentPage - 1) *
+    ATHLETES_PER_PAGE;
+
+  const endIndex =
+    startIndex + ATHLETES_PER_PAGE;
+
+  const paginatedAthletes =
+    filteredAthletes.slice(
+      startIndex,
+      endIndex
+    );
 
   const hasActiveFilters =
     searchTerm.trim() !== "" ||
     selectedAgeGroups.length > 0 ||
-    selectedEvents.length > 0;
+    selectedEventFilters.length > 0;
 
   const activeFilterCount =
     selectedAgeGroups.length +
-    selectedEvents.length;
+    selectedEventFilters.length;
 
   return (
     <div className="directory-page">
@@ -224,15 +661,17 @@ function AthleteDirectoryPage() {
           </p>
 
           <p className="page-description">
-            Search, edit and update
-            Flying Angels athlete information.
+            Search, edit and update Flying Angels athlete
+            information.
           </p>
         </section>
 
         <section className="directory-panel">
           <div className="directory-toolbar">
             <div className="search-wrapper">
-              <span className="search-icon">⌕</span>
+              <span className="search-icon">
+                ⌕
+              </span>
 
               <input
                 type="text"
@@ -240,7 +679,9 @@ function AthleteDirectoryPage() {
                 placeholder="Search by athlete name..."
                 value={searchTerm}
                 onChange={(event) =>
-                  setSearchTerm(event.target.value)
+                  setSearchTerm(
+                    event.target.value
+                  )
                 }
               />
             </div>
@@ -248,23 +689,37 @@ function AthleteDirectoryPage() {
             <button
               className="filter-button"
               type="button"
-              onClick={() =>
-                setFiltersOpen(!filtersOpen)
-              }
+              onClick={() => {
+                const willOpen =
+                  !filtersOpen;
+
+                setFiltersOpen(
+                  willOpen
+                );
+
+                if (willOpen) {
+                  void loadAthleteEvents();
+                }
+              }}
             >
               <span>
                 Filters
 
-                {activeFilterCount > 0 && (
+                {activeFilterCount >
+                  0 && (
                   <span className="filter-count">
-                    {activeFilterCount}
+                    {
+                      activeFilterCount
+                    }
                   </span>
                 )}
               </span>
 
               <span
                 className={`filter-arrow ${
-                  filtersOpen ? "open" : ""
+                  filtersOpen
+                    ? "open"
+                    : ""
                 }`}
               ></span>
             </button>
@@ -282,6 +737,8 @@ function AthleteDirectoryPage() {
 
           {filtersOpen && (
             <div className="filter-panel">
+              {/* AGE GROUP FILTER */}
+
               <div className="multi-select">
                 <span className="filter-label">
                   Age Group
@@ -295,18 +752,27 @@ function AthleteDirectoryPage() {
                       !ageDropdownOpen
                     );
 
-                    setEventDropdownOpen(false);
+                    setEventFilterDropdownOpen(
+                      false
+                    );
                   }}
                 >
                   <span>
-                    {selectedAgeGroups.length === 0
+                    {selectedAgeGroups.length ===
+                    0
                       ? "All age groups"
-                      : selectedAgeGroups.join(", ")}
+                      : selectedAgeGroups.join(
+                          ", "
+                        )}
                   </span>
 
-                  <span className="dropdown-arrow">
-                    {ageDropdownOpen ? "⌃" : "⌄"}
-                  </span>
+                  <span
+                    className={`event-select-arrow ${
+                      ageDropdownOpen
+                        ? "open"
+                        : ""
+                    }`}
+                  ></span>
                 </button>
 
                 {ageDropdownOpen && (
@@ -315,107 +781,153 @@ function AthleteDirectoryPage() {
                       "5-14",
                       "15-18",
                       "18+",
-                    ].map((ageGroup) => {
-                      const isSelected =
-                        selectedAgeGroups.includes(
-                          ageGroup
+                    ].map(
+                      (ageGroup) => {
+                        const isSelected =
+                          selectedAgeGroups.includes(
+                            ageGroup
+                          );
+
+                        return (
+                          <button
+                            key={
+                              ageGroup
+                            }
+                            type="button"
+                            className={`multi-select-option ${
+                              isSelected
+                                ? "selected"
+                                : ""
+                            }`}
+                            onClick={() =>
+                              toggleAgeGroup(
+                                ageGroup
+                              )
+                            }
+                          >
+                            <span>
+                              {
+                                ageGroup
+                              }
+                            </span>
+
+                            <span className="option-check">
+                              {isSelected
+                                ? "✓"
+                                : ""}
+                            </span>
+                          </button>
                         );
-
-                      return (
-                        <button
-                          key={ageGroup}
-                          type="button"
-                          className={`multi-select-option ${
-                            isSelected
-                              ? "selected"
-                              : ""
-                          }`}
-                          onClick={() =>
-                            toggleAgeGroup(ageGroup)
-                          }
-                        >
-                          <span>{ageGroup}</span>
-
-                          <span className="option-check">
-                            {isSelected ? "✓" : ""}
-                          </span>
-                        </button>
-                      );
-                    })}
+                      }
+                    )}
                   </div>
                 )}
               </div>
 
+              {/* EVENT FILTER */}
+
               <div className="multi-select">
                 <span className="filter-label">
-                  Event
+                  Events
                 </span>
 
                 <button
                   className="multi-select-button"
                   type="button"
                   onClick={() => {
-                    setEventDropdownOpen(
-                      !eventDropdownOpen
+                    setEventFilterDropdownOpen(
+                      !eventFilterDropdownOpen
                     );
 
-                    setAgeDropdownOpen(false);
+                    setAgeDropdownOpen(
+                      false
+                    );
                   }}
+                  disabled={
+                    eventsLoading
+                  }
                 >
                   <span>
-                    {selectedEvents.length === 0
-                      ? "All events"
-                      : selectedEvents.length === 1
-                        ? selectedEvents[0]
-                        : `${selectedEvents.length} events selected`}
+                    {eventsLoading
+                      ? "Loading events..."
+                      : selectedEventFilters.length ===
+                          0
+                        ? "All events"
+                        : `${selectedEventFilters.length} ${
+                            selectedEventFilters.length ===
+                            1
+                              ? "event"
+                              : "events"
+                          } selected`}
                   </span>
 
-                  <span className="dropdown-arrow">
-                    {eventDropdownOpen
-                      ? "⌃"
-                      : "⌄"}
-                  </span>
+                  <span
+                    className={`event-select-arrow ${
+                      eventFilterDropdownOpen
+                        ? "open"
+                        : ""
+                    }`}
+                  ></span>
                 </button>
 
-                {eventDropdownOpen && (
-                  <div className="multi-select-menu event-select-menu">
-                    {EVENT_OPTIONS.map((event) => {
-                      const isSelected =
-                        selectedEvents.includes(
-                          event
-                        );
+                {eventFilterDropdownOpen &&
+                  !eventsLoading && (
+                    <div className="multi-select-menu">
+                      {EVENT_OPTIONS.map(
+                        (
+                          eventName
+                        ) => {
+                          const isSelected =
+                            selectedEventFilters.includes(
+                              eventName
+                            );
 
-                      return (
-                        <button
-                          key={event}
-                          type="button"
-                          className={`multi-select-option ${
-                            isSelected
-                              ? "selected"
-                              : ""
-                          }`}
-                          onClick={() =>
-                            toggleEvent(event)
-                          }
-                        >
-                          <span>{event}</span>
+                          return (
+                            <button
+                              key={
+                                eventName
+                              }
+                              type="button"
+                              className={`multi-select-option ${
+                                isSelected
+                                  ? "selected"
+                                  : ""
+                              }`}
+                              onClick={() =>
+                                toggleEventFilter(
+                                  eventName
+                                )
+                              }
+                            >
+                              <span>
+                                {
+                                  eventName
+                                }
+                              </span>
 
-                          <span className="option-check">
-                            {isSelected ? "✓" : ""}
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
+                              <span className="option-check">
+                                {isSelected
+                                  ? "✓"
+                                  : ""}
+                              </span>
+                            </button>
+                          );
+                        }
+                      )}
+                    </div>
+                  )}
               </div>
 
-              {(selectedAgeGroups.length > 0 ||
-                selectedEvents.length > 0) && (
+              {(selectedAgeGroups.length >
+                0 ||
+                selectedEventFilters.length >
+                  0) && (
                 <button
                   className="clear-filters-button"
                   type="button"
-                  onClick={clearFilters}
+                  onClick={
+                    clearFilters
+                  }
                 >
                   Clear Filters
                 </button>
@@ -428,49 +940,62 @@ function AthleteDirectoryPage() {
 
             <div className="results-summary">
               <span>
-                {filteredAthletes.length}{" "}
-                {filteredAthletes.length === 1
+                {
+                  filteredAthletes.length
+                }{" "}
+                {filteredAthletes.length ===
+                1
                   ? "athlete"
                   : "athletes"}{" "}
                 found
               </span>
 
-              {searchTerm.trim() !== "" && (
+              {searchTerm.trim() !==
+                "" && (
                 <>
                   <span className="summary-divider">
                     •
                   </span>
 
                   <span>
-                    Search: "{searchTerm}"
+                    Search: "
+                    {searchTerm}"
                   </span>
                 </>
               )}
 
-              {selectedAgeGroups.length > 0 && (
+              {selectedAgeGroups.length >
+                0 && (
                 <>
                   <span className="summary-divider">
                     •
                   </span>
 
                   <span>
-                    {selectedAgeGroups.length}{" "}
-                    {selectedAgeGroups.length === 1
+                    {
+                      selectedAgeGroups.length
+                    }{" "}
+                    {selectedAgeGroups.length ===
+                    1
                       ? "age group"
                       : "age groups"}
                   </span>
                 </>
               )}
 
-              {selectedEvents.length > 0 && (
+              {selectedEventFilters.length >
+                0 && (
                 <>
                   <span className="summary-divider">
                     •
                   </span>
 
                   <span>
-                    {selectedEvents.length}{" "}
-                    {selectedEvents.length === 1
+                    {
+                      selectedEventFilters.length
+                    }{" "}
+                    {selectedEventFilters.length ===
+                    1
                       ? "event"
                       : "events"}
                   </span>
@@ -490,85 +1015,167 @@ function AthleteDirectoryPage() {
           </div>
 
           <div className="athlete-list">
-            <div className="list-heading">
-              <span>Athlete</span>
-              <span>Events</span>
-              <span></span>
-            </div>
-
-            {filteredAthletes.map((athlete) => (
-              <button
-                className="athlete-row"
-                type="button"
-                key={athlete.id}
-                onClick={() =>
-                  navigate(
-                    `/athletes/${athlete.id}`
-                  )
-                }
-              >
-                <div className="athlete-identity">
-                  <div className="athlete-initials">
-                    {athlete.firstName.charAt(0)}
-                    {athlete.lastName.charAt(0)}
-                  </div>
-
-                  <div>
-                    <span className="athlete-name">
-                      {athlete.firstName}{" "}
-                      {athlete.lastName}
-                    </span>
-
-                    <span className="athlete-id">
-                      Athlete #{athlete.id}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="event-list">
-                  {athlete.events
-                    .slice(0, 2)
-                    .map((event) => (
-                      <span
-                        className="event-tag"
-                        key={event}
-                      >
-                        {event}
-                      </span>
-                    ))}
-
-                  {athlete.events.length > 2 && (
-                    <span className="more-events">
-                      +
-                      {athlete.events.length - 2}
-                    </span>
-                  )}
-                </div>
-
-                <span className="row-arrow">
-                  ›
-                </span>
-              </button>
-            ))}
-
-            {filteredAthletes.length === 0 && (
+            {isLoading ? (
               <div className="no-results">
-                <p>No athletes found.</p>
+                <p>
+                  Loading athletes...
+                </p>
 
                 <span>
-                  Try changing your search or
-                  filters.
+                  Athlete information is
+                  being retrieved.
                 </span>
               </div>
+            ) : loadError ? (
+              <div className="no-results">
+                <p>
+                  Unable to load
+                  athletes.
+                </p>
+
+                <span>
+                  {loadError}
+                </span>
+              </div>
+            ) : filteredAthletes.length ===
+              0 ? (
+              <div className="no-results">
+                <p>
+                  No athletes found.
+                </p>
+
+                <span>
+                  Try changing your
+                  search or filters.
+                </span>
+              </div>
+            ) : (
+              paginatedAthletes.map(
+                (athlete) => (
+                  <button
+                    className="athlete-row"
+                    type="button"
+                    key={athlete.id}
+                    onClick={() =>
+                      navigate(
+                        `/athletes/${athlete.id}`
+                      )
+                    }
+                  >
+                    <div className="athlete-identity">
+                      <div className="athlete-initials">
+                        {athlete.firstName.charAt(
+                          0
+                        )}
+                        {athlete.lastName.charAt(
+                          0
+                        )}
+                      </div>
+
+                      <div>
+                        <span className="athlete-name">
+                          {
+                            athlete.firstName
+                          }{" "}
+                          {
+                            athlete.lastName
+                          }
+                        </span>
+
+                        <span className="athlete-id">
+                          Athlete #
+                          {athlete.id}
+                        </span>
+                      </div>
+                    </div>
+
+                    <span className="row-arrow">
+                      ›
+                    </span>
+                  </button>
+                )
+              )
             )}
           </div>
+
+          {!isLoading &&
+            !loadError &&
+            filteredAthletes.length > 0 && (
+              <div className="pagination">
+                <span className="pagination-summary">
+                  Showing{" "}
+                  {startIndex + 1}–
+                  {Math.min(
+                    endIndex,
+                    filteredAthletes.length
+                  )}{" "}
+                  of{" "}
+                  {filteredAthletes.length}{" "}
+                  athletes
+                </span>
+
+                {totalPages > 1 && (
+                  <div className="pagination-controls">
+                    <button
+                      className="pagination-button"
+                      type="button"
+                      onClick={() =>
+                        setCurrentPage(
+                          (page) =>
+                            Math.max(
+                              1,
+                              page - 1
+                            )
+                        )
+                      }
+                      disabled={
+                        currentPage === 1
+                      }
+                    >
+                      ← Previous
+                    </button>
+
+                    <span className="pagination-page">
+                      Page {currentPage} of{" "}
+                      {totalPages}
+                    </span>
+
+                    <button
+                      className="pagination-button"
+                      type="button"
+                      onClick={() =>
+                        setCurrentPage(
+                          (page) =>
+                            Math.min(
+                              totalPages,
+                              page + 1
+                            )
+                        )
+                      }
+                      disabled={
+                        currentPage ===
+                        totalPages
+                      }
+                    >
+                      Next →
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
         </section>
       </main>
+
+      {/* ==================================================
+          ADD ATHLETE MODAL
+          ================================================== */}
 
       {addModalOpen && (
         <div
           className="modal-overlay"
-          onMouseDown={closeAddModal}
+          onMouseDown={
+            closeAddModal
+          }
         >
           <div
             className="athlete-modal"
@@ -582,14 +1189,19 @@ function AthleteDirectoryPage() {
                   ATHLETE MANAGEMENT
                 </p>
 
-                <h2>Add Athlete</h2>
+                <h2>
+                  Add Athlete
+                </h2>
               </div>
 
               <button
                 className="modal-close"
                 type="button"
-                onClick={closeAddModal}
+                onClick={
+                  closeAddModal
+                }
                 aria-label="Close"
+                disabled={isAdding}
               >
                 ×
               </button>
@@ -597,7 +1209,9 @@ function AthleteDirectoryPage() {
 
             <form
               className="athlete-form"
-              onSubmit={handleAddAthlete}
+              onSubmit={
+                handleAddAthlete
+              }
             >
               <div className="form-grid">
                 <div className="form-field">
@@ -608,10 +1222,16 @@ function AthleteDirectoryPage() {
                   <input
                     id="first-name"
                     type="text"
-                    value={newFirstName}
-                    onChange={(event) =>
+                    value={
+                      newFirstName
+                    }
+                    maxLength={100}
+                    onChange={(
+                      event
+                    ) =>
                       setNewFirstName(
-                        event.target.value
+                        event.target
+                          .value
                       )
                     }
                     required
@@ -626,110 +1246,426 @@ function AthleteDirectoryPage() {
                   <input
                     id="last-name"
                     type="text"
-                    value={newLastName}
-                    onChange={(event) =>
+                    value={
+                      newLastName
+                    }
+                    maxLength={100}
+                    onChange={(
+                      event
+                    ) =>
                       setNewLastName(
-                        event.target.value
+                        event.target
+                          .value
                       )
                     }
                     required
                   />
                 </div>
 
-                <div className="form-field">
-                  <label htmlFor="date-of-birth">
-                    Date of Birth *
+                <div className="form-field form-field-wide">
+                  <label>
+                    Date of Birth
                   </label>
 
-                  <input
-                    id="date-of-birth"
-                    type="date"
-                    value={newDateOfBirth}
-                    onChange={(event) =>
-                      setNewDateOfBirth(
-                        event.target.value
-                      )
-                    }
-                    required
-                  />
+                  <div className="dob-fields">
+                    <select
+                      aria-label="Birth month"
+                      value={
+                        birthMonth
+                      }
+                      onChange={(
+                        event
+                      ) =>
+                        updateBirthDate(
+                          birthYear,
+                          event.target
+                            .value,
+                          birthDay
+                        )
+                      }
+                    >
+                      <option value="">
+                        Month
+                      </option>
+
+                      {months.map(
+                        (month) => (
+                          <option
+                            key={
+                              month.value
+                            }
+                            value={
+                              month.value
+                            }
+                          >
+                            {
+                              month.label
+                            }
+                          </option>
+                        )
+                      )}
+                    </select>
+
+                    <select
+                      aria-label="Birth day"
+                      value={birthDay}
+                      onChange={(
+                        event
+                      ) =>
+                        updateBirthDate(
+                          birthYear,
+                          birthMonth,
+                          event.target
+                            .value
+                        )
+                      }
+                    >
+                      <option value="">
+                        Day
+                      </option>
+
+                      {Array.from(
+                        {
+                          length: 31,
+                        },
+                        (
+                          _,
+                          index
+                        ) => {
+                          const day =
+                            String(
+                              index +
+                                1
+                            ).padStart(
+                              2,
+                              "0"
+                            );
+
+                          return (
+                            <option
+                              key={
+                                day
+                              }
+                              value={
+                                day
+                              }
+                            >
+                              {index +
+                                1}
+                            </option>
+                          );
+                        }
+                      )}
+                    </select>
+
+                    <select
+                      aria-label="Birth year"
+                      value={
+                        birthYear
+                      }
+                      onChange={(
+                        event
+                      ) =>
+                        updateBirthDate(
+                          event.target
+                            .value,
+                          birthMonth,
+                          birthDay
+                        )
+                      }
+                    >
+                      <option value="">
+                        Year
+                      </option>
+
+                      {birthYears.map(
+                        (year) => (
+                          <option
+                            key={
+                              year
+                            }
+                            value={
+                              year
+                            }
+                          >
+                            {year}
+                          </option>
+                        )
+                      )}
+                    </select>
+                  </div>
                 </div>
 
                 <div className="form-field">
-                  <label htmlFor="hometown">
-                    Hometown
+                  <label htmlFor="gender">
+                    Gender
+                  </label>
+
+                  <select
+                    id="gender"
+                    value={newGender}
+                    onChange={(
+                      event
+                    ) =>
+                      setNewGender(
+                        event.target
+                          .value
+                      )
+                    }
+                  >
+                    <option value="">
+                      Select gender
+                    </option>
+
+                    <option value="Male">
+                      Male
+                    </option>
+
+                    <option value="Female">
+                      Female
+                    </option>
+
+                    <option value="Rather not say">
+                      Rather not say
+                    </option>
+                  </select>
+                </div>
+
+                <div className="form-field">
+                  <label htmlFor="fly-status">
+                    FLY Status
                   </label>
 
                   <input
-                    id="hometown"
+                    id="fly-status"
                     type="text"
-                    value={newHometown}
-                    onChange={(event) =>
-                      setNewHometown(
-                        event.target.value
+                    value={
+                      newFlyStatus
+                    }
+                    maxLength={100}
+                    onChange={(
+                      event
+                    ) =>
+                      setNewFlyStatus(
+                        event.target
+                          .value
+                      )
+                    }
+                  />
+                </div>
+
+                <div className="form-field">
+                  <label htmlFor="flya-status">
+                    FLYA Status
+                  </label>
+
+                  <input
+                    id="flya-status"
+                    type="text"
+                    value={
+                      newFlyaStatus
+                    }
+                    maxLength={100}
+                    onChange={(
+                      event
+                    ) =>
+                      setNewFlyaStatus(
+                        event.target
+                          .value
                       )
                     }
                   />
                 </div>
 
                 <div className="form-field form-field-wide">
-                  <label htmlFor="team">
-                    Team
+                  <label htmlFor="note">
+                    Note
                   </label>
 
-                  <input
-                    id="team"
-                    type="text"
-                    value={newTeam}
-                    onChange={(event) =>
-                      setNewTeam(
-                        event.target.value
+                  <textarea
+                    id="note"
+                    value={newNote}
+                    maxLength={500}
+                    onChange={(
+                      event
+                    ) =>
+                      setNewNote(
+                        event.target
+                          .value
                       )
                     }
                   />
                 </div>
               </div>
 
-              <div className="form-events">
-                <span className="form-label">
-                  Events
-                </span>
+              {/* ======================================
+                  EVENTS
+                  ====================================== */}
 
-                <div className="form-event-options">
-                  {EVENT_OPTIONS.map((event) => {
-                    const isSelected =
-                      newEvents.includes(event);
+              <div className="add-events-section">
+                <div className="add-events-heading">
+                  <span className="add-events-title">
+                    Events
+                  </span>
 
-                    return (
-                      <button
-                        key={event}
-                        type="button"
-                        className={`form-event-option ${
-                          isSelected
-                            ? "selected"
-                            : ""
-                        }`}
-                        onClick={() =>
-                          toggleNewAthleteEvent(
-                            event
-                          )
-                        }
-                      >
-                        {event}
-
-                        {isSelected && (
-                          <span>✓</span>
-                        )}
-                      </button>
-                    );
-                  })}
+                  <span className="add-events-description">
+                    Select the athlete's events. Scores are provided by the system.
+                  </span>
                 </div>
+
+                <div className="event-multi-select">
+                  <button
+                    className="event-multi-select-button"
+                    type="button"
+                    onClick={() =>
+                      setEventDropdownOpen(
+                        !eventDropdownOpen
+                      )
+                    }
+                    disabled={
+                      isAdding
+                    }
+                  >
+                    <span>
+                      {newEvents.length ===
+                      0
+                        ? "Select events"
+                        : `${newEvents.length} ${
+                            newEvents.length ===
+                            1
+                              ? "event"
+                              : "events"
+                          } selected`}
+                    </span>
+
+                    <span className="dropdown-arrow">
+                      {eventDropdownOpen
+                        ? "⌃"
+                        : "⌄"}
+                    </span>
+                  </button>
+
+                  {eventDropdownOpen && (
+                    <div className="event-multi-select-menu">
+                      {EVENT_OPTIONS.map(
+                        (
+                          eventName
+                        ) => {
+                          const isSelected =
+                            newEvents.some(
+                              (
+                                event
+                              ) =>
+                                event.eventName ===
+                                eventName
+                            );
+
+                          return (
+                            <button
+                              key={
+                                eventName
+                              }
+                              type="button"
+                              className={`event-multi-select-option ${
+                                isSelected
+                                  ? "selected"
+                                  : ""
+                              }`}
+                              onClick={() =>
+                                toggleEvent(
+                                  eventName
+                                )
+                              }
+                            >
+                              <span>
+                                {
+                                  eventName
+                                }
+                              </span>
+
+                              <span className="option-check">
+                                {isSelected
+                                  ? "✓"
+                                  : ""}
+                              </span>
+                            </button>
+                          );
+                        }
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {newEvents.length >
+                  0 && (
+                  <div className="selected-events">
+                    <div className="selected-events-header">
+                      <span>
+                        Event
+                      </span>
+
+                      <span>
+                        Score
+                      </span>
+
+                      <span></span>
+                    </div>
+
+                    {newEvents.map(
+                      (event) => (
+                        <div
+                          className="selected-event-row"
+                          key={
+                            event.eventName
+                          }
+                        >
+                          <span className="selected-event-name">
+                            {
+                              event.eventName
+                            }
+                          </span>
+
+                          <span className="selected-event-score">
+                            Not available
+                          </span>
+
+                          <button
+                            className="remove-event-button"
+                            type="button"
+                            onClick={() =>
+                              removeEvent(
+                                event.eventName
+                              )
+                            }
+                            disabled={
+                              isAdding
+                            }
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      )
+                    )}
+                  </div>
+                )}
               </div>
+
+              {addError && (
+                <div className="form-error">
+                  {addError}
+                </div>
+              )}
 
               <div className="modal-actions">
                 <button
                   className="cancel-button"
                   type="button"
-                  onClick={closeAddModal}
+                  onClick={
+                    closeAddModal
+                  }
+                  disabled={
+                    isAdding
+                  }
                 >
                   Cancel
                 </button>
@@ -737,8 +1673,13 @@ function AthleteDirectoryPage() {
                 <button
                   className="save-button"
                   type="submit"
+                  disabled={
+                    isAdding
+                  }
                 >
-                  Add Athlete
+                  {isAdding
+                    ? "Adding..."
+                    : "Add Athlete"}
                 </button>
               </div>
             </form>

@@ -1,0 +1,662 @@
+* {
+  box-sizing: border-box;
+}
+
+.profile-page {
+  min-height: 100vh;
+
+  background: #f1f2f2;
+  color: #3d4043;
+
+  font-size: 14px;
+  font-weight: 400;
+}
+/* ==================================================
+   HEADER
+   ================================================== */
+
+
+/* ==================================================
+   PROFILE HEADING ACTIONS
+   ================================================== */
+
+.profile-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+
+  gap: 20px;
+}
+
+.edit-athlete-button,
+.profile-save-button {
+  height: 38px;
+
+  padding: 0 14px;
+
+  color: #ffffff;
+  background: #cf7735;
+
+  border: 1px solid #cf7735;
+  border-radius: 5px;
+
+  cursor: pointer;
+
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.edit-athlete-button:hover,
+.profile-save-button:hover {
+  background: #b9672c;
+  border-color: #b9672c;
+}
+
+.edit-actions {
+  display: flex;
+  align-items: center;
+
+  gap: 8px;
+}
+
+.profile-cancel-button {
+  height: 38px;
+
+  padding: 0 14px;
+
+  color: #666a6e;
+  background: transparent;
+
+  border: 1px solid #c9cbcc;
+  border-radius: 5px;
+
+  cursor: pointer;
+
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.profile-cancel-button:hover {
+  background: #f1f1f0;
+}
+
+/* ==================================================
+   EDITABLE PROFILE FIELDS
+   ================================================== */
+
+.profile-input {
+  width: 100%;
+  height: 38px;
+
+  padding: 0 10px;
+
+  color: #3d4043;
+  background: #ffffff;
+
+    border: 1px solid #c3c6c8;
+  border-radius: 5px;
+
+  outline: none;
+
+  font-size: 13px;
+  font-weight: 400;
+}
+
+.profile-input:focus {
+   border-color: #cf7735;
+}
+
+.profile-team-detail {
+  grid-column: span 2;
+}
+
+/* ==================================================
+   EDIT EVENTS
+   ================================================== */
+
+.edit-event-area {
+  padding: 18px 24px;
+
+  display: flex;
+  align-items: flex-start;
+  flex-wrap: wrap;
+
+  gap: 6px;
+}
+
+.edit-event-option {
+  min-height: 31px;
+
+  padding: 5px 8px;
+
+  display: flex;
+  align-items: center;
+
+  gap: 6px;
+
+  color: #666a6e;
+  background: #fafaf9;
+
+  border: 1px solid #d4d6d7;
+  border-radius: 4px;
+
+  cursor: pointer;
+
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.edit-event-option:hover {
+  border-color: #c3b09f;
+}
+
+.edit-event-option.selected {
+  color: #80502e;
+  background: #f3e8df;
+
+  border-color: #dfc5b1;
+}
+
+.edit-event-option.selected span {
+  color: #b9672c;
+}
+
+.empty-events {
+  color: #85898d;
+
+  font-size: 12px;
+  font-weight: 400;
+}
+
+/* ==================================================
+   DELETE
+   ================================================== */
+
+.danger-zone {
+  margin-top: 24px;
+  padding: 16px 18px;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 20px;
+
+  background: #faf8f7;
+
+  border: 1px solid #ddd5d1;
+  border-radius: 6px;
+
+  text-align: left;
+}
+
+.danger-zone > div {
+  display: flex;
+  flex-direction: column;
+
+  gap: 4px;
+}
+
+.danger-title {
+  color: #6f4b43;
+
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.danger-description {
+  color: #85898d;
+
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.delete-athlete-button {
+  height: 36px;
+
+  padding: 0 13px;
+
+  flex-shrink: 0;
+
+  color: #9b4137;
+  background: transparent;
+
+  border: 1px solid #c9958e;
+  border-radius: 5px;
+
+  cursor: pointer;
+
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.delete-athlete-button:hover {
+  background: #f5e8e6;
+}
+
+/* ==================================================
+   DELETE MODAL
+   ================================================== */
+
+.profile-modal-overlay {
+  position: fixed;
+  inset: 0;
+
+  z-index: 100;
+
+  padding: 24px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  background: rgba(43, 45, 47, 0.42);
+}
+
+.delete-modal {
+  width: min(430px, 100%);
+
+  padding: 22px;
+
+  background: #fafaf9;
+
+  border: 1px solid #d4d6d7;
+  border-radius: 6px;
+
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+
+  text-align: left;
+}
+
+.delete-modal h2 {
+  margin: 0 0 8px;
+
+  color: #3d4043;
+
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.delete-modal p {
+  margin: 0;
+
+  color: #666a6e;
+
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.6;
+}
+
+.delete-modal-actions {
+  margin-top: 20px;
+
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+
+  gap: 8px;
+}
+
+.confirm-delete-button {
+  height: 38px;
+
+  padding: 0 14px;
+
+  color: #ffffff;
+  background: #a94b40;
+
+  border: 1px solid #a94b40;
+  border-radius: 5px;
+
+  cursor: pointer;
+
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.confirm-delete-button:hover {
+  background: #913d34;
+}
+/* ==================================================
+   PAGE
+   ================================================== */
+
+.profile-container {
+  width: min(1180px, calc(100% - 64px));
+
+  margin: 0 auto;
+  padding: 24px 0 50px;
+
+  text-align: left;
+}
+
+/* ==================================================
+   BACK
+   ================================================== */
+
+.back-button {
+  margin: 0 0 18px;
+  padding: 0;
+
+  color: #666a6e;
+  background: transparent;
+
+  border: 0;
+
+  cursor: pointer;
+
+  font-size: 12px;
+  font-weight: 400;
+
+  text-align: left;
+}
+
+.back-button:hover {
+  color: #b9672c;
+}
+
+/* ==================================================
+   HEADING
+   ================================================== */
+/* ==================================================
+   PROFILE IDENTITY
+   ================================================== */
+
+.profile-heading {
+  margin: 0 0 18px;
+  padding: 18px 20px;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 20px;
+
+  background: #fafaf9;
+
+    border: 1px solid #c5c8ca;
+  border-left: 3px solid #cf7735;
+  border-radius: 6px;
+
+  text-align: left;
+}
+
+.profile-identity {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+
+  gap: 7px;
+}
+
+.profile-eyebrow {
+  margin: 0;
+
+  color: #b9672c;
+
+  font-size: 12px;
+  font-weight: 500;
+
+  letter-spacing: 0.5px;
+}
+
+.profile-heading h1 {
+  margin: 0;
+
+  color: #34383c;
+
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 1.35;
+
+  letter-spacing: -0.1px;
+
+  text-align: left;
+}
+.profile-eyebrow {
+  margin: 0 0 10px;
+
+  color: #b9672c;
+
+  font-size: 12px;
+  font-weight: 500;
+
+  letter-spacing: 0.5px;
+}
+
+.profile-heading h1 {
+  margin: 0 0 7px;
+
+  color: #34383c;
+
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 1.35;
+
+  letter-spacing: -0.1px;
+
+  text-align: left;
+}
+
+.profile-athlete-id {
+  margin: 0;
+
+  color: #85898d;
+
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.profile-athlete-id {
+  margin: 0;
+
+  color: #7c8185;
+
+  font-size: 12px;
+  font-weight: 400;
+
+  letter-spacing: 0.1px;
+}
+
+/* ==================================================
+   PROFILE PANEL
+   ================================================== */
+
+.profile-panel {
+  overflow: hidden;
+
+  background: #fbfbfa;
+
+  border: 1px solid #c5c8ca;
+  border-radius: 6px;
+
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.035);
+}
+
+.profile-section + .profile-section {
+  border-top: 1px solid #d1d3d5;
+}
+
+.profile-section-heading {
+  padding: 14px 24px;
+
+  background: #f0f1f1;
+
+  border-bottom: 1px solid #d1d3d5;
+}
+.profile-section-heading h2 {
+  margin: 0;
+
+  color: #3d4043;
+
+  font-size: 13px;
+  font-weight: 500;
+
+  text-align: left;
+}
+
+/* ==================================================
+   DETAILS
+   ================================================== */
+
+.profile-details {
+
+  background: #fdfdfc;
+  padding: 22px 24px;
+
+  display: grid;
+  grid-template-columns: repeat(3, minmax(180px, 1fr));
+
+  gap: 28px;
+}
+
+.profile-detail {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+
+  gap: 6px;
+
+  text-align: left;
+}
+
+.detail-label {
+  color: #85898d;
+
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.detail-value {
+  color: #3d4043;
+
+  font-size: 13px;
+  font-weight: 400;
+}
+
+/* ==================================================
+   EVENTS
+   ================================================== */
+
+.profile-events {
+  min-height: 68px;
+
+  padding: 18px 24px;
+
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+
+  gap: 7px;
+}
+
+.profile-event-tag {
+  padding: 5px 8px;
+
+  color: #6e5039;
+  background: #f3e8df;
+
+  border: 1px solid #dfcec0;
+  border-radius: 4px;
+
+  font-size: 12px;
+  font-weight: 400;
+}
+
+/* ==================================================
+   NOT FOUND
+   ================================================== */
+
+.profile-not-found {
+  padding: 24px;
+
+  background: #f7f7f6;
+
+  border: 1px solid #d4d6d7;
+  border-radius: 6px;
+
+  text-align: left;
+}
+
+.profile-not-found h1 {
+  margin: 0 0 6px;
+
+  color: #3d4043;
+
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.profile-not-found p {
+  margin: 0;
+
+  color: #85898d;
+
+  font-size: 12px;
+  font-weight: 400;
+}
+
+/* ==================================================
+   RESPONSIVE
+   ================================================== */
+
+@media (max-width: 750px) {
+
+  .profile-container {
+    width: calc(100% - 32px);
+  }
+
+  .profile-details {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 550px) {
+ 
+
+  .profile-details {
+    grid-template-columns: 1fr;
+
+    gap: 18px;
+
+    padding: 18px 16px;
+  }
+
+  .profile-section-heading,
+  .profile-events {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+  .profile-heading {
+  align-items: flex-start;
+  flex-direction: column;
+}
+
+.edit-actions {
+  width: 100%;
+}
+
+.edit-athlete-button,
+.profile-save-button,
+.profile-cancel-button {
+  width: 100%;
+}
+
+.profile-team-detail {
+  grid-column: auto;
+}
+
+.edit-event-area {
+  padding: 16px;
+}
+
+.danger-zone {
+  align-items: stretch;
+  flex-direction: column;
+}
+
+.delete-athlete-button {
+  width: 100%;
+}
+}

@@ -13,6 +13,6 @@ public record EventResponse(Long id, String name, LocalDate eventDate, String lo
 		return new EventResponse(event.getId(), event.getName(), event.getEventDate(), event.getLocation(),
 				event.getEventType(), event.getExternalUrl(), event.getMeet().getId(), event.getMeet().getName(),
 				EventCategoryResponse.from(event.getCategory()),
-				event.getRankingOrder(), event.getResults().size());
+				event.getRankingOrder(), event.getParticipations().size());
 	}
 }

@@ -8,5 +8,6 @@ import jakarta.validation.constraints.Size;
 public record EventCategoryRequest(
 		@NotBlank(message = "Event category name is required")
 		@Size(max = 150, message = "Event category name must be 150 characters or fewer") String name,
-		@NotNull(message = "Ranking order is required") RankingOrder rankingOrder) {
+		@NotNull(message = "Ranking order is required") RankingOrder rankingOrder, com.flyingangels.backend.event.ResultUnit unit) {
+    public EventCategoryRequest(String name,RankingOrder rankingOrder) { this(name,rankingOrder,null); }
 }

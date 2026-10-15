@@ -10,12 +10,14 @@ public interface EventResultRepository extends JpaRepository<EventResult, Long> 
 
 	boolean existsByEventIdAndAthleteId(Long eventId, Long athleteId);
 
-	Optional<EventResult> findByEventIdAndAthleteId(Long eventId, Long athleteId);
+	List<EventResult> findByEventIdAndAthleteId(Long eventId, Long athleteId);
+    void deleteByEventIdAndAthleteId(Long eventId, Long athleteId);
+    void deleteByAthleteId(Long athleteId);
 
 	boolean existsByEventIsNullAndCategoryIdAndAthleteIdAndResult(Long categoryId, Long athleteId, String result);
 
 	Optional<EventResult> findByIdAndEventId(Long id, Long eventId);
 
-	@EntityGraph(attributePaths = {"category", "event"})
+	@EntityGraph(attributePaths = {"category", "event", "event.meet", "athlete"})
 	List<EventResult> findByAthleteId(Long athleteId);
 }

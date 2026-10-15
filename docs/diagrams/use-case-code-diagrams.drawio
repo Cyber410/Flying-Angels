@@ -1,0 +1,458 @@
+<?xml version='1.0' encoding='utf-8'?>
+<mxfile host="app.diagrams.net">
+  <diagram id="01-meet-management" name="Meet Management">
+    <mxGraphModel dx="1600" dy="1000" grid="1" gridSize="10" page="1" pageWidth="1600" pageHeight="820">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" value="Meet Management — code flow&#10;Frontend / HTTP API / Spring Boot / JPA / MySQL" style="rounded=0;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=12;fontSize=14;fillColor=#f5f5f5;strokeColor=#555555;" vertex="1" parent="1">
+          <mxGeometry x="30" y="20" width="1540" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="front-layer" value="Frontend — React + TypeScript" style="rounded=0;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=12;fontSize=14;fillColor=#f8fafc;strokeColor=#555555;" vertex="1" parent="1">
+          <mxGeometry x="30" y="100" width="390" height="230" as="geometry" />
+        </mxCell>
+        <mxCell id="api-layer" value="HTTP API" style="rounded=0;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=12;fontSize=14;fillColor=#f8fafc;strokeColor=#555555;" vertex="1" parent="1">
+          <mxGeometry x="460" y="100" width="650" height="230" as="geometry" />
+        </mxCell>
+        <mxCell id="back-layer" value="Backend — Java + Spring Boot / JPA" style="rounded=0;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=12;fontSize=14;fillColor=#f8fafc;strokeColor=#555555;" vertex="1" parent="1">
+          <mxGeometry x="30" y="370" width="1080" height="430" as="geometry" />
+        </mxCell>
+        <mxCell id="db-layer" value="Database — MySQL 8.4" style="rounded=0;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=12;fontSize=14;fillColor=#f8fafc;strokeColor=#555555;" vertex="1" parent="1">
+          <mxGeometry x="1150" y="370" width="420" height="430" as="geometry" />
+        </mxCell>
+        <mxCell id="n0" value="Client: HTTP API consumer&#10;Create, list, view, edit, delete meet" style="rounded=0;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=12;fontSize=14;fillColor=#ffffff;strokeColor=#555555;" vertex="1" parent="1">
+          <mxGeometry x="50" y="145" width="350" height="160" as="geometry" />
+        </mxCell>
+        <mxCell id="n1" value="HTTP API: Meet routes&#10;GET, POST /api/meets&#10;GET, PUT, DELETE /api/meets/{id}&#10;GET /api/meets/{id}/events" style="rounded=0;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=12;fontSize=14;fillColor=#ffffff;strokeColor=#555555;" vertex="1" parent="1">
+          <mxGeometry x="480" y="145" width="610" height="160" as="geometry" />
+        </mxCell>
+        <mxCell id="n2" value="Controller: MeetController&#10;@Valid MeetRequest&#10;list(), get(), create(), update(), delete(), events()" style="rounded=0;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=12;fontSize=14;fillColor=#ffffff;strokeColor=#555555;" vertex="1" parent="1">
+          <mxGeometry x="50" y="420" width="510" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="n3" value="Service: MeetService&#10;Validate date range; keep existing events inside dates&#10;Get meet; save changes; delete meet and events" style="rounded=0;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=12;fontSize=14;fillColor=#ffffff;strokeColor=#555555;" vertex="1" parent="1">
+          <mxGeometry x="590" y="420" width="500" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="n4" value="Repository: MeetRepository + EventRepository&#10;findById(), findAllByOrderByMeetDateDescNameAsc()&#10;save(), delete(); fetch meet events and categories" style="rounded=0;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=12;fontSize=14;fillColor=#ffffff;strokeColor=#555555;" vertex="1" parent="1">
+          <mxGeometry x="590" y="625" width="500" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="n5" value="Entity / Database: Meet / meets; Event / events&#10;name, startDate, endDate, location, externalUrl&#10;meetDate retained as a compatibility alias" style="rounded=0;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=12;fontSize=14;fillColor=#ffffff;strokeColor=#555555;" vertex="1" parent="1">
+          <mxGeometry x="1170" y="420" width="380" height="210" as="geometry" />
+        </mxCell>
+        <mxCell id="n6" value="Response: MeetResponse + MeetProfileResponse&#10;Summary: dates and eventCount&#10;Profile: meet + events[]; static DTO from() mapping" style="rounded=0;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=12;fontSize=14;fillColor=#ffffff;strokeColor=#555555;" vertex="1" parent="1">
+          <mxGeometry x="50" y="625" width="510" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="e1" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=open;html=0;" edge="1" parent="1" source="n0" target="n1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e2" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=open;html=0;" edge="1" parent="1" source="n1" target="n2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e3" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=open;html=0;" edge="1" parent="1" source="n2" target="n3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e4" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=open;html=0;" edge="1" parent="1" source="n3" target="n4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e5" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=open;html=0;" edge="1" parent="1" source="n4" target="n5">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e6" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=open;html=0;dashed=1;" edge="1" parent="1" source="n2" target="n6">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e7" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=open;html=0;dashed=1;" edge="1" parent="1" source="n6" target="n1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="02-event-management" name="Event Management">
+    <mxGraphModel dx="1600" dy="1000" grid="1" gridSize="10" page="1" pageWidth="1600" pageHeight="820">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" value="Event Management — code flow&#10;Frontend / HTTP API / Spring Boot / JPA / MySQL" style="rounded=0;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=12;fontSize=14;fillColor=#f5f5f5;strokeColor=#555555;" vertex="1" parent="1">
+          <mxGeometry x="30" y="20" width="1540" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="front-layer" value="Frontend — React + TypeScript" style="rounded=0;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=12;fontSize=14;fillColor=#f8fafc;strokeColor=#555555;" vertex="1" parent="1">
+          <mxGeometry x="30" y="100" width="390" height="230" as="geometry" />
+        </mxCell>
+        <mxCell id="api-layer" value="HTTP API" style="rounded=0;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=12;fontSize=14;fillColor=#f8fafc;strokeColor=#555555;" vertex="1" parent="1">
+          <mxGeometry x="460" y="100" width="650" height="230" as="geometry" />
+        </mxCell>
+        <mxCell id="back-layer" value="Backend — Java + Spring Boot / JPA" style="rounded=0;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=12;fontSize=14;fillColor=#f8fafc;strokeColor=#555555;" vertex="1" parent="1">
+          <mxGeometry x="30" y="370" width="1080" height="430" as="geometry" />
+        </mxCell>
+        <mxCell id="db-layer" value="Database — MySQL 8.4" style="rounded=0;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=12;fontSize=14;fillColor=#f8fafc;strokeColor=#555555;" vertex="1" parent="1">
+          <mxGeometry x="1150" y="370" width="420" height="430" as="geometry" />
+        </mxCell>
+        <mxCell id="n0" value="Client: HTTP API consumer&#10;Reusable definitions; batch add; selected&#10;copy" style="rounded=0;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=12;fontSize=14;fillColor=#ffffff;strokeColor=#555555;" vertex="1" parent="1">
+          <mxGeometry x="50" y="145" width="350" height="160" as="geometry" />
+        </mxCell>
+        <mxCell id="n1" value="HTTP API: Definition and meet-event routes&#10;GET, POST /api/event-categories&#10;GET, POST /api/events | GET, PUT, DELETE /api/events/{id}&#10;POST /api/meets/{id}/events/bulk&#10;POST /api/meets/{id}/events/copy" style="rounded=0;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=12;fontSize=14;fillColor=#ffffff;strokeColor=#555555;" vertex="1" parent="1">
+          <mxGeometry x="480" y="145" width="610" height="160" as="geometry" />
+        </mxCell>
+        <mxCell id="n2" value="Controller: EventCategoryController / EventController&#10;MeetEventController: add(), copy()&#10;Validate EventBatchRequest / CopyEventsRequest" style="rounded=0;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=12;fontSize=14;fillColor=#ffffff;strokeColor=#555555;" vertex="1" parent="1">
+          <mxGeometry x="50" y="420" width="510" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="n3" value="Service: EventCategoryService + EventService&#10;Resolve reusable category; validate meet dates&#10;createBatch(), copyEvents(): atomic operations&#10;Copy definitions into new events with empty participation" style="rounded=0;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=12;fontSize=14;fillColor=#ffffff;strokeColor=#555555;" vertex="1" parent="1">
+          <mxGeometry x="590" y="420" width="500" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="n4" value="Repository: EventCategoryRepository / EventRepository&#10;Category name lookup; meet/category duplicate checks&#10;MeetRepository verifies source and target meets" style="rounded=0;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=12;fontSize=14;fillColor=#ffffff;strokeColor=#555555;" vertex="1" parent="1">
+          <mxGeometry x="590" y="625" width="500" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="n5" value="Entity / Database: EventCategory + Event&#10;Category: name, rankingOrder, unit&#10;Event: meet_id, category_id, eventDate&#10;UNIQUE(meet_id, category_id)" style="rounded=0;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=12;fontSize=14;fillColor=#ffffff;strokeColor=#555555;" vertex="1" parent="1">
+          <mxGeometry x="1170" y="420" width="380" height="210" as="geometry" />
+        </mxCell>
+        <mxCell id="n6" value="Response: EventCategoryResponse / EventResponse&#10;Category includes measurement unit&#10;Event includes meet, category, participantCount" style="rounded=0;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=12;fontSize=14;fillColor=#ffffff;strokeColor=#555555;" vertex="1" parent="1">
+          <mxGeometry x="50" y="625" width="510" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="e1" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=open;html=0;" edge="1" parent="1" source="n0" target="n1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e2" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=open;html=0;" edge="1" parent="1" source="n1" target="n2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e3" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=open;html=0;" edge="1" parent="1" source="n2" target="n3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e4" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=open;html=0;" edge="1" parent="1" source="n3" target="n4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e5" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=open;html=0;" edge="1" parent="1" source="n4" target="n5">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e6" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=open;html=0;dashed=1;" edge="1" parent="1" source="n2" target="n6">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e7" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=open;html=0;dashed=1;" edge="1" parent="1" source="n6" target="n1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="03-athlete-participation" name="Athlete Event Participation">
+    <mxGraphModel dx="1600" dy="1000" grid="1" gridSize="10" page="1" pageWidth="1600" pageHeight="820">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" value="Athlete Event Participation — code flow&#10;Frontend / HTTP API / Spring Boot / JPA / MySQL" style="rounded=0;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=12;fontSize=14;fillColor=#f5f5f5;strokeColor=#555555;" vertex="1" parent="1">
+          <mxGeometry x="30" y="20" width="1540" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="front-layer" value="Frontend — React + TypeScript" style="rounded=0;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=12;fontSize=14;fillColor=#f8fafc;strokeColor=#555555;" vertex="1" parent="1">
+          <mxGeometry x="30" y="100" width="390" height="230" as="geometry" />
+        </mxCell>
+        <mxCell id="api-layer" value="HTTP API" style="rounded=0;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=12;fontSize=14;fillColor=#f8fafc;strokeColor=#555555;" vertex="1" parent="1">
+          <mxGeometry x="460" y="100" width="650" height="230" as="geometry" />
+        </mxCell>
+        <mxCell id="back-layer" value="Backend — Java + Spring Boot / JPA" style="rounded=0;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=12;fontSize=14;fillColor=#f8fafc;strokeColor=#555555;" vertex="1" parent="1">
+          <mxGeometry x="30" y="370" width="1080" height="430" as="geometry" />
+        </mxCell>
+        <mxCell id="db-layer" value="Database — MySQL 8.4" style="rounded=0;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=12;fontSize=14;fillColor=#f8fafc;strokeColor=#555555;" vertex="1" parent="1">
+          <mxGeometry x="1150" y="370" width="420" height="430" as="geometry" />
+        </mxCell>
+        <mxCell id="n0" value="Client: HTTP API consumer&#10;Assign one/many athletes; list; remove" style="rounded=0;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=12;fontSize=14;fillColor=#ffffff;strokeColor=#555555;" vertex="1" parent="1">
+          <mxGeometry x="50" y="145" width="350" height="160" as="geometry" />
+        </mxCell>
+        <mxCell id="n1" value="HTTP API: Participation routes&#10;POST, GET /api/events/{id}/participants&#10;POST /api/events/{id}/participants/bulk&#10;DELETE /api/events/{id}/participants/{athleteId}" style="rounded=0;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=12;fontSize=14;fillColor=#ffffff;strokeColor=#555555;" vertex="1" parent="1">
+          <mxGeometry x="480" y="145" width="610" height="160" as="geometry" />
+        </mxCell>
+        <mxCell id="n2" value="Controller: EventController&#10;assignParticipant(), assignBulk(), participants()&#10;removeParticipant(); validated athlete IDs" style="rounded=0;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=12;fontSize=14;fillColor=#ffffff;strokeColor=#555555;" vertex="1" parent="1">
+          <mxGeometry x="50" y="420" width="510" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="n3" value="Service: EventService&#10;assignParticipant() creates independent assignment&#10;assignBatch() rolls back if any assignment fails&#10;removeParticipant() deletes assignment and its attempts" style="rounded=0;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=12;fontSize=14;fillColor=#ffffff;strokeColor=#555555;" vertex="1" parent="1">
+          <mxGeometry x="590" y="420" width="500" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="n4" value="Repository: EventParticipationRepository&#10;existsByEventIdAndAthleteId(), save(), delete()&#10;findByEventIdOrderByAthleteLastNameAscAthleteFirstNameAsc()" style="rounded=0;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=12;fontSize=14;fillColor=#ffffff;strokeColor=#555555;" vertex="1" parent="1">
+          <mxGeometry x="590" y="625" width="500" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="n5" value="Entity / Database: EventParticipation /&#10;event_participations&#10;event_id + athlete_id are required&#10;UNIQUE(event_id, athlete_id)&#10;Same athlete can enter different events" style="rounded=0;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=12;fontSize=14;fillColor=#ffffff;strokeColor=#555555;" vertex="1" parent="1">
+          <mxGeometry x="1170" y="420" width="380" height="210" as="geometry" />
+        </mxCell>
+        <mxCell id="n6" value="Response: EventParticipationResponse&#10;participationId; athlete identity&#10;event and meet IDs/names; category identity" style="rounded=0;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=12;fontSize=14;fillColor=#ffffff;strokeColor=#555555;" vertex="1" parent="1">
+          <mxGeometry x="50" y="625" width="510" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="e1" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=open;html=0;" edge="1" parent="1" source="n0" target="n1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e2" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=open;html=0;" edge="1" parent="1" source="n1" target="n2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e3" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=open;html=0;" edge="1" parent="1" source="n2" target="n3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e4" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=open;html=0;" edge="1" parent="1" source="n3" target="n4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e5" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=open;html=0;" edge="1" parent="1" source="n4" target="n5">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e6" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=open;html=0;dashed=1;" edge="1" parent="1" source="n2" target="n6">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e7" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=open;html=0;dashed=1;" edge="1" parent="1" source="n6" target="n1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="04-results-management" name="Results Management">
+    <mxGraphModel dx="1600" dy="1000" grid="1" gridSize="10" page="1" pageWidth="1600" pageHeight="820">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" value="Results Management — code flow&#10;Frontend / HTTP API / Spring Boot / JPA / MySQL" style="rounded=0;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=12;fontSize=14;fillColor=#f5f5f5;strokeColor=#555555;" vertex="1" parent="1">
+          <mxGeometry x="30" y="20" width="1540" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="front-layer" value="Frontend — React + TypeScript" style="rounded=0;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=12;fontSize=14;fillColor=#f8fafc;strokeColor=#555555;" vertex="1" parent="1">
+          <mxGeometry x="30" y="100" width="390" height="230" as="geometry" />
+        </mxCell>
+        <mxCell id="api-layer" value="HTTP API" style="rounded=0;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=12;fontSize=14;fillColor=#f8fafc;strokeColor=#555555;" vertex="1" parent="1">
+          <mxGeometry x="460" y="100" width="650" height="230" as="geometry" />
+        </mxCell>
+        <mxCell id="back-layer" value="Backend — Java + Spring Boot / JPA" style="rounded=0;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=12;fontSize=14;fillColor=#f8fafc;strokeColor=#555555;" vertex="1" parent="1">
+          <mxGeometry x="30" y="370" width="1080" height="430" as="geometry" />
+        </mxCell>
+        <mxCell id="db-layer" value="Database — MySQL 8.4" style="rounded=0;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=12;fontSize=14;fillColor=#f8fafc;strokeColor=#555555;" vertex="1" parent="1">
+          <mxGeometry x="1150" y="370" width="420" height="430" as="geometry" />
+        </mxCell>
+        <mxCell id="n0" value="Frontend: AthleteProfilePage.tsx&#10;getAthleteById() displays historical + meet&#10;results&#10;HTTP API consumers record and correct&#10;attempts" style="rounded=0;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=12;fontSize=14;fillColor=#ffffff;strokeColor=#555555;" vertex="1" parent="1">
+          <mxGeometry x="50" y="145" width="350" height="160" as="geometry" />
+        </mxCell>
+        <mxCell id="n1" value="HTTP API: Result routes&#10;GET, POST /api/events/{id}/results&#10;POST /api/events/{id}/results/bulk&#10;PUT, DELETE /api/events/{id}/results/{resultId}&#10;GET /api/events/{id}/leaderboard" style="rounded=0;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=12;fontSize=14;fillColor=#ffffff;strokeColor=#555555;" vertex="1" parent="1">
+          <mxGeometry x="480" y="145" width="610" height="160" as="geometry" />
+        </mxCell>
+        <mxCell id="n2" value="Controller: EventController&#10;addResult(), results(), resultsBulk()&#10;updateResult(), deleteResult(), leaderboard()" style="rounded=0;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=12;fontSize=14;fillColor=#ffffff;strokeColor=#555555;" vertex="1" parent="1">
+          <mxGeometry x="50" y="420" width="510" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="n3" value="Service: EventService + ResultValues&#10;Append attempts; validate unit and normalized value&#10;Parse seconds/metres/points and performance statuses&#10;Bulk saves are atomic; leaderboard uses best attempt" style="rounded=0;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=12;fontSize=14;fillColor=#ffffff;strokeColor=#555555;" vertex="1" parent="1">
+          <mxGeometry x="590" y="420" width="500" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="n4" value="Repository: EventResultRepository + participation repositories&#10;save(), findByIdAndEventId(), delete()&#10;Create participation if missing when recording result" style="rounded=0;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=12;fontSize=14;fillColor=#ffffff;strokeColor=#555555;" vertex="1" parent="1">
+          <mxGeometry x="590" y="625" width="500" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="n5" value="Entity / Database: EventResult / event_results&#10;Independent IDs allow repeated athlete/event&#10;results&#10;Raw result, score, unit, status, recordedAt,&#10;source&#10;EventParticipation stores unique assignment&#10;separately" style="rounded=0;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=12;fontSize=14;fillColor=#ffffff;strokeColor=#555555;" vertex="1" parent="1">
+          <mxGeometry x="1170" y="420" width="380" height="210" as="geometry" />
+        </mxCell>
+        <mxCell id="n6" value="Response: EventResultResponse&#10;resultId, athlete, category, raw result, numeric score&#10;eventId/name, meetId/name, unit, status, source" style="rounded=0;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=12;fontSize=14;fillColor=#ffffff;strokeColor=#555555;" vertex="1" parent="1">
+          <mxGeometry x="50" y="625" width="510" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="e1" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=open;html=0;" edge="1" parent="1" source="n0" target="n1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e2" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=open;html=0;" edge="1" parent="1" source="n1" target="n2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e3" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=open;html=0;" edge="1" parent="1" source="n2" target="n3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e4" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=open;html=0;" edge="1" parent="1" source="n3" target="n4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e5" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=open;html=0;" edge="1" parent="1" source="n4" target="n5">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e6" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=open;html=0;dashed=1;" edge="1" parent="1" source="n2" target="n6">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e7" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=open;html=0;dashed=1;" edge="1" parent="1" source="n6" target="n1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="05-athlete-notes" name="Athlete Notes">
+    <mxGraphModel dx="1600" dy="1000" grid="1" gridSize="10" page="1" pageWidth="1600" pageHeight="820">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" value="Athlete Notes — code flow&#10;Frontend / HTTP API / Spring Boot / JPA / MySQL" style="rounded=0;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=12;fontSize=14;fillColor=#f5f5f5;strokeColor=#555555;" vertex="1" parent="1">
+          <mxGeometry x="30" y="20" width="1540" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="front-layer" value="Frontend — React + TypeScript" style="rounded=0;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=12;fontSize=14;fillColor=#f8fafc;strokeColor=#555555;" vertex="1" parent="1">
+          <mxGeometry x="30" y="100" width="390" height="230" as="geometry" />
+        </mxCell>
+        <mxCell id="api-layer" value="HTTP API" style="rounded=0;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=12;fontSize=14;fillColor=#f8fafc;strokeColor=#555555;" vertex="1" parent="1">
+          <mxGeometry x="460" y="100" width="650" height="230" as="geometry" />
+        </mxCell>
+        <mxCell id="back-layer" value="Backend — Java + Spring Boot / JPA" style="rounded=0;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=12;fontSize=14;fillColor=#f8fafc;strokeColor=#555555;" vertex="1" parent="1">
+          <mxGeometry x="30" y="370" width="1080" height="430" as="geometry" />
+        </mxCell>
+        <mxCell id="db-layer" value="Database — MySQL 8.4" style="rounded=0;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=12;fontSize=14;fillColor=#f8fafc;strokeColor=#555555;" vertex="1" parent="1">
+          <mxGeometry x="1150" y="370" width="420" height="430" as="geometry" />
+        </mxCell>
+        <mxCell id="n0" value="Client: Athlete profile + HTTP API consumer&#10;General note remains in profile&#10;Timestamped history via dedicated notes API" style="rounded=0;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=12;fontSize=14;fillColor=#ffffff;strokeColor=#555555;" vertex="1" parent="1">
+          <mxGeometry x="50" y="145" width="350" height="160" as="geometry" />
+        </mxCell>
+        <mxCell id="n1" value="HTTP API: Note routes&#10;GET, POST /api/athletes/{id}/notes&#10;GET /api/athletes/{id} includes general note" style="rounded=0;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=12;fontSize=14;fillColor=#ffffff;strokeColor=#555555;" vertex="1" parent="1">
+          <mxGeometry x="480" y="145" width="610" height="160" as="geometry" />
+        </mxCell>
+        <mxCell id="n2" value="Controller: AthleteNoteController&#10;create(), list(); @Valid AthleteNoteRequest&#10;Optional eventId; required note text" style="rounded=0;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=12;fontSize=14;fillColor=#ffffff;strokeColor=#555555;" vertex="1" parent="1">
+          <mxGeometry x="50" y="420" width="510" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="n3" value="Service: AthleteNoteService&#10;Verify athlete and optional event; append note&#10;List newest first; no general-note replacement" style="rounded=0;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=12;fontSize=14;fillColor=#ffffff;strokeColor=#555555;" vertex="1" parent="1">
+          <mxGeometry x="590" y="420" width="500" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="n4" value="Repository: AthleteNoteRepository&#10;findByAthleteIdOrderByCreatedAtDescIdDesc()&#10;save(); detachEvent() preserves notes on event deletion" style="rounded=0;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=12;fontSize=14;fillColor=#ffffff;strokeColor=#555555;" vertex="1" parent="1">
+          <mxGeometry x="590" y="625" width="500" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="n5" value="Entity / Database: AthleteNote / athlete_notes&#10;athlete_id, optional event_id, text, created_at&#10;Athlete.note remains separate&#10;Index supports athlete/time retrieval" style="rounded=0;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=12;fontSize=14;fillColor=#ffffff;strokeColor=#555555;" vertex="1" parent="1">
+          <mxGeometry x="1170" y="420" width="380" height="210" as="geometry" />
+        </mxCell>
+        <mxCell id="n6" value="Response: AthleteNoteResponse&#10;id, athleteId, text, createdAt&#10;Optional eventId/name and meetId/name" style="rounded=0;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=12;fontSize=14;fillColor=#ffffff;strokeColor=#555555;" vertex="1" parent="1">
+          <mxGeometry x="50" y="625" width="510" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="e1" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=open;html=0;" edge="1" parent="1" source="n0" target="n1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e2" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=open;html=0;" edge="1" parent="1" source="n1" target="n2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e3" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=open;html=0;" edge="1" parent="1" source="n2" target="n3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e4" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=open;html=0;" edge="1" parent="1" source="n3" target="n4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e5" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=open;html=0;" edge="1" parent="1" source="n4" target="n5">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e6" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=open;html=0;dashed=1;" edge="1" parent="1" source="n2" target="n6">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e7" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=open;html=0;dashed=1;" edge="1" parent="1" source="n6" target="n1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="06-athlete-import" name="CSV Athlete Import">
+    <mxGraphModel dx="1600" dy="1000" grid="1" gridSize="10" page="1" pageWidth="1600" pageHeight="820">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" value="CSV Athlete Import — code flow&#10;Frontend / HTTP API / Spring Boot / JPA / MySQL" style="rounded=0;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=12;fontSize=14;fillColor=#f5f5f5;strokeColor=#555555;" vertex="1" parent="1">
+          <mxGeometry x="30" y="20" width="1540" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="front-layer" value="Frontend — React + TypeScript" style="rounded=0;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=12;fontSize=14;fillColor=#f8fafc;strokeColor=#555555;" vertex="1" parent="1">
+          <mxGeometry x="30" y="100" width="390" height="230" as="geometry" />
+        </mxCell>
+        <mxCell id="api-layer" value="HTTP API" style="rounded=0;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=12;fontSize=14;fillColor=#f8fafc;strokeColor=#555555;" vertex="1" parent="1">
+          <mxGeometry x="460" y="100" width="650" height="230" as="geometry" />
+        </mxCell>
+        <mxCell id="back-layer" value="Backend — Java + Spring Boot / JPA" style="rounded=0;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=12;fontSize=14;fillColor=#f8fafc;strokeColor=#555555;" vertex="1" parent="1">
+          <mxGeometry x="30" y="370" width="1080" height="430" as="geometry" />
+        </mxCell>
+        <mxCell id="db-layer" value="Database — MySQL 8.4" style="rounded=0;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=12;fontSize=14;fillColor=#f8fafc;strokeColor=#555555;" vertex="1" parent="1">
+          <mxGeometry x="1150" y="370" width="420" height="430" as="geometry" />
+        </mxCell>
+        <mxCell id="n0" value="Client: HTTP API consumer&#10;Upload CSV/TSV/XLSX; review rows; select row&#10;numbers" style="rounded=0;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=12;fontSize=14;fillColor=#ffffff;strokeColor=#555555;" vertex="1" parent="1">
+          <mxGeometry x="50" y="145" width="350" height="160" as="geometry" />
+        </mxCell>
+        <mxCell id="n1" value="HTTP API: Preview and commit routes&#10;POST /api/athletes/import/preview&#10;GET /api/athletes/import/{id}&#10;POST /api/athletes/import/{id}/commit&#10;Immediate POST /api/athletes/import uses the same service" style="rounded=0;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=12;fontSize=14;fillColor=#ffffff;strokeColor=#555555;" vertex="1" parent="1">
+          <mxGeometry x="480" y="145" width="610" height="160" as="geometry" />
+        </mxCell>
+        <mxCell id="n2" value="Controller: AthleteImportController&#10;preview(), get(), commit()&#10;source-scoped identifier; validated row selection" style="rounded=0;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=12;fontSize=14;fillColor=#ffffff;strokeColor=#555555;" vertex="1" parent="1">
+          <mxGeometry x="50" y="420" width="510" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="n3" value="Service: AthleteImportService / AthleteRegistrationParser&#10;Header mapping; NEW / UPDATE / UNCHANGED classification&#10;ImportRowWriter commits one selected row atomically&#10;AthleteImportMatcher compares supplied profile and values" style="rounded=0;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=12;fontSize=14;fillColor=#ffffff;strokeColor=#555555;" vertex="1" parent="1">
+          <mxGeometry x="590" y="420" width="500" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="n4" value="Repository: ImportJobRepository / ImportRowRepository&#10;Persist original file + row outcomes; lock row on commit&#10;Match external ID or unique name; preserve missing fields" style="rounded=0;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=12;fontSize=14;fillColor=#ffffff;strokeColor=#555555;" vertex="1" parent="1">
+          <mxGeometry x="590" y="625" width="500" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="n5" value="Entity / Database: ImportJob + ImportRow +&#10;Athlete + EventResult&#10;Rows: NEW, UPDATE, UNCHANGED; IMPORTED / UPDATED&#10;Raw historical values retained; unknown format&#10;UNPARSED&#10;No meet context invented for roster performance&#10;columns" style="rounded=0;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=12;fontSize=14;fillColor=#ffffff;strokeColor=#555555;" vertex="1" parent="1">
+          <mxGeometry x="1170" y="420" width="380" height="210" as="geometry" />
+        </mxCell>
+        <mxCell id="n6" value="Response: ImportPreviewResponse + ImportCommitResponse&#10;Rows include parsed data, status and explanation&#10;Commit returns imported, updated, skipped, failed counts" style="rounded=0;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=12;fontSize=14;fillColor=#ffffff;strokeColor=#555555;" vertex="1" parent="1">
+          <mxGeometry x="50" y="625" width="510" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="e1" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=open;html=0;" edge="1" parent="1" source="n0" target="n1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e2" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=open;html=0;" edge="1" parent="1" source="n1" target="n2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e3" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=open;html=0;" edge="1" parent="1" source="n2" target="n3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e4" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=open;html=0;" edge="1" parent="1" source="n3" target="n4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e5" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=open;html=0;" edge="1" parent="1" source="n4" target="n5">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e6" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=open;html=0;dashed=1;" edge="1" parent="1" source="n2" target="n6">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e7" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=open;html=0;dashed=1;" edge="1" parent="1" source="n6" target="n1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="07-athlete-api" name="Existing Athlete API">
+    <mxGraphModel dx="1600" dy="1000" grid="1" gridSize="10" page="1" pageWidth="1600" pageHeight="820">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" value="Existing Athlete API — code flow&#10;Frontend / HTTP API / Spring Boot / JPA / MySQL" style="rounded=0;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=12;fontSize=14;fillColor=#f5f5f5;strokeColor=#555555;" vertex="1" parent="1">
+          <mxGeometry x="30" y="20" width="1540" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="front-layer" value="Frontend — React + TypeScript" style="rounded=0;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=12;fontSize=14;fillColor=#f8fafc;strokeColor=#555555;" vertex="1" parent="1">
+          <mxGeometry x="30" y="100" width="390" height="230" as="geometry" />
+        </mxCell>
+        <mxCell id="api-layer" value="HTTP API" style="rounded=0;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=12;fontSize=14;fillColor=#f8fafc;strokeColor=#555555;" vertex="1" parent="1">
+          <mxGeometry x="460" y="100" width="650" height="230" as="geometry" />
+        </mxCell>
+        <mxCell id="back-layer" value="Backend — Java + Spring Boot / JPA" style="rounded=0;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=12;fontSize=14;fillColor=#f8fafc;strokeColor=#555555;" vertex="1" parent="1">
+          <mxGeometry x="30" y="370" width="1080" height="430" as="geometry" />
+        </mxCell>
+        <mxCell id="db-layer" value="Database — MySQL 8.4" style="rounded=0;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=12;fontSize=14;fillColor=#f8fafc;strokeColor=#555555;" vertex="1" parent="1">
+          <mxGeometry x="1150" y="370" width="420" height="430" as="geometry" />
+        </mxCell>
+        <mxCell id="n0" value="Frontend: AthleteDirectoryPage /&#10;AthleteProfilePage&#10;React Router: / and /athletes/:athleteId&#10;services/athleteService.ts fetches athlete&#10;API" style="rounded=0;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=12;fontSize=14;fillColor=#ffffff;strokeColor=#555555;" vertex="1" parent="1">
+          <mxGeometry x="50" y="145" width="350" height="160" as="geometry" />
+        </mxCell>
+        <mxCell id="n1" value="HTTP API: Athlete routes&#10;GET, POST /api/athletes&#10;GET, PUT, DELETE /api/athletes/{id}&#10;PUT response retains results and participation" style="rounded=0;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=12;fontSize=14;fillColor=#ffffff;strokeColor=#555555;" vertex="1" parent="1">
+          <mxGeometry x="480" y="145" width="610" height="160" as="geometry" />
+        </mxCell>
+        <mxCell id="n2" value="Controller: AthleteController&#10;search(), profile(), create(), update(), delete()&#10;Delegates profile assembly and writes to service" style="rounded=0;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=12;fontSize=14;fillColor=#ffffff;strokeColor=#555555;" vertex="1" parent="1">
+          <mxGeometry x="50" y="420" width="510" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="n3" value="Service: AthleteService&#10;profile(), createProfile(), updateProfile()&#10;Load athlete, central results and participation together&#10;Delete related notes/results/assignments before athlete" style="rounded=0;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=12;fontSize=14;fillColor=#ffffff;strokeColor=#555555;" vertex="1" parent="1">
+          <mxGeometry x="590" y="420" width="500" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="n4" value="Repository: AthleteRepository + related repositories&#10;search(), findById(), save(), delete()&#10;EventResultRepository / EventParticipationRepository" style="rounded=0;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=12;fontSize=14;fillColor=#ffffff;strokeColor=#555555;" vertex="1" parent="1">
+          <mxGeometry x="590" y="625" width="500" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="n5" value="Entity / Database: Athlete + participation +&#10;results&#10;gender, dateOfBirth, flyStatus, flyaStatus&#10;Source-scoped external ID; historical events&#10;retained&#10;Known status spellings canonicalized; missing&#10;status empty" style="rounded=0;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=12;fontSize=14;fillColor=#ffffff;strokeColor=#555555;" vertex="1" parent="1">
+          <mxGeometry x="1170" y="420" width="380" height="210" as="geometry" />
+        </mxCell>
+        <mxCell id="n6" value="Response: AthleteSummaryResponse / AthleteProfileResponse&#10;Summary exposes all requested demographic/status fields&#10;Profile includes results[] in events + participations[]&#10;Historical records remain visible with nullable context" style="rounded=0;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=12;fontSize=14;fillColor=#ffffff;strokeColor=#555555;" vertex="1" parent="1">
+          <mxGeometry x="50" y="625" width="510" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="e1" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=open;html=0;" edge="1" parent="1" source="n0" target="n1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e2" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=open;html=0;" edge="1" parent="1" source="n1" target="n2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e3" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=open;html=0;" edge="1" parent="1" source="n2" target="n3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e4" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=open;html=0;" edge="1" parent="1" source="n3" target="n4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e5" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=open;html=0;" edge="1" parent="1" source="n4" target="n5">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e6" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=open;html=0;dashed=1;" edge="1" parent="1" source="n2" target="n6">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e7" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=open;html=0;dashed=1;" edge="1" parent="1" source="n6" target="n1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="820" viewBox="0 0 1600 820">
+<defs><marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto"><path d="M0,0 L9,3 L0,6" fill="none" stroke="#444"/></marker></defs>
+<rect width="1600" height="820" fill="white"/>
+<rect x="30" y="20" width="1540" height="55" fill="#f5f5f5" stroke="#555"/>
+<text x="44" y="44" font-family="Arial,sans-serif" font-size="16" font-weight="bold">CSV Athlete Import — code flow</text>
+<text x="44" y="65" font-family="Arial,sans-serif" font-size="14" font-weight="normal">Frontend / HTTP API / Spring Boot / JPA / MySQL</text>
+<rect x="30" y="100" width="390" height="230" fill="#f8fafc" stroke="#555"/>
+<text x="44" y="124" font-family="Arial,sans-serif" font-size="16" font-weight="bold">Frontend — React + TypeScript</text>
+<rect x="460" y="100" width="650" height="230" fill="#f8fafc" stroke="#555"/>
+<text x="474" y="124" font-family="Arial,sans-serif" font-size="16" font-weight="bold">HTTP API</text>
+<rect x="30" y="370" width="1080" height="430" fill="#f8fafc" stroke="#555"/>
+<text x="44" y="394" font-family="Arial,sans-serif" font-size="16" font-weight="bold">Backend — Java + Spring Boot / JPA</text>
+<rect x="1150" y="370" width="420" height="430" fill="#f8fafc" stroke="#555"/>
+<text x="1164" y="394" font-family="Arial,sans-serif" font-size="16" font-weight="bold">Database — MySQL 8.4</text>
+<rect x="50" y="145" width="350" height="160" fill="#ffffff" stroke="#555"/>
+<text x="64" y="169" font-family="Arial,sans-serif" font-size="16" font-weight="bold">Client: HTTP API consumer</text>
+<text x="64" y="190" font-family="Arial,sans-serif" font-size="14" font-weight="normal">Upload CSV/TSV/XLSX; review rows; select row</text>
+<text x="64" y="211" font-family="Arial,sans-serif" font-size="14" font-weight="normal">numbers</text>
+<rect x="480" y="145" width="610" height="160" fill="#ffffff" stroke="#555"/>
+<text x="494" y="169" font-family="Arial,sans-serif" font-size="16" font-weight="bold">HTTP API: Preview and commit routes</text>
+<text x="494" y="190" font-family="Arial,sans-serif" font-size="14" font-weight="normal">POST /api/athletes/import/preview</text>
+<text x="494" y="211" font-family="Arial,sans-serif" font-size="14" font-weight="normal">GET /api/athletes/import/{id}</text>
+<text x="494" y="232" font-family="Arial,sans-serif" font-size="14" font-weight="normal">POST /api/athletes/import/{id}/commit</text>
+<text x="494" y="253" font-family="Arial,sans-serif" font-size="14" font-weight="normal">Immediate POST /api/athletes/import uses the same service</text>
+<rect x="50" y="420" width="510" height="150" fill="#ffffff" stroke="#555"/>
+<text x="64" y="444" font-family="Arial,sans-serif" font-size="16" font-weight="bold">Controller: AthleteImportController</text>
+<text x="64" y="465" font-family="Arial,sans-serif" font-size="14" font-weight="normal">preview(), get(), commit()</text>
+<text x="64" y="486" font-family="Arial,sans-serif" font-size="14" font-weight="normal">source-scoped identifier; validated row selection</text>
+<rect x="590" y="420" width="500" height="150" fill="#ffffff" stroke="#555"/>
+<text x="604" y="444" font-family="Arial,sans-serif" font-size="16" font-weight="bold">Service: AthleteImportService / AthleteRegistrationParser</text>
+<text x="604" y="465" font-family="Arial,sans-serif" font-size="14" font-weight="normal">Header mapping; NEW / UPDATE / UNCHANGED classification</text>
+<text x="604" y="486" font-family="Arial,sans-serif" font-size="14" font-weight="normal">ImportRowWriter commits one selected row atomically</text>
+<text x="604" y="507" font-family="Arial,sans-serif" font-size="14" font-weight="normal">AthleteImportMatcher compares supplied profile and values</text>
+<rect x="590" y="625" width="500" height="150" fill="#ffffff" stroke="#555"/>
+<text x="604" y="649" font-family="Arial,sans-serif" font-size="16" font-weight="bold">Repository: ImportJobRepository / ImportRowRepository</text>
+<text x="604" y="670" font-family="Arial,sans-serif" font-size="14" font-weight="normal">Persist original file + row outcomes; lock row on commit</text>
+<text x="604" y="691" font-family="Arial,sans-serif" font-size="14" font-weight="normal">Match external ID or unique name; preserve missing fields</text>
+<rect x="1170" y="420" width="380" height="210" fill="#ffffff" stroke="#555"/>
+<text x="1184" y="444" font-family="Arial,sans-serif" font-size="16" font-weight="bold">Entity / Database: ImportJob + ImportRow +</text>
+<text x="1184" y="465" font-family="Arial,sans-serif" font-size="14" font-weight="normal">Athlete + EventResult</text>
+<text x="1184" y="486" font-family="Arial,sans-serif" font-size="14" font-weight="normal">Rows: NEW, UPDATE, UNCHANGED; IMPORTED / UPDATED</text>
+<text x="1184" y="507" font-family="Arial,sans-serif" font-size="14" font-weight="normal">Raw historical values retained; unknown format</text>
+<text x="1184" y="528" font-family="Arial,sans-serif" font-size="14" font-weight="normal">UNPARSED</text>
+<text x="1184" y="549" font-family="Arial,sans-serif" font-size="14" font-weight="normal">No meet context invented for roster performance</text>
+<text x="1184" y="570" font-family="Arial,sans-serif" font-size="14" font-weight="normal">columns</text>
+<rect x="50" y="625" width="510" height="150" fill="#ffffff" stroke="#555"/>
+<text x="64" y="649" font-family="Arial,sans-serif" font-size="16" font-weight="bold">Response: ImportPreviewResponse + ImportCommitResponse</text>
+<text x="64" y="670" font-family="Arial,sans-serif" font-size="14" font-weight="normal">Rows include parsed data, status and explanation</text>
+<text x="64" y="691" font-family="Arial,sans-serif" font-size="14" font-weight="normal">Commit returns imported, updated, skipped, failed counts</text>
+<polyline points="400,220 480,220" fill="none" stroke="#444" marker-end="url(#arrow)"/>
+<polyline points="785,305 785,350 305,350 305,420" fill="none" stroke="#444" marker-end="url(#arrow)"/>
+<polyline points="560,490 590,490" fill="none" stroke="#444" marker-end="url(#arrow)"/>
+<polyline points="840,570 840,625" fill="none" stroke="#444" marker-end="url(#arrow)"/>
+<polyline points="1090,700 1130,700 1130,525 1170,525" fill="none" stroke="#444" marker-end="url(#arrow)"/>
+<polyline points="305,570 305,625" fill="none" stroke="#444" marker-end="url(#arrow)" stroke-dasharray="5 5"/>
+<polyline points="50,700 20,700 20,345 1125,345 1125,220 1090,220" fill="none" stroke="#444" marker-end="url(#arrow)" stroke-dasharray="5 5"/>
+</svg>

@@ -1,10 +1,9 @@
-package com.flyingangels.backend.athlete;
+package com.flyingangels.backend.importing;
 
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.junit.jupiter.api.Test;
-import org.springframework.mock.web.MockMultipartFile;
 
 import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
@@ -12,7 +11,7 @@ import java.nio.charset.StandardCharsets;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
-class AthleteImportServiceTest {
+class AthleteRegistrationParserSpreadsheetTest {
 
 	@Test
 	void parsesTabSeparatedAthletesAndOnlyCreatesEventsForPopulatedResults() throws Exception {
@@ -20,19 +19,18 @@ class AthleteImportServiceTest {
 				+ " Ada \t Lovelace \t\"Needs review\"\tIn Roster\t\t2010-03-21\tFemale\t\t12.40\n"
 				+ "No Date\tAthlete\t\t\t\t\tMale\t7.50\t\n";
 
-		AthleteImportService.ImportSummary summary = new AthleteImportService().importFile(
-				new MockMultipartFile("file", "athletes.csv", "text/tab-separated-values", csv.getBytes(StandardCharsets.UTF_8)));
+		var rows = new AthleteRegistrationParser().parse(csv.getBytes(StandardCharsets.UTF_8), "athletes.csv");
 
-		assertEquals(2, summary.athleteCount());
-		assertEquals(2, summary.eventCount());
-		Athlete first = summary.athletes().get(0);
-		assertEquals("Ada", first.getFirstName());
-		assertEquals("Lovelace", first.getLastName());
-		assertEquals("Needs review", first.getNote());
-		assertEquals("2010-03-21", first.getDateOfBirth().toString());
-		assertEquals("100M", first.getEvents().get(0).getEventName());
-		assertEquals("12.40", first.getEvents().get(0).getResult());
-		assertNull(summary.athletes().get(1).getDateOfBirth());
+		assertEquals(2, rows.size());
+		assertEquals(2, rows.stream().mapToInt(r -> r.athlete().events().size()).sum());
+		var first = rows.get(0).athlete();
+		assertEquals("Ada", first.firstName());
+		assertEquals("Lovelace", first.lastName());
+		assertEquals("Needs review", first.note());
+		assertEquals("2010-03-21", first.dateOfBirth().toString());
+		assertEquals("100M", first.events().get(0).eventName());
+		assertEquals("12.40", first.events().get(0).result());
+		assertNull(rows.get(1).athlete().dateOfBirth());
 	}
 
 	@Test
@@ -50,13 +48,11 @@ class AthleteImportServiceTest {
 			}
 			workbook.write(output);
 
-			AthleteImportService.ImportSummary summary = new AthleteImportService().importFile(
-					new MockMultipartFile("file", "athletes.xlsx",
-							"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", output.toByteArray()));
+			var rows = new AthleteRegistrationParser().parse(output.toByteArray(), "athletes.xlsx");
 
-			assertEquals(1, summary.athleteCount());
-			assertEquals("Ada", summary.athletes().get(0).getFirstName());
-			assertEquals("12.40", summary.athletes().get(0).getEvents().get(0).getResult());
+			assertEquals(1, rows.size());
+			assertEquals("Ada", rows.get(0).athlete().firstName());
+			assertEquals("12.40", rows.get(0).athlete().events().get(0).result());
 		}
 	}
 }

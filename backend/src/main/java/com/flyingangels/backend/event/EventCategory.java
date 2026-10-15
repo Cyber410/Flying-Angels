@@ -26,14 +26,20 @@ public class EventCategory {
 
 	@Enumerated(EnumType.STRING)
 	private RankingOrder rankingOrder;
+    @Enumerated(EnumType.STRING) private ResultUnit unit;
 
 	public EventCategory(String name, RankingOrder rankingOrder) {
 		this.name = name.trim();
 		this.rankingOrder = rankingOrder;
+        this.unit = ResultValues.unitFor(name,rankingOrder);
 	}
 
+    public EventCategory(String name,RankingOrder rankingOrder,ResultUnit unit) {
+        this(name,rankingOrder); if(unit!=null)this.unit=unit;
+    }
 	public void update(String name, RankingOrder rankingOrder) {
 		this.name = name.trim();
 		this.rankingOrder = rankingOrder;
+        this.unit = ResultValues.unitFor(name,rankingOrder);
 	}
 }

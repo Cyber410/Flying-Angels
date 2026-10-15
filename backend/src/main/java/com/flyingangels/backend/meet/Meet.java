@@ -29,8 +29,10 @@ public class Meet {
 
 	private String name;
 	private LocalDate meetDate;
+    private LocalDate startDate;
+    private LocalDate endDate;
 	private String location;
-	private String externalUrl;
+	@jakarta.persistence.Column(length=500) private String externalUrl;
 
 	@OneToMany(mappedBy = "meet", cascade = CascadeType.ALL, orphanRemoval = true)
 	private List<Event> events = new ArrayList<>();
@@ -41,7 +43,10 @@ public class Meet {
 
 	public void updateFrom(MeetRequest request) {
 		this.name = request.name().trim();
-		this.meetDate = request.meetDate();
+		if (!request.isDateRangeValid()) throw new IllegalArgumentException("Invalid meet date range");
+        this.startDate = request.effectiveStartDate();
+        this.endDate = request.effectiveEndDate();
+        this.meetDate = this.startDate;
 		this.location = request.location();
 		this.externalUrl = request.externalUrl();
 	}

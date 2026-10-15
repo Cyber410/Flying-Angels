@@ -1,0 +1,3721 @@
+{
+  "info": {
+    "name": "Flying Angels - Complete backend verification",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "All 39 controller endpoints plus positive/negative workflows. Run folders in order against a disposable database. Fixtures are relative to docs/postman. Development uses No Auth; for prod select collection Basic Auth and set username/password locally. CSRF headers are populated automatically when a token is returned."
+  },
+  "auth": {
+    "type": "noauth"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080"
+    },
+    {
+      "key": "csrfToken",
+      "value": ""
+    },
+    {
+      "key": "csrfHeader",
+      "value": "X-XSRF-TOKEN"
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "if (![\"GET\",\"HEAD\",\"OPTIONS\"].includes(pm.request.method)) {",
+          "  const token=pm.collectionVariables.get(\"csrfToken\");",
+          "  if (token) pm.request.headers.upsert({key:pm.collectionVariables.get(\"csrfHeader\") || \"X-XSRF-TOKEN\",value:token});",
+          "}"
+        ]
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "00 - Setup and athletes",
+      "description": "Run the full collection in order against a disposable database. First request creates a fresh run ID; response scripts save all IDs. Set collection Basic Auth manually when running with prod security.",
+      "item": [
+        {
+          "name": "Initialize run and list athletes",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/athletes",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set(\"runId\", pm.variables.replaceIn(\"{{$guid}}\"));",
+                  "pm.collectionVariables.set(\"importSource\", \"POSTMAN_\" + pm.collectionVariables.get(\"runId\"));",
+                  "[\"csrfToken\",\"csrfHeader\",\"athleteAId\",\"athleteBId\",\"athleteCId\",\"athleteDId\",\"meetId\",\"targetMeetId\",\"category100Id\",\"category200Id\",\"categoryJumpId\",\"category400Id\",\"event100Id\",\"event200Id\",\"eventJumpId\",\"copiedEventId\",\"resultId\",\"importId\",\"updateImportId\",\"unchangedImportId\",\"importAthleteId\",\"importNoDobAthleteId\",\"immediateAthleteId\",\"tsvAthleteId\",\"xlsxAthleteId\"].forEach(k => pm.collectionVariables.unset(k));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "var responseBody = pm.response.json();",
+                  "pm.test(\"Expected behavior\", () => {",
+                  "pm.expect(responseBody).to.be.an(\"array\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get CSRF token (needed for secured writes)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/csrf",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"CSRF endpoint responds\", () => pm.expect([200,204]).to.include(pm.response.code));",
+                  "if (pm.response.text()) { var responseBody=pm.response.json(); if (responseBody && responseBody.token) { pm.collectionVariables.set(\"csrfToken\",responseBody.token); pm.collectionVariables.set(\"csrfHeader\",responseBody.headerName); } }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create CaseA without DOB",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/athletes",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"CaseA\",\n  \"lastName\": \"QA {{runId}}\",\n  \"gender\": \"Female\",\n  \"dateOfBirth\": null,\n  \"flyStatus\": \"In Roster\",\n  \"flyaStatus\": \"\",\n  \"note\": \"General note {{runId}}\",\n  \"events\": []\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", () => pm.response.to.have.status(201));",
+                  "var responseBody = pm.response.json();",
+                  "pm.collectionVariables.set(\"athleteAId\", responseBody.id);",
+                  "pm.test(\"Expected behavior\", () => {",
+                  "pm.expect(responseBody.id).to.be.a(\"number\"); pm.expect(responseBody.dateOfBirth).to.equal(null);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create CaseB",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/athletes",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"CaseB\",\n  \"lastName\": \"QA {{runId}}\",\n  \"gender\": \"Male\",\n  \"dateOfBirth\": \"2010-03-21\",\n  \"flyStatus\": \"In Roster\",\n  \"flyaStatus\": \"\",\n  \"note\": \"General note {{runId}}\",\n  \"events\": []\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", () => pm.response.to.have.status(201));",
+                  "var responseBody = pm.response.json();",
+                  "pm.collectionVariables.set(\"athleteBId\", responseBody.id);",
+                  "pm.test(\"Expected behavior\", () => {",
+                  "pm.expect(responseBody.id).to.be.a(\"number\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create CaseC",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/athletes",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"CaseC\",\n  \"lastName\": \"QA {{runId}}\",\n  \"gender\": \"Male\",\n  \"dateOfBirth\": \"2011-03-21\",\n  \"flyStatus\": \"In Roster\",\n  \"flyaStatus\": \"\",\n  \"note\": \"General note {{runId}}\",\n  \"events\": []\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", () => pm.response.to.have.status(201));",
+                  "var responseBody = pm.response.json();",
+                  "pm.collectionVariables.set(\"athleteCId\", responseBody.id);",
+                  "pm.test(\"Expected behavior\", () => {",
+                  "pm.expect(responseBody.id).to.be.a(\"number\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create CaseD",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/athletes",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"CaseD\",\n  \"lastName\": \"QA {{runId}}\",\n  \"gender\": \"Male\",\n  \"dateOfBirth\": \"2012-03-21\",\n  \"flyStatus\": \"In Roster\",\n  \"flyaStatus\": \"\",\n  \"note\": \"General note {{runId}}\",\n  \"events\": []\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", () => pm.response.to.have.status(201));",
+                  "var responseBody = pm.response.json();",
+                  "pm.collectionVariables.set(\"athleteDId\", responseBody.id);",
+                  "pm.test(\"Expected behavior\", () => {",
+                  "pm.expect(responseBody.id).to.be.a(\"number\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject missing first name",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/athletes",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"\",\n  \"lastName\": \"QA {{runId}}\",\n  \"gender\": \"Male\",\n  \"dateOfBirth\": \"2010-03-21\",\n  \"flyStatus\": \"In Roster\",\n  \"flyaStatus\": \"\",\n  \"note\": \"General note {{runId}}\",\n  \"events\": []\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", () => pm.response.to.have.status(400));",
+                  "var responseBody = pm.response.json();",
+                  "pm.test(\"Expected behavior\", () => {",
+                  "pm.expect(responseBody.code).to.equal(\"VALIDATION_ERROR\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject duplicate demographic identity",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/athletes",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"CaseB\",\n  \"lastName\": \"QA {{runId}}\",\n  \"gender\": \"Male\",\n  \"dateOfBirth\": \"2010-03-21\",\n  \"flyStatus\": \"In Roster\",\n  \"flyaStatus\": \"\",\n  \"note\": \"General note {{runId}}\",\n  \"events\": []\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 409\", () => pm.response.to.have.status(409));",
+                  "var responseBody = pm.response.json();",
+                  "pm.test(\"Expected behavior\", () => {",
+                  "pm.expect(responseBody.code).to.equal(\"ATHLETE_ALREADY_EXISTS\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject future DOB in ordinary CRUD",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/athletes",
+            "description": "Import tolerates unusable DOB as unknown; ordinary athlete CRUD still validates supplied DOB.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"InvalidDOB\",\n  \"lastName\": \"QA {{runId}}\",\n  \"gender\": \"Male\",\n  \"dateOfBirth\": \"2999-01-01\",\n  \"flyStatus\": \"In Roster\",\n  \"flyaStatus\": \"\",\n  \"note\": \"General note {{runId}}\",\n  \"events\": []\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", () => pm.response.to.have.status(400));",
+                  "var responseBody = pm.response.json();",
+                  "pm.test(\"Expected behavior\", () => {",
+                  "pm.expect(responseBody.code).to.equal(\"VALIDATION_ERROR\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Directory search and required fields",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/athletes?search={{runId}}&gender=Female&team=FLY",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "var responseBody = pm.response.json();",
+                  "pm.test(\"Expected behavior\", () => {",
+                  "pm.expect(responseBody.some(a=>a.id===Number(pm.collectionVariables.get(\"athleteAId\")))).to.equal(true); [\"gender\",\"dateOfBirth\",\"flyStatus\",\"flyaStatus\"].forEach(k=>pm.expect(responseBody[0]).to.have.property(k));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get athlete profile",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/athletes/{{athleteAId}}",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "var responseBody = pm.response.json();",
+                  "pm.test(\"Expected behavior\", () => {",
+                  "pm.expect(responseBody.participations).to.be.an(\"array\"); pm.expect(responseBody.events).to.be.an(\"array\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject malformed athlete ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/athletes/not-a-number",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", () => pm.response.to.have.status(400));",
+                  "var responseBody = pm.response.json();",
+                  "pm.test(\"Expected behavior\", () => {",
+                  "pm.expect(responseBody.code).to.equal(\"INVALID_REQUEST\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "01 - Meets and event definitions",
+      "description": "Create reusable definitions, single/bulk events, and verify date and duplicate constraints.",
+      "item": [
+        {
+          "name": "Create multi-day meet",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/meets",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"QA source {{runId}}\",\n  \"startDate\": \"2026-05-16\",\n  \"endDate\": \"2026-05-18\",\n  \"location\": \"QA Stadium\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", () => pm.response.to.have.status(201));",
+                  "var responseBody = pm.response.json();",
+                  "pm.collectionVariables.set(\"meetId\", responseBody.id);",
+                  "pm.test(\"Expected behavior\", () => {",
+                  "pm.expect(responseBody.startDate).to.equal(\"2026-05-16\"); pm.expect(responseBody.endDate).to.equal(\"2026-05-18\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create target meet with legacy meetDate",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/meets",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"QA target {{runId}}\",\n  \"meetDate\": \"2026-06-01\",\n  \"location\": \"QA Park\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", () => pm.response.to.have.status(201));",
+                  "var responseBody = pm.response.json();",
+                  "pm.collectionVariables.set(\"targetMeetId\", responseBody.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject reversed meet dates",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/meets",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"QA source {{runId}}\",\n  \"startDate\": \"2026-05-19\",\n  \"endDate\": \"2026-05-18\",\n  \"location\": \"QA Stadium\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List meets",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/meets",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "var responseBody = pm.response.json();",
+                  "pm.test(\"Expected behavior\", () => {",
+                  "pm.expect(responseBody).to.be.an(\"array\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get meet profile",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/meets/{{meetId}}",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "var responseBody = pm.response.json();",
+                  "pm.test(\"Expected behavior\", () => {",
+                  "pm.expect(responseBody.meet.id).to.equal(Number(pm.collectionVariables.get(\"meetId\"))); pm.expect(responseBody.events).to.be.an(\"array\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update meet",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/meets/{{meetId}}",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"QA source {{runId}}\",\n  \"startDate\": \"2026-05-16\",\n  \"endDate\": \"2026-05-18\",\n  \"location\": \"QA Updated Stadium\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "var responseBody = pm.response.json();",
+                  "pm.test(\"Expected behavior\", () => {",
+                  "pm.expect(responseBody.location).to.equal(\"QA Updated Stadium\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create 100m definition",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/event-categories",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"100m QA {{runId}}\",\n  \"unit\": \"SECONDS\",\n  \"rankingOrder\": \"ASC\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", () => pm.response.to.have.status(201));",
+                  "var responseBody = pm.response.json();",
+                  "pm.collectionVariables.set(\"category100Id\", responseBody.id);",
+                  "pm.test(\"Expected behavior\", () => {",
+                  "pm.expect(responseBody.unit).to.equal(\"SECONDS\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create 200m definition",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/event-categories",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"200m QA {{runId}}\",\n  \"unit\": \"SECONDS\",\n  \"rankingOrder\": \"ASC\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", () => pm.response.to.have.status(201));",
+                  "var responseBody = pm.response.json();",
+                  "pm.collectionVariables.set(\"category200Id\", responseBody.id);",
+                  "pm.test(\"Expected behavior\", () => {",
+                  "pm.expect(responseBody.unit).to.equal(\"SECONDS\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create Long Jump definition",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/event-categories",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Long Jump QA {{runId}}\",\n  \"unit\": \"METRES\",\n  \"rankingOrder\": \"DESC\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", () => pm.response.to.have.status(201));",
+                  "var responseBody = pm.response.json();",
+                  "pm.collectionVariables.set(\"categoryJumpId\", responseBody.id);",
+                  "pm.test(\"Expected behavior\", () => {",
+                  "pm.expect(responseBody.unit).to.equal(\"METRES\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create 400m definition",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/event-categories",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"400m QA {{runId}}\",\n  \"unit\": \"SECONDS\",\n  \"rankingOrder\": \"ASC\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", () => pm.response.to.have.status(201));",
+                  "var responseBody = pm.response.json();",
+                  "pm.collectionVariables.set(\"category400Id\", responseBody.id);",
+                  "pm.test(\"Expected behavior\", () => {",
+                  "pm.expect(responseBody.unit).to.equal(\"SECONDS\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject duplicate definition",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/event-categories",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"100m QA {{runId}}\",\n  \"unit\": \"SECONDS\",\n  \"rankingOrder\": \"ASC\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 409\", () => pm.response.to.have.status(409));",
+                  "var responseBody = pm.response.json();",
+                  "pm.test(\"Expected behavior\", () => {",
+                  "pm.expect(responseBody.code).to.equal(\"DATA_CONFLICT\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List definitions",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/event-categories",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "var responseBody = pm.response.json();",
+                  "pm.test(\"Expected behavior\", () => {",
+                  "pm.expect(responseBody).to.be.an(\"array\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create meet 100m event",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/events",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"100m {{runId}}\",\n  \"eventDate\": \"2026-05-17\",\n  \"location\": \"QA Stadium\",\n  \"eventType\": \"Track\",\n  \"externalUrl\": null,\n  \"rankingOrder\": \"ASC\",\n  \"meetId\": {{meetId}},\n  \"categoryId\": {{category100Id}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", () => pm.response.to.have.status(201));",
+                  "var responseBody = pm.response.json();",
+                  "pm.collectionVariables.set(\"event100Id\", responseBody.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Bulk add 200m and Long Jump",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/meets/{{meetId}}/events/bulk",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"events\": [\n    {\n      \"name\": \"200m {{runId}}\",\n      \"eventDate\": \"2026-05-17\",\n      \"location\": \"QA Stadium\",\n      \"eventType\": \"Track\",\n      \"externalUrl\": null,\n      \"rankingOrder\": \"ASC\",\n      \"meetId\": {{meetId}},\n      \"categoryId\": {{category200Id}}\n    },\n    {\n      \"name\": \"Long Jump {{runId}}\",\n      \"eventDate\": \"2026-05-17\",\n      \"location\": \"QA Stadium\",\n      \"eventType\": \"Field\",\n      \"externalUrl\": null,\n      \"rankingOrder\": \"DESC\",\n      \"meetId\": {{meetId}},\n      \"categoryId\": {{categoryJumpId}}\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", () => pm.response.to.have.status(201));",
+                  "var responseBody = pm.response.json();",
+                  "pm.test(\"Expected behavior\", () => {",
+                  "pm.expect(responseBody).to.have.lengthOf(2); pm.collectionVariables.set(\"event200Id\",responseBody[0].id); pm.collectionVariables.set(\"eventJumpId\",responseBody[1].id);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject duplicate event in a meet",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/events",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Duplicate 100m {{runId}}\",\n  \"eventDate\": \"2026-05-17\",\n  \"location\": \"QA Stadium\",\n  \"eventType\": \"Track\",\n  \"externalUrl\": null,\n  \"rankingOrder\": \"ASC\",\n  \"meetId\": {{meetId}},\n  \"categoryId\": {{category100Id}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 409\", () => pm.response.to.have.status(409));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Bulk event failure rolls back valid first entry",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/meets/{{meetId}}/events/bulk",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"events\": [\n    {\n      \"name\": \"400m {{runId}}\",\n      \"eventDate\": \"2026-05-17\",\n      \"location\": \"QA Stadium\",\n      \"eventType\": \"Track\",\n      \"externalUrl\": null,\n      \"rankingOrder\": \"ASC\",\n      \"meetId\": {{meetId}},\n      \"categoryId\": {{category400Id}}\n    },\n    {\n      \"name\": \"Duplicate 100m {{runId}}\",\n      \"eventDate\": \"2026-05-17\",\n      \"location\": \"QA Stadium\",\n      \"eventType\": \"Track\",\n      \"externalUrl\": null,\n      \"rankingOrder\": \"ASC\",\n      \"meetId\": {{meetId}},\n      \"categoryId\": {{category100Id}}\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 409\", () => pm.response.to.have.status(409));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Confirm bulk event rollback",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/meets/{{meetId}}/events",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "var responseBody = pm.response.json();",
+                  "pm.test(\"Expected behavior\", () => {",
+                  "pm.expect(responseBody).to.have.lengthOf(3); pm.expect(responseBody.some(e=>e.category.id===Number(pm.collectionVariables.get(\"category400Id\")))).to.equal(false);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject event outside meet dates",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/events",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"400m {{runId}}\",\n  \"eventDate\": \"2026-05-19\",\n  \"location\": \"QA Stadium\",\n  \"eventType\": \"Track\",\n  \"externalUrl\": null,\n  \"rankingOrder\": \"ASC\",\n  \"meetId\": {{meetId}},\n  \"categoryId\": {{category400Id}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get selected meet event",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/meets/{{meetId}}/events/{{event100Id}}",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "var responseBody = pm.response.json();",
+                  "pm.test(\"Expected behavior\", () => {",
+                  "pm.expect(responseBody.id).to.equal(Number(pm.collectionVariables.get(\"event100Id\")));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject event requested through wrong meet",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/meets/{{targetMeetId}}/events/{{event100Id}}",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 404\", () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update event metadata",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/events/{{event100Id}}",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Updated 100m {{runId}}\",\n  \"eventDate\": \"2026-05-17\",\n  \"location\": \"QA Stadium\",\n  \"eventType\": \"Track\",\n  \"externalUrl\": null,\n  \"rankingOrder\": \"ASC\",\n  \"meetId\": {{meetId}},\n  \"categoryId\": {{category100Id}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "var responseBody = pm.response.json();",
+                  "pm.test(\"Expected behavior\", () => {",
+                  "pm.expect(responseBody.name).to.include(\"Updated 100m\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List events",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/events",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "var responseBody = pm.response.json();",
+                  "pm.test(\"Expected behavior\", () => {",
+                  "pm.expect(responseBody).to.be.an(\"array\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject narrowing meet around existing event",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/meets/{{meetId}}",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"QA source {{runId}}\",\n  \"startDate\": \"2026-05-18\",\n  \"endDate\": \"2026-05-18\",\n  \"location\": \"QA Stadium\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "02 - Participation",
+      "description": "Unique assignments, bulk rollback, and the same athlete in multiple events.",
+      "item": [
+        {
+          "name": "Assign A to 100m without a result",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/events/{{event100Id}}/participants",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"athleteId\": {{athleteAId}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", () => pm.response.to.have.status(201));",
+                  "var responseBody = pm.response.json();",
+                  "pm.test(\"Expected behavior\", () => {",
+                  "pm.expect(responseBody.participationId).to.be.a(\"number\"); pm.expect(responseBody.meetId).to.equal(Number(pm.collectionVariables.get(\"meetId\")));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject duplicate assignment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/events/{{event100Id}}/participants",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"athleteId\": {{athleteAId}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 409\", () => pm.response.to.have.status(409));",
+                  "var responseBody = pm.response.json();",
+                  "pm.test(\"Expected behavior\", () => {",
+                  "pm.expect(responseBody.code).to.equal(\"ATHLETE_ALREADY_ASSIGNED\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Bulk assign B and C",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/events/{{event100Id}}/participants/bulk",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"athleteIds\": [\n    {{athleteBId}},\n    {{athleteCId}}\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", () => pm.response.to.have.status(201));",
+                  "var responseBody = pm.response.json();",
+                  "pm.test(\"Expected behavior\", () => {",
+                  "pm.expect(responseBody).to.have.lengthOf(2);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject repeated IDs within a batch",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/events/{{event100Id}}/participants/bulk",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"athleteIds\": [\n    {{athleteDId}},\n    {{athleteDId}}\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Bulk assignment failure rolls back D",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/events/{{event100Id}}/participants/bulk",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"athleteIds\": [\n    {{athleteDId}},\n    {{athleteAId}}\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 409\", () => pm.response.to.have.status(409));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List participants and confirm D rollback",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/events/{{event100Id}}/participants",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "var responseBody = pm.response.json();",
+                  "pm.test(\"Expected behavior\", () => {",
+                  "pm.expect(responseBody).to.have.lengthOf(3); pm.expect(responseBody.some(p=>p.athleteId===Number(pm.collectionVariables.get(\"athleteDId\")))).to.equal(false);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Assign same athlete A to Long Jump",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/events/{{eventJumpId}}/participants",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"athleteId\": {{athleteAId}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "03 - Results and leaderboard",
+      "description": "Append attempts, correct one record, normalize track/field measurements, reject invalid input, and verify bulk rollback.",
+      "item": [
+        {
+          "name": "Record A first 100m attempt",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/events/{{event100Id}}/results",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"athleteId\": {{athleteAId}},\n  \"result\": \"12.40\",\n  \"unit\": \"SECONDS\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", () => pm.response.to.have.status(201));",
+                  "var responseBody = pm.response.json();",
+                  "pm.test(\"Expected behavior\", () => {",
+                  "pm.expect(responseBody.score).to.equal(12.4); pm.expect(responseBody.unit).to.equal(\"SECONDS\"); pm.collectionVariables.set(\"resultId\",responseBody.resultId);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Record A second attempt without replacing first",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/events/{{event100Id}}/results",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"athleteId\": {{athleteAId}},\n  \"result\": \"12.10\",\n  \"unit\": \"SECONDS\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Append through compatibility participant-result PUT",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/events/{{event100Id}}/participants/{{athleteAId}}/result",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"result\": \"12.00\",\n  \"unit\": \"SECONDS\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "var responseBody = pm.response.json();",
+                  "pm.test(\"Expected behavior\", () => {",
+                  "pm.expect(responseBody.score).to.equal(12);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Correct only the first result",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/events/{{event100Id}}/results/{{resultId}}",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"athleteId\": {{athleteAId}},\n  \"result\": \"12.35\",\n  \"unit\": \"SECONDS\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "var responseBody = pm.response.json();",
+                  "pm.test(\"Expected behavior\", () => {",
+                  "pm.expect(responseBody.resultId).to.equal(Number(pm.collectionVariables.get(\"resultId\"))); pm.expect(responseBody.score).to.equal(12.35);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Bulk save B and C results",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/events/{{event100Id}}/results/bulk",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"results\": [\n    {\n      \"athleteId\": {{athleteBId}},\n      \"result\": \"12.90\",\n      \"unit\": \"SECONDS\"\n    },\n    {\n      \"athleteId\": {{athleteCId}},\n      \"result\": \"13.10\",\n      \"unit\": \"SECONDS\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", () => pm.response.to.have.status(201));",
+                  "var responseBody = pm.response.json();",
+                  "pm.test(\"Expected behavior\", () => {",
+                  "pm.expect(responseBody).to.have.lengthOf(2);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Record field measurement",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/events/{{eventJumpId}}/results",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"athleteId\": {{athleteAId}},\n  \"result\": \"5.18m\",\n  \"unit\": \"METRES\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", () => pm.response.to.have.status(201));",
+                  "var responseBody = pm.response.json();",
+                  "pm.test(\"Expected behavior\", () => {",
+                  "pm.expect(responseBody.score).to.equal(5.18); pm.expect(responseBody.unit).to.equal(\"METRES\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Normalize minutes and seconds and auto-assign D to 200m",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/events/{{event200Id}}/results",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"athleteId\": {{athleteDId}},\n  \"result\": \"2:44.07\",\n  \"unit\": \"SECONDS\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", () => pm.response.to.have.status(201));",
+                  "var responseBody = pm.response.json();",
+                  "pm.test(\"Expected behavior\", () => {",
+                  "pm.expect(responseBody.score).to.equal(164.07); pm.expect(responseBody.status).to.equal(\"VALID\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Record NT without inventing a numeric score",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/events/{{event200Id}}/results",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"athleteId\": {{athleteDId}},\n  \"result\": \"NT\",\n  \"unit\": \"SECONDS\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", () => pm.response.to.have.status(201));",
+                  "var responseBody = pm.response.json();",
+                  "pm.test(\"Expected behavior\", () => {",
+                  "pm.expect(responseBody.score).to.equal(null); pm.expect(responseBody.status).to.equal(\"NT\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Record field FOUL without a score",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/events/{{eventJumpId}}/results",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"athleteId\": {{athleteDId}},\n  \"result\": \"FOUL\",\n  \"unit\": \"METRES\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", () => pm.response.to.have.status(201));",
+                  "var responseBody = pm.response.json();",
+                  "pm.test(\"Expected behavior\", () => {",
+                  "pm.expect(responseBody.score).to.equal(null); pm.expect(responseBody.status).to.equal(\"FOUL\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Field leaderboard excludes FOUL and ranks metres descending",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/events/{{eventJumpId}}/leaderboard",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "var responseBody = pm.response.json();",
+                  "pm.test(\"Expected behavior\", () => {",
+                  "pm.expect(responseBody).to.have.lengthOf(1); pm.expect(responseBody[0].score).to.equal(5.18);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject changing category after results exist",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/events/{{event100Id}}",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Changed category {{runId}}\",\n  \"eventDate\": \"2026-05-17\",\n  \"location\": \"QA Stadium\",\n  \"eventType\": \"Track\",\n  \"externalUrl\": null,\n  \"rankingOrder\": \"ASC\",\n  \"meetId\": {{meetId}},\n  \"categoryId\": {{category400Id}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject wrong result unit",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/events/{{event100Id}}/results",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"athleteId\": {{athleteAId}},\n  \"result\": \"12.4\",\n  \"unit\": \"METRES\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject score inconsistent with raw result",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/events/{{event100Id}}/results",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"athleteId\": {{athleteAId}},\n  \"result\": \"12.4\",\n  \"unit\": \"SECONDS\",\n  \"score\": 99\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject malformed time",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/events/{{event100Id}}/results",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"athleteId\": {{athleteAId}},\n  \"result\": \"2:99.00\",\n  \"unit\": \"SECONDS\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Bulk invalid result rolls back D result and assignment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/events/{{event100Id}}/results/bulk",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"results\": [\n    {\n      \"athleteId\": {{athleteDId}},\n      \"result\": \"13.5\",\n      \"unit\": \"SECONDS\"\n    },\n    {\n      \"athleteId\": {{athleteAId}},\n      \"result\": \"not-a-result\",\n      \"unit\": \"SECONDS\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List results - attempts preserved, invalid bulk absent",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/events/{{event100Id}}/results",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "var responseBody = pm.response.json();",
+                  "pm.test(\"Expected behavior\", () => {",
+                  "pm.expect(responseBody).to.have.lengthOf(5); pm.expect(responseBody.filter(r=>r.athleteId===Number(pm.collectionVariables.get(\"athleteAId\")))).to.have.lengthOf(3); pm.expect(responseBody.some(r=>r.athleteId===Number(pm.collectionVariables.get(\"athleteDId\")))).to.equal(false);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Leaderboard has one best attempt per athlete",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/events/{{event100Id}}/leaderboard",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "var responseBody = pm.response.json();",
+                  "pm.test(\"Expected behavior\", () => {",
+                  "pm.expect(responseBody).to.have.lengthOf(3); pm.expect(responseBody[0].athleteId).to.equal(Number(pm.collectionVariables.get(\"athleteAId\"))); pm.expect(responseBody[0].score).to.equal(12);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get event profile including participants and results",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/events/{{event100Id}}",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "var responseBody = pm.response.json();",
+                  "pm.test(\"Expected behavior\", () => {",
+                  "pm.expect(responseBody.participants).to.have.lengthOf(3); pm.expect(responseBody.results).to.have.lengthOf(5);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Athlete profile includes meet context and both assignments",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/athletes/{{athleteAId}}",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "var responseBody = pm.response.json();",
+                  "pm.test(\"Expected behavior\", () => {",
+                  "pm.expect(responseBody.participations).to.have.lengthOf(2); pm.expect(responseBody.events).to.have.lengthOf(4); pm.expect(responseBody.events.every(r=>r.meetId===Number(pm.collectionVariables.get(\"meetId\")))).to.equal(true);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Athlete update response preserves results and participation",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/athletes/{{athleteAId}}",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"CaseA\",\n  \"lastName\": \"QA {{runId}}\",\n  \"dateOfBirth\": \"2010-01-01\",\n  \"gender\": \"Female\",\n  \"flyStatus\": \"In Roster\",\n  \"flyaStatus\": \"\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "var responseBody = pm.response.json();",
+                  "pm.test(\"Expected behavior\", () => {",
+                  "pm.expect(responseBody.participations).to.have.lengthOf(2); pm.expect(responseBody.events).to.have.lengthOf(4); pm.expect(responseBody.note).to.equal(\"General note \"+pm.collectionVariables.get(\"runId\"));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "04 - Notes and definition-only copying",
+      "description": "Create ordered notes and copy a populated event into an empty meet without carrying athletes/results.",
+      "item": [
+        {
+          "name": "Append general history note",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/athletes/{{athleteAId}}/notes",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"text\": \"General history {{runId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Append event-specific history note",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/athletes/{{athleteAId}}/notes",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"text\": \"Event observation {{runId}}\",\n  \"eventId\": {{event100Id}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List notes newest first with meet context",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/athletes/{{athleteAId}}/notes",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "var responseBody = pm.response.json();",
+                  "pm.test(\"Expected behavior\", () => {",
+                  "pm.expect(responseBody).to.have.lengthOf(2); pm.expect(responseBody[0].eventId).to.equal(Number(pm.collectionVariables.get(\"event100Id\"))); pm.expect(responseBody[0].meetId).to.equal(Number(pm.collectionVariables.get(\"meetId\")));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject empty history note",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/athletes/{{athleteAId}}/notes",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"text\": \"\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Copy selected populated event",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/meets/{{targetMeetId}}/events/copy",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sourceMeetId\": {{meetId}},\n  \"eventIds\": [\n    {{event100Id}}\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", () => pm.response.to.have.status(201));",
+                  "var responseBody = pm.response.json();",
+                  "pm.test(\"Expected behavior\", () => {",
+                  "pm.expect(responseBody).to.have.lengthOf(1); pm.expect(responseBody[0].participantCount).to.equal(0); pm.expect(responseBody[0].meetId).to.equal(Number(pm.collectionVariables.get(\"targetMeetId\"))); pm.collectionVariables.set(\"copiedEventId\",responseBody[0].id);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Confirm copied event has no results or assignments",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/events/{{copiedEventId}}",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "var responseBody = pm.response.json();",
+                  "pm.test(\"Expected behavior\", () => {",
+                  "pm.expect(responseBody.results).to.have.lengthOf(0); pm.expect(responseBody.participants).to.have.lengthOf(0);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject duplicate copied category",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/meets/{{targetMeetId}}/events/copy",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sourceMeetId\": {{meetId}},\n  \"eventIds\": [\n    {{event100Id}}\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 409\", () => pm.response.to.have.status(409));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "05 - Imports create update unchanged",
+      "description": "Choose the fixture files if your Postman installation cannot resolve the relative paths. Keep the same source variable for the whole run.",
+      "item": [
+        {
+          "name": "Preview initial CSV - missing and unusable DOB allowed",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/athletes/import/preview",
+            "description": "",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": "fixtures/athletes-initial.csv"
+                },
+                {
+                  "key": "source",
+                  "type": "text",
+                  "value": "{{importSource}}"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "var responseBody = pm.response.json();",
+                  "pm.test(\"Expected behavior\", () => {",
+                  "pm.expect(responseBody.rows.map(r=>r.status)).to.eql([\"NEW\",\"INVALID\",\"NEW\",\"NEW\"]); pm.expect(responseBody.rows[0].athlete.dateOfBirth).to.equal(null); pm.expect(responseBody.rows[2].athlete.dateOfBirth).to.equal(null); pm.collectionVariables.set(\"importId\",responseBody.importId);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Retrieve persisted preview",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/athletes/import/{{importId}}",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "var responseBody = pm.response.json();",
+                  "pm.test(\"Expected behavior\", () => {",
+                  "pm.expect(responseBody.rows).to.have.lengthOf(4);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject source row outside preview",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/athletes/import/{{importId}}/commit",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"rowNumbers\": [\n    999\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Commit selected rows 2 and 4 only",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/athletes/import/{{importId}}/commit",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"rowNumbers\": [\n    2,\n    4\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "var responseBody = pm.response.json();",
+                  "pm.test(\"Expected behavior\", () => {",
+                  "pm.expect(responseBody.imported).to.equal(2); pm.expect(responseBody.updated).to.equal(0); pm.expect(responseBody.skipped).to.equal(2); pm.expect(responseBody.failed).to.equal(0); pm.collectionVariables.set(\"importAthleteId\",responseBody.rows.find(r=>r.rowNumber===2).athleteId); pm.collectionVariables.set(\"importNoDobAthleteId\",responseBody.rows.find(r=>r.rowNumber===4).athleteId);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Repeat commit - no duplicate insertion",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/athletes/import/{{importId}}/commit",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"rowNumbers\": [\n    2,\n    4\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "var responseBody = pm.response.json();",
+                  "pm.test(\"Expected behavior\", () => {",
+                  "pm.expect(responseBody.imported).to.equal(2); pm.expect(responseBody.updated).to.equal(0); pm.expect(responseBody.rows.find(r=>r.rowNumber===2).athleteId).to.equal(Number(pm.collectionVariables.get(\"importAthleteId\")));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Selecting an invalid row preserves successful earlier imports",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/athletes/import/{{importId}}/commit",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"rowNumbers\": [\n    3\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "var responseBody = pm.response.json();",
+                  "pm.test(\"Expected behavior\", () => {",
+                  "pm.expect(responseBody.imported).to.equal(2); pm.expect(responseBody.failed).to.equal(1); pm.expect(responseBody.rows.find(r=>r.rowNumber===2).status).to.equal(\"IMPORTED\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Preview later registration changes",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/athletes/import/preview",
+            "description": "",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": "fixtures/athletes-updated.csv"
+                },
+                {
+                  "key": "source",
+                  "type": "text",
+                  "value": "{{importSource}}"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "var responseBody = pm.response.json();",
+                  "pm.test(\"Expected behavior\", () => {",
+                  "pm.expect(responseBody.rows.map(r=>r.status)).to.eql([\"UPDATE\",\"UPDATE\"]); pm.collectionVariables.set(\"updateImportId\",responseBody.importId);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Commit later registration updates",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/athletes/import/{{updateImportId}}/commit",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"rowNumbers\": [\n    2,\n    3\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "var responseBody = pm.response.json();",
+                  "pm.test(\"Expected behavior\", () => {",
+                  "pm.expect(responseBody.imported).to.equal(0); pm.expect(responseBody.updated).to.equal(2); pm.expect(responseBody.failed).to.equal(0);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Confirm DOB filled and performances preserved",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/athletes/{{importAthleteId}}",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "var responseBody = pm.response.json();",
+                  "pm.test(\"Expected behavior\", () => {",
+                  "pm.expect(responseBody.dateOfBirth).to.equal(\"2010-03-21\"); pm.expect(responseBody.note).to.equal(\"Updated registration note\"); pm.expect(responseBody.flyStatus).to.equal(\"In Roster\"); pm.expect(responseBody.events).to.have.lengthOf(2); pm.expect(responseBody.events.every(r=>r.meetId===null)).to.equal(true);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Preview identical registration - unchanged",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/athletes/import/preview",
+            "description": "",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": "fixtures/athletes-updated.csv"
+                },
+                {
+                  "key": "source",
+                  "type": "text",
+                  "value": "{{importSource}}"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "var responseBody = pm.response.json();",
+                  "pm.test(\"Expected behavior\", () => {",
+                  "pm.expect(responseBody.rows.map(r=>r.status)).to.eql([\"UNCHANGED\",\"UNCHANGED\"]); pm.collectionVariables.set(\"unchangedImportId\",responseBody.importId);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Skip unchanged rows",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/athletes/import/{{unchangedImportId}}/commit",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"rowNumbers\": [\n    2,\n    3\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "var responseBody = pm.response.json();",
+                  "pm.test(\"Expected behavior\", () => {",
+                  "pm.expect(responseBody.imported).to.equal(0); pm.expect(responseBody.updated).to.equal(0); pm.expect(responseBody.skipped).to.equal(2);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Preview blank fields against stored data",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/athletes/import/preview",
+            "description": "",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": "fixtures/athletes-blanks.csv"
+                },
+                {
+                  "key": "source",
+                  "type": "text",
+                  "value": "{{importSource}}"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "var responseBody = pm.response.json();",
+                  "pm.test(\"Expected behavior\", () => {",
+                  "pm.expect(responseBody.rows[0].status).to.equal(\"UNCHANGED\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject missing required registration headers",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/athletes/import/preview",
+            "description": "",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": "fixtures/invalid-headers.csv"
+                },
+                {
+                  "key": "source",
+                  "type": "text",
+                  "value": "{{importSource}}"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Immediate import uses same create rules",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/athletes/import",
+            "description": "",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": "fixtures/athletes-immediate.csv"
+                },
+                {
+                  "key": "source",
+                  "type": "text",
+                  "value": "{{importSource}}"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "var responseBody = pm.response.json();",
+                  "pm.test(\"Expected behavior\", () => {",
+                  "pm.expect(responseBody.athleteCount).to.equal(1); pm.expect(responseBody.updatedCount).to.equal(0);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Resolve immediate upload ID through same matching",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/athletes/import/preview",
+            "description": "",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": "fixtures/athletes-immediate.csv"
+                },
+                {
+                  "key": "source",
+                  "type": "text",
+                  "value": "{{importSource}}"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "var responseBody = pm.response.json();",
+                  "pm.test(\"Expected behavior\", () => {",
+                  "pm.expect(responseBody.rows[0].status).to.equal(\"UNCHANGED\"); pm.collectionVariables.set(\"immediateAthleteId\",responseBody.rows[0].athleteId);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Immediate import updates an existing athlete",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/athletes/import",
+            "description": "",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": "fixtures/athletes-immediate-updated.csv"
+                },
+                {
+                  "key": "source",
+                  "type": "text",
+                  "value": "{{importSource}}"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "var responseBody = pm.response.json();",
+                  "pm.test(\"Expected behavior\", () => {",
+                  "pm.expect(responseBody.athleteCount).to.equal(0); pm.expect(responseBody.updatedCount).to.equal(1);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Immediate identical upload skips unchanged",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/athletes/import",
+            "description": "",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": "fixtures/athletes-immediate-updated.csv"
+                },
+                {
+                  "key": "source",
+                  "type": "text",
+                  "value": "{{importSource}}"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "var responseBody = pm.response.json();",
+                  "pm.test(\"Expected behavior\", () => {",
+                  "pm.expect(responseBody.athleteCount).to.equal(0); pm.expect(responseBody.updatedCount).to.equal(0); pm.expect(responseBody.duplicateCount).to.equal(1); pm.expect(responseBody.skippedCount).to.equal(1);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Import TSV registration",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/athletes/import",
+            "description": "",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": "fixtures/athletes.tsv"
+                },
+                {
+                  "key": "source",
+                  "type": "text",
+                  "value": "{{importSource}}"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "var responseBody = pm.response.json();",
+                  "pm.test(\"Expected behavior\", () => {",
+                  "pm.expect(responseBody.athleteCount).to.equal(1); pm.expect(responseBody.failedCount).to.equal(0);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Resolve TSV athlete for cleanup",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/athletes/import/preview",
+            "description": "",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": "fixtures/athletes.tsv"
+                },
+                {
+                  "key": "source",
+                  "type": "text",
+                  "value": "{{importSource}}"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "var responseBody = pm.response.json();",
+                  "pm.test(\"Expected behavior\", () => {",
+                  "pm.expect(responseBody.rows[0].status).to.equal(\"UNCHANGED\"); pm.collectionVariables.set(\"tsvAthleteId\",responseBody.rows[0].athleteId);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Import XLSX registration",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/athletes/import",
+            "description": "",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": "fixtures/athletes.xlsx"
+                },
+                {
+                  "key": "source",
+                  "type": "text",
+                  "value": "{{importSource}}"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "var responseBody = pm.response.json();",
+                  "pm.test(\"Expected behavior\", () => {",
+                  "pm.expect(responseBody.athleteCount).to.equal(1); pm.expect(responseBody.failedCount).to.equal(0);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Resolve XLSX athlete for cleanup",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/athletes/import/preview",
+            "description": "",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": "fixtures/athletes.xlsx"
+                },
+                {
+                  "key": "source",
+                  "type": "text",
+                  "value": "{{importSource}}"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "var responseBody = pm.response.json();",
+                  "pm.test(\"Expected behavior\", () => {",
+                  "pm.expect(responseBody.rows[0].status).to.equal(\"UNCHANGED\"); pm.collectionVariables.set(\"xlsxAthleteId\",responseBody.rows[0].athleteId);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create same-name identity ambiguousAId",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/athletes",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"PostmanAmbiguous\",\n  \"lastName\": \"Sample\",\n  \"dateOfBirth\": \"2010-01-01\",\n  \"gender\": \"Male\",\n  \"events\": []\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", () => pm.response.to.have.status(201));",
+                  "var responseBody = pm.response.json();",
+                  "pm.collectionVariables.set(\"ambiguousAId\", responseBody.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create same-name identity ambiguousBId",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/athletes",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"PostmanAmbiguous\",\n  \"lastName\": \"Sample\",\n  \"dateOfBirth\": \"2011-01-01\",\n  \"gender\": \"Male\",\n  \"events\": []\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", () => pm.response.to.have.status(201));",
+                  "var responseBody = pm.response.json();",
+                  "pm.collectionVariables.set(\"ambiguousBId\", responseBody.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Flag multiple possible identities for review",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/athletes/import/preview",
+            "description": "",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": "fixtures/athletes-ambiguous.csv"
+                },
+                {
+                  "key": "source",
+                  "type": "text",
+                  "value": "{{importSource}}"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "var responseBody = pm.response.json();",
+                  "pm.test(\"Expected behavior\", () => {",
+                  "pm.expect(responseBody.rows[0].status).to.equal(\"AMBIGUOUS\"); pm.collectionVariables.set(\"ambiguousImportId\",responseBody.importId);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Ambiguous row does not overwrite an arbitrary athlete",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/athletes/import/{{ambiguousImportId}}/commit",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"rowNumbers\": [\n    2\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "var responseBody = pm.response.json();",
+                  "pm.test(\"Expected behavior\", () => {",
+                  "pm.expect(responseBody.imported).to.equal(0); pm.expect(responseBody.updated).to.equal(0); pm.expect(responseBody.failed).to.equal(1);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "06 - Deletion and cleanup",
+      "description": "Deletes only IDs created/captured during this run. Categories and import jobs have no deletion endpoint and remain; use a disposable database.",
+      "item": [
+        {
+          "name": "Delete one attempt",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/api/events/{{event100Id}}/results/{{resultId}}",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 204\", () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Deleting one attempt keeps participation",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/events/{{event100Id}}/participants",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "var responseBody = pm.response.json();",
+                  "pm.test(\"Expected behavior\", () => {",
+                  "pm.expect(responseBody).to.have.lengthOf(3);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Remove A from 100m",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/api/events/{{event100Id}}/participants/{{athleteAId}}",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 204\", () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Removing A also removes their remaining 100m attempts",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/events/{{event100Id}}/results",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "var responseBody = pm.response.json();",
+                  "pm.test(\"Expected behavior\", () => {",
+                  "pm.expect(responseBody).to.have.lengthOf(2); pm.expect(responseBody.some(r=>r.athleteId===Number(pm.collectionVariables.get(\"athleteAId\")))).to.equal(false);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Delete populated field event",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/api/events/{{eventJumpId}}",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 204\", () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Deleted field event is absent",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/events/{{eventJumpId}}",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 404\", () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Delete source meet and dependent events",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/api/meets/{{meetId}}",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 204\", () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Notes survive meet deletion without event context",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/athletes/{{athleteAId}}/notes",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "var responseBody = pm.response.json();",
+                  "pm.test(\"Expected behavior\", () => {",
+                  "pm.expect(responseBody).to.have.lengthOf(2); pm.expect(responseBody.every(n=>n.eventId===null && n.meetId===null)).to.equal(true);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Delete target meet and copied event",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/api/meets/{{targetMeetId}}",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 204\", () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Delete created athlete athleteAId",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/api/athletes/{{athleteAId}}",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 204\", () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Delete created athlete athleteBId",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/api/athletes/{{athleteBId}}",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 204\", () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Delete created athlete athleteCId",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/api/athletes/{{athleteCId}}",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 204\", () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Delete created athlete athleteDId",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/api/athletes/{{athleteDId}}",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 204\", () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Delete created athlete importAthleteId",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/api/athletes/{{importAthleteId}}",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 204\", () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Delete created athlete importNoDobAthleteId",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/api/athletes/{{importNoDobAthleteId}}",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 204\", () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Delete created athlete immediateAthleteId",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/api/athletes/{{immediateAthleteId}}",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 204\", () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Delete created athlete tsvAthleteId",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/api/athletes/{{tsvAthleteId}}",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 204\", () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Delete created athlete xlsxAthleteId",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/api/athletes/{{xlsxAthleteId}}",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 204\", () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Delete created athlete ambiguousAId",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/api/athletes/{{ambiguousAId}}",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 204\", () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Delete created athlete ambiguousBId",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/api/athletes/{{ambiguousBId}}",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 204\", () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Deleted athlete returns 404",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/athletes/{{athleteAId}}",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 404\", () => pm.response.to.have.status(404));",
+                  "var responseBody = pm.response.json();",
+                  "pm.test(\"Expected behavior\", () => {",
+                  "pm.expect(responseBody.code).to.equal(\"ATHLETE_NOT_FOUND\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

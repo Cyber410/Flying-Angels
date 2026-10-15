@@ -18,5 +18,5 @@ public record AthleteRequest(
 		@Size(max = 100, message = "FLYA status must be 100 characters or fewer") String flyaStatus,
 		@Past(message = "Date of birth must be in the past") LocalDate dateOfBirth,
 		@Size(max = 30, message = "Gender must be 30 characters or fewer") String gender,
-		List<AthleteEventRequest> events) {
+		List<@Valid AthleteEventRequest> events) {
 }

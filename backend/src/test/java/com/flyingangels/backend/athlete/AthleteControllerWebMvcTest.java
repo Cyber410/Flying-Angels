@@ -32,8 +32,6 @@ import org.springframework.test.web.servlet.MockMvc;
 import com.flyingangels.backend.config.SecurityConfig;
 import com.flyingangels.backend.event.EventCategory;
 import com.flyingangels.backend.event.EventResult;
-import com.flyingangels.backend.event.EventResultRepository;
-import com.flyingangels.backend.event.EventService;
 import com.flyingangels.backend.event.RankingOrder;
 
 /**
@@ -55,14 +53,8 @@ class AthleteControllerWebMvcTest {
 	@MockitoBean
 	private AthleteService athleteService;
 
-	@MockitoBean
-	private AthleteImportService importService;
 
-	@MockitoBean
-	private EventResultRepository eventResultRepository;
 
-	@MockitoBean
-	private EventService eventService;
 
 	// ---------- GET /api/athletes ----------
 
@@ -118,8 +110,7 @@ class AthleteControllerWebMvcTest {
 	void profileByIdReturnsAthleteJson() throws Exception {
 		// Proves: a known ID returns one athlete with all nine profile fields; with no central results,
 		// the athlete's own imported events are shown (event name in categoryName).
-		when(athleteService.get(1L)).thenReturn(janeDoe());
-		when(eventResultRepository.findByAthleteId(1L)).thenReturn(List.of());
+		when(athleteService.profile(1L)).thenReturn(com.flyingangels.backend.athlete.dto.AthleteProfileResponse.from(janeDoe(),List.of()));
 
 		mockMvc.perform(get("/api/athletes/{id}", 1))
 				.andExpect(status().isOk())
@@ -146,21 +137,20 @@ class AthleteControllerWebMvcTest {
 	}
 
 	@Test
-	@DisplayName("Controller: profile shows central event results instead of imported events when they exist (supports TC-UC02-09)")
-	void profileUsesCentralEventResultsWhenPresent() throws Exception {
+	@DisplayName("Controller: profile preserves unmatched legacy events alongside central results (supports TC-UC02-09)")
+	void profilePreservesLegacyEventsAlongsideCentralResults() throws Exception {
 		// Proves: once the athlete has central EventResult rows, those are returned (with IDs and score)
-		// and the legacy imported events are not mixed in.
+		// and unmatched historical events remain visible.
 		Athlete jane = janeDoe();
 		EventCategory category = new EventCategory("100M", RankingOrder.ASC);
 		ReflectionTestUtils.setField(category, "id", 7L);
 		EventResult central = new EventResult(null, category, jane, "12.10", new BigDecimal("12.10"));
 		ReflectionTestUtils.setField(central, "id", 50L);
-		when(athleteService.get(1L)).thenReturn(jane);
-		when(eventResultRepository.findByAthleteId(1L)).thenReturn(List.of(central));
+		when(athleteService.profile(1L)).thenReturn(com.flyingangels.backend.athlete.dto.AthleteProfileResponse.from(jane,List.of(central)));
 
 		mockMvc.perform(get("/api/athletes/{id}", 1))
 				.andExpect(status().isOk())
-				.andExpect(jsonPath("$.events", hasSize(1)))
+				.andExpect(jsonPath("$.events", hasSize(3)))
 				.andExpect(jsonPath("$.events[0].resultId").value(50))
 				.andExpect(jsonPath("$.events[0].athleteId").value(1))
 				.andExpect(jsonPath("$.events[0].categoryId").value(7))
@@ -173,7 +163,7 @@ class AthleteControllerWebMvcTest {
 	@DisplayName("Controller: unknown ID returns 404 with no athlete data (supports TC-UC02-16)")
 	void unknownIdReturnsNotFound() throws Exception {
 		// Proves: an ID that does not exist gets a 404 error body, and no athlete fields are sent back.
-		when(athleteService.get(999L)).thenThrow(new AthleteService.AthleteNotFoundException(999L));
+		when(athleteService.profile(999L)).thenThrow(new AthleteService.AthleteNotFoundException(999L));
 
 		mockMvc.perform(get("/api/athletes/{id}", 999))
 				.andExpect(status().isNotFound())

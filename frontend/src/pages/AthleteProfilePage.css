@@ -1,0 +1,812 @@
+* {
+  box-sizing: border-box;
+}
+
+/* ==================================================
+   PAGE
+   ================================================== */
+
+.profile-page {
+  min-height: 100vh;
+
+  background: #f1f2f2;
+  color: #3d4043;
+
+  font-size: 14px;
+  font-weight: 400;
+}
+
+.profile-container {
+  width: min(1180px, calc(100% - 64px));
+
+  margin: 0 auto;
+  padding: 24px 0 50px;
+
+  text-align: left;
+}
+
+/* ==================================================
+   BACK BUTTON
+   ================================================== */
+
+.back-button {
+  margin: 0 0 18px;
+  padding: 0;
+
+  color: #666a6e;
+  background: transparent;
+
+  border: 0;
+
+  cursor: pointer;
+
+  font-size: 12px;
+  font-weight: 400;
+
+  text-align: left;
+}
+
+.back-button:hover {
+  color: #b9672c;
+}
+
+/* ==================================================
+   PROFILE HEADING
+   ================================================== */
+
+.profile-heading {
+  margin: 0 0 18px;
+  padding: 18px 20px;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 20px;
+
+  background: #fafaf9;
+
+  border: 1px solid #c5c8ca;
+  border-left: 3px solid #cf7735;
+  border-radius: 6px;
+
+  text-align: left;
+}
+
+.profile-identity {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+
+  gap: 7px;
+}
+
+.profile-eyebrow {
+  margin: 0;
+
+  color: #b9672c;
+
+  font-size: 12px;
+  font-weight: 500;
+
+  letter-spacing: 0.5px;
+}
+
+.profile-heading h1 {
+  margin: 0;
+
+  color: #34383c;
+
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 1.35;
+
+  letter-spacing: -0.1px;
+
+  text-align: left;
+}
+
+/* ==================================================
+   PROFILE HEADING ACTIONS
+   ================================================== */
+
+.edit-athlete-button,
+.profile-save-button {
+  height: 38px;
+
+  padding: 0 14px;
+
+  color: #ffffff;
+  background: #cf7735;
+
+  border: 1px solid #cf7735;
+  border-radius: 5px;
+
+  cursor: pointer;
+
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.edit-athlete-button:hover,
+.profile-save-button:hover {
+  background: #b9672c;
+  border-color: #b9672c;
+}
+
+.edit-actions {
+  display: flex;
+  align-items: center;
+
+  gap: 8px;
+}
+
+.profile-cancel-button {
+  height: 38px;
+
+  padding: 0 14px;
+
+  color: #666a6e;
+  background: transparent;
+
+  border: 1px solid #c9cbcc;
+  border-radius: 5px;
+
+  cursor: pointer;
+
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.profile-cancel-button:hover {
+  background: #f1f1f0;
+}
+
+.profile-save-button:disabled,
+.profile-cancel-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* ==================================================
+   PROFILE PANEL
+   ================================================== */
+
+.profile-panel {
+  overflow: hidden;
+
+  background: #fbfbfa;
+
+  border: 1px solid #c5c8ca;
+  border-radius: 6px;
+
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.035);
+}
+
+.profile-section + .profile-section {
+  border-top: 1px solid #d1d3d5;
+}
+
+.profile-section-heading {
+  padding: 14px 24px;
+
+  background: #f0f1f1;
+
+  border-bottom: 1px solid #d1d3d5;
+}
+
+.profile-section-heading h2 {
+  margin: 0;
+
+  color: #3d4043;
+
+  font-size: 13px;
+  font-weight: 500;
+
+  text-align: left;
+}
+
+/* ==================================================
+   ATHLETE DETAILS
+   ================================================== */
+
+.profile-details {
+  padding: 22px 24px;
+
+  display: grid;
+  grid-template-columns: repeat(
+    3,
+    minmax(180px, 1fr)
+  );
+
+  gap: 28px;
+
+  background: #fdfdfc;
+}
+
+.profile-detail {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+
+  gap: 6px;
+
+  text-align: left;
+}
+
+.profile-team-detail {
+  grid-column: span 2;
+}
+
+.detail-label {
+  color: #85898d;
+
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.detail-value {
+  color: #3d4043;
+
+  font-size: 13px;
+  font-weight: 400;
+}
+
+/* ==================================================
+   EDITABLE PROFILE FIELDS
+   ================================================== */
+
+.profile-input {
+  width: 100%;
+  height: 38px;
+
+  padding: 0 10px;
+
+  color: #3d4043;
+  background: #ffffff;
+
+  border: 1px solid #c3c6c8;
+  border-radius: 5px;
+
+  outline: none;
+
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 400;
+}
+
+.profile-input:focus {
+  border-color: #cf7735;
+}
+
+.profile-textarea {
+  width: 100%;
+  min-height: 80px;
+
+  padding: 9px 10px;
+
+  color: #3d4043;
+  background: #ffffff;
+
+  border: 1px solid #c3c6c8;
+  border-radius: 5px;
+
+  outline: none;
+
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.5;
+
+  resize: vertical;
+}
+
+.profile-textarea:focus {
+  border-color: #cf7735;
+}
+
+.profile-save-error {
+  margin: 0 24px 20px;
+  padding: 9px 11px;
+
+  color: #8a3d35;
+  background: #f8eeee;
+
+  border: 1px solid #e2c6c2;
+  border-radius: 5px;
+
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.4;
+
+  text-align: left;
+}
+
+/* ==================================================
+   EVENT RESULTS
+   ================================================== */
+
+.event-results-table {
+  width: 100%;
+
+  margin: 0;
+
+  overflow: hidden;
+
+  background: #fdfdfc;
+}
+
+.event-results-header,
+.event-result-row {
+  display: grid;
+
+  grid-template-columns:
+    minmax(180px, 2fr)
+    minmax(120px, 1fr);
+
+  align-items: center;
+  column-gap: 24px;
+  padding: 11px 24px;
+}
+
+.event-results-header {
+  min-height: 40px;
+
+  color: #666a6e;
+  background: #f7f7f6;
+
+  border-bottom: 1px solid #d1d3d5;
+
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.event-result-row {
+  min-height: 48px;
+
+  color: #3d4043;
+  background: #fdfdfc;
+
+  border-bottom: 1px solid #e2e3e4;
+
+  font-size: 13px;
+  font-weight: 400;
+}
+
+.event-result-row:last-child {
+  border-bottom: 0;
+}
+
+.event-results-header > span,
+.event-result-row > span {
+  min-width: 0;
+
+  text-align: left;
+}
+
+/* ==================================================
+   EDITABLE EVENT RESULT
+   ================================================== */
+
+.event-result-input {
+  width: 100%;
+  max-width: 180px;
+  height: 34px;
+
+  padding: 0 9px;
+
+  color: #3d4043;
+  background: #ffffff;
+
+  border: 1px solid #c3c6c8;
+  border-radius: 5px;
+
+  outline: none;
+
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 400;
+}
+
+.event-result-input:focus {
+  border-color: #cf7735;
+}
+
+.event-result-input:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* ==================================================
+   EMPTY EVENTS
+   ================================================== */
+
+.profile-events {
+  min-height: 68px;
+
+  padding: 18px 24px;
+
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+
+  background: #fdfdfc;
+}
+
+.empty-events {
+  color: #85898d;
+
+  font-size: 12px;
+  font-weight: 400;
+}
+
+/* ==================================================
+   NOT FOUND / LOADING
+   ================================================== */
+
+.profile-not-found {
+  padding: 24px;
+
+  background: #f7f7f6;
+
+  border: 1px solid #d4d6d7;
+  border-radius: 6px;
+
+  text-align: left;
+}
+
+.profile-not-found h1 {
+  margin: 0 0 6px;
+
+  color: #3d4043;
+
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.profile-not-found p {
+  margin: 0;
+
+  color: #85898d;
+
+  font-size: 12px;
+  font-weight: 400;
+}
+
+/* ==================================================
+   DELETE / DANGER ZONE
+   ================================================== */
+
+.danger-zone {
+  background: #fdfdfc;
+}
+
+.danger-zone-content {
+  min-height: 82px;
+
+  padding: 16px 24px;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 24px;
+
+  background: #fdfdfc;
+
+  text-align: left;
+}
+
+.danger-zone-content > div {
+  min-width: 0;
+
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+
+  gap: 4px;
+
+  text-align: left;
+}
+
+.danger-zone-title {
+  margin: 0;
+  padding: 0;
+
+  color: #5f4540;
+
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.4;
+
+  text-align: left;
+}
+
+.danger-zone-description {
+  margin: 0;
+  padding: 0;
+
+  color: #85898d;
+
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.5;
+
+  text-align: left;
+}
+
+.delete-athlete-button {
+  height: 36px;
+
+  padding: 0 13px;
+
+  flex-shrink: 0;
+
+  color: #9b4137;
+  background: #ffffff;
+
+  border: 1px solid #c9958e;
+  border-radius: 5px;
+
+  cursor: pointer;
+
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+
+  white-space: nowrap;
+
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.delete-athlete-button:hover {
+  color: #84372f;
+
+  background: #f5e8e6;
+
+  border-color: #bd8179;
+}
+
+.delete-athlete-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+/* ==================================================
+   DELETE MODAL
+   ================================================== */
+
+.profile-modal-overlay {
+  position: fixed;
+  inset: 0;
+
+  z-index: 100;
+
+  padding: 24px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  background: rgba(43, 45, 47, 0.42);
+}
+
+.delete-modal {
+  width: min(430px, 100%);
+
+  padding: 22px;
+
+  background: #fafaf9;
+
+  border: 1px solid #d4d6d7;
+  border-radius: 6px;
+
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+
+  text-align: left;
+}
+
+.delete-modal-eyebrow {
+  margin: 0 0 5px;
+  padding: 0;
+
+  color: #9b4137;
+
+  font-size: 11px;
+  font-weight: 500;
+
+  letter-spacing: 0.5px;
+
+  text-align: left;
+}
+
+.delete-modal h2 {
+  margin: 0 0 9px;
+  padding: 0;
+
+  color: #3d4043;
+
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1.4;
+
+  text-align: left;
+}
+
+.delete-modal-message {
+  margin: 0;
+  padding: 0;
+
+  color: #666a6e;
+
+  font-size: 12.5px;
+  font-weight: 400;
+  line-height: 1.6;
+
+  text-align: left;
+}
+
+.delete-modal-message strong {
+  color: #3d4043;
+
+  font-weight: 500;
+}
+
+.delete-modal .profile-save-error {
+  margin: 16px 0 0;
+}
+
+.delete-modal-actions {
+  margin-top: 20px;
+  padding-top: 15px;
+
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+
+  gap: 8px;
+
+  border-top: 1px solid #d1d3d5;
+}
+
+.confirm-delete-button {
+  height: 38px;
+
+  padding: 0 14px;
+
+  color: #ffffff;
+  background: #a94b40;
+
+  border: 1px solid #a94b40;
+  border-radius: 5px;
+
+  cursor: pointer;
+
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.confirm-delete-button:hover {
+  background: #913d34;
+  border-color: #913d34;
+}
+
+.confirm-delete-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* ==================================================
+   RESPONSIVE - TABLET
+   ================================================== */
+
+@media (max-width: 750px) {
+  .profile-container {
+    width: calc(100% - 32px);
+  }
+
+  .profile-details {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .event-results-header,
+.event-result-row {
+  grid-template-columns: 2fr 1fr;
+
+
+    column-gap: 14px;
+  }
+}
+
+/* ==================================================
+   RESPONSIVE - MOBILE
+   ================================================== */
+
+@media (max-width: 550px) {
+  .profile-details {
+    grid-template-columns: 1fr;
+
+    gap: 18px;
+
+    padding: 18px 16px;
+  }
+
+  .profile-team-detail {
+    grid-column: auto;
+  }
+
+  .profile-section-heading,
+  .profile-events {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .profile-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .edit-actions {
+    width: 100%;
+  }
+
+  .edit-athlete-button,
+  .profile-save-button,
+  .profile-cancel-button {
+    width: 100%;
+  }
+
+  .danger-zone-content {
+    padding-left: 16px;
+    padding-right: 16px;
+
+    align-items: stretch;
+    flex-direction: column;
+
+    gap: 14px;
+  }
+
+  .delete-athlete-button {
+    width: 100%;
+  }
+
+  .profile-modal-overlay {
+    padding: 16px;
+  }
+
+  .delete-modal {
+    padding: 20px;
+  }
+
+  .delete-modal-actions {
+    align-items: stretch;
+    flex-direction: column-reverse;
+  }
+
+  .delete-modal-actions .profile-cancel-button,
+  .confirm-delete-button {
+    width: 100%;
+  }
+
+  .event-results-table {
+    overflow-x: auto;
+  }
+
+.event-results-header,
+.event-result-row {
+  grid-template-columns: 2fr 1fr;
+
+  }
+
+  .event-result-input {
+    max-width: 150px;
+  }
+}

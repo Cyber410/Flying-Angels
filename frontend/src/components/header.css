@@ -1,0 +1,127 @@
+/* ==================================================
+   SHARED SITE HEADER
+   ================================================== */
+
+.site-header {
+  width: 100%;
+  height: 70px;
+
+  background: #fdfdfc;
+
+  border-bottom: 1px solid #d0d2d2;
+
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.site-header-content {
+  width: min(1180px, calc(100% - 64px));
+  height: 100%;
+
+  margin: 0 auto;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 24px;
+}
+
+/* ==================================================
+   BRAND
+   ================================================== */
+
+.site-brand {
+  min-width: 0;
+
+  display: flex;
+  align-items: center;
+
+  gap: 12px;
+}
+
+.site-brand-mark {
+  width: 36px;
+  height: 36px;
+
+  flex: 0 0 36px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  color: #ffffff;
+  background: #b9672c;
+
+  border-radius: 5px;
+
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.site-brand-name {
+  min-width: 0;
+
+  color: #3d4043;
+
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.2;
+
+  white-space: nowrap;
+}
+
+/* ==================================================
+   ADMIN
+   ================================================== */
+
+.site-admin {
+  flex-shrink: 0;
+
+  display: flex;
+  align-items: center;
+
+  gap: 8px;
+
+  color: #666a6e;
+
+  font-size: 13px;
+  font-weight: 400;
+}
+
+.site-admin-dot {
+  width: 7px;
+  height: 7px;
+
+  flex: 0 0 7px;
+
+  background: #cf7735;
+
+  border-radius: 50%;
+}
+
+/* ==================================================
+   RESPONSIVE
+   ================================================== */
+
+@media (max-width: 750px) {
+  .site-header-content {
+    width: calc(100% - 32px);
+  }
+}
+
+@media (max-width: 550px) {
+  .site-header {
+    height: 66px;
+  }
+
+  .site-brand-name {
+    max-width: 210px;
+
+    overflow: hidden;
+
+    font-size: 13px;
+
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}

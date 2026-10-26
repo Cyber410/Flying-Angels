@@ -14,6 +14,6 @@ Open [use-case-code-diagrams.drawio](use-case-code-diagrams.drawio) in diagrams.
 
 The complete backend structure, architecture, API contracts, setup, and operational guide are in [backend/README.md](../../backend/README.md).
 
-See [backend changes and rationale](../backend-changes.md) for behavior, API examples, migration/deployment instructions, and the supplied spreadsheet's handling rules.
+See [backend changes and rationale](../backend-changes.md) for behavior, API examples, database setup/deployment instructions, and the supplied spreadsheet's handling rules.
 
 Regenerate from the repository root with `python3 docs/diagrams/generate.py`.

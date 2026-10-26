@@ -4,7 +4,7 @@ import com.flyingangels.backend.event.Event;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.Instant;
-@Entity @Table(name="athlete_notes") @Getter @NoArgsConstructor(access=AccessLevel.PROTECTED)
+@Entity @Table(name="athlete_notes",indexes=@Index(name="idx_note_order",columnList="athlete_id,created_at,id")) @Getter @NoArgsConstructor(access=AccessLevel.PROTECTED)
 public class AthleteNote {
     @Id @GeneratedValue(strategy=GenerationType.IDENTITY) private Long id;
     @ManyToOne(optional=false) @JoinColumn(name="athlete_id",nullable=false) private Athlete athlete;

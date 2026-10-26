@@ -11,8 +11,10 @@ These records describe the current implementation. Their status is **Implemented
 | [ADR-0003](0003-single-import-module-and-upserts.md) | Use one import module with create, update and unchanged behavior |
 | [ADR-0004](0004-persisted-previews-row-transactions.md) | Persist import previews and commit selected rows independently |
 | [ADR-0005](0005-raw-normalized-historical-results.md) | Preserve raw performance values alongside normalized measurements |
-| [ADR-0006](0006-versioned-schema-migrations.md) | Manage schema evolution with Flyway and Hibernate validation |
+| [ADR-0006](0006-hibernate-schema-management.md) | Hibernate creates/updates the current schema from entity mappings |
 | [ADR-0007](0007-production-access-boundary.md) | Separate anonymous development access from authenticated production access |
+| [ADR-0008](0008-required-import-birth-dates.md) | Require valid past DOB on every imported row; replaces ADR-0003's permissive DOB policy |
+| [ADR-0009](0009-name-dob-and-confirmed-identifiers.md) | Different DOB means a separate person; existing name/DOB matches require a supplied identifier |
 
 ## Workflow
 

@@ -30,7 +30,7 @@ Use EventCategory for reusable definitions, Event for an instance inside a Meet,
 - [backend/src/main/java/com/flyingangels/backend/event/EventParticipation.java](../../backend/src/main/java/com/flyingangels/backend/event/EventParticipation.java)
 - [backend/src/main/java/com/flyingangels/backend/event/EventResult.java](../../backend/src/main/java/com/flyingangels/backend/event/EventResult.java)
 - [backend/src/main/java/com/flyingangels/backend/event/EventService.java](../../backend/src/main/java/com/flyingangels/backend/event/EventService.java)
-- [backend/src/main/resources/db/migration/V2__participation_notes_imports_and_dates.sql](../../backend/src/main/resources/db/migration/V2__participation_notes_imports_and_dates.sql)
+- [backend/src/main/java/com/flyingangels/backend/event/Event.java](../../backend/src/main/java/com/flyingangels/backend/event/Event.java)
 - [backend/src/test/java/com/flyingangels/backend/ManagementIntegrationTest.java](../../backend/src/test/java/com/flyingangels/backend/ManagementIntegrationTest.java)
 
 ## Review and supersession

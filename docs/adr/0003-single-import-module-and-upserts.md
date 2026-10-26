@@ -5,6 +5,10 @@
 - Scope: Backend
 - Approver: Not yet recorded; review with the team before marking Accepted.
 
+**Policy update, 2026-10-15:** The permissive DOB behavior recorded below is historical and is superseded by [ADR-0008](0008-required-import-birth-dates.md). Current imports require a valid past DOB on every row. The single-module, matching, create/update/skip and optional-field preservation decisions remain in effect.
+
+**Identity-policy update, 2026-10-15:** Automatic unique-name/gender matching below is also historical and is superseded by [ADR-0009](0009-name-dob-and-confirmed-identifiers.md). Different known DOBs are distinct people; existing name/DOB matches require a registration identifier before updating or classifying unchanged.
+
 ## Context
 
 The club roster contains missing DOB, repeated athletes, changed statuses and performance values. Future registration uploads should enrich existing profiles. Two overlapping import services previously applied different duplicate policies. Missing DOB is not a reason to discard an athlete.

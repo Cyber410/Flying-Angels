@@ -7,7 +7,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import java.util.*;
 
-/** Shared create/update/no-change decision for previews and commits. DOB is optional, not an identity prerequisite. */
+/** Shared create/update/no-change decision for previews and commits; valid DOB is required for imports. */
 @Component
 @RequiredArgsConstructor
 public class AthleteImportMatcher {
@@ -20,6 +20,8 @@ public class AthleteImportMatcher {
     public Plan plan(AthleteRegistrationParser.ParsedRow row, String source) {
         if (!row.errors().isEmpty()) return new Plan("INVALID", String.join("; ", row.errors()), null, List.of(), List.of());
         var request = row.athlete();
+        if (request.dateOfBirth() == null || !request.dateOfBirth().isBefore(java.time.LocalDate.now()))
+            return new Plan("INVALID", "A valid birth date in the past is required for import", null, List.of(), List.of());
         Athlete match = null;
         if (row.externalId() != null) {
             match = athletes.findByExternalSourceAndExternalId(source, row.externalId()).orElse(null);
@@ -30,19 +32,20 @@ public class AthleteImportMatcher {
             if (row.externalId() != null) candidates = candidates.stream()
                     .filter(a -> a.getExternalId() == null || (source.equals(a.getExternalSource()) && row.externalId().equals(a.getExternalId())))
                     .toList();
-            if (candidates.size() == 1) match = candidates.get(0);
-            else if (candidates.size() > 1) {
-                var narrowed = candidates;
-                if (request.dateOfBirth() != null) narrowed = narrowed.stream()
-                        .filter(a -> request.dateOfBirth().equals(a.getDateOfBirth())).toList();
-                if (narrowed.size() > 1 && hasValue(request.gender())) narrowed = narrowed.stream()
-                        .filter(a -> Athlete.normalizeGender(request.gender()).equalsIgnoreCase(Athlete.normalizeGender(a.getGender()))).toList();
-                if (narrowed.size() == 1) match = narrowed.get(0);
-                else return new Plan("AMBIGUOUS", "Several athletes share this name; provide a registration identifier or resolve the match", null, List.of(), List.of());
+            var sameBirthDate = candidates.stream()
+                    .filter(a -> request.dateOfBirth().equals(a.getDateOfBirth())).toList();
+            if (sameBirthDate.size() == 1 && row.externalId() != null) {
+                // A supplied identifier can attach to one otherwise unkeyed name-and-DOB match.
+                match = sameBirthDate.get(0);
+            } else if (!sameBirthDate.isEmpty()) {
+                return new Plan("AMBIGUOUS", "An existing athlete has the same name and birth date; provide a registration identifier to confirm the match", null, List.of(), List.of());
+            } else if (candidates.stream().anyMatch(a -> a.getDateOfBirth() == null)) {
+                return new Plan("AMBIGUOUS", "An existing athlete with this name has no birth date; provide their registered identifier to confirm the match", null, List.of(), List.of());
             }
+            // Known different birth dates identify different people, even when only one name matches.
         }
         var incomingEvents = request.events() == null ? List.<AthleteEventRequest>of() : request.events();
-        if (match == null) return new Plan("NEW", withWarnings("Create athlete (birth date is optional)", row),
+        if (match == null) return new Plan("NEW", withWarnings("Create athlete", row),
                 null, List.of("newAthlete"), distinct(incomingEvents));
 
         List<String> changes = new ArrayList<>();

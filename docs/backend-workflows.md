@@ -97,11 +97,15 @@ Preview does write import-job records. It does not create/update athlete profile
 | --- | --- | --- |
 | NEW | No eligible existing athlete matched | Select to create |
 | UPDATE | A matched athlete has changed supplied information | Review the changed-field explanation, then select to update |
-| UNCHANGED | The supplied information already exists | No athlete write is needed |
+| UNCHANGED | A confirmed identity has the same supplied information | No athlete write is needed |
 | INVALID | A required value or another validation rule failed | Correct the file and create a new preview |
-| AMBIGUOUS | Identity cannot be narrowed to one athlete | Resolve identity in the data before creating a new preview |
+| AMBIGUOUS | An existing name/DOB match lacks an identifier, or identity remains unresolved | Supply the actual registration identifier and create a new preview |
 
-Missing or unusable DOB is a warning and is treated as unknown. Missing gender is also a warning. Neither alone prevents import. First and last names are required. Blank spreadsheet fields preserve existing profile values; they do not erase them.
+First name, last name and a valid DOB in the past are required on every imported row, including updates to existing athletes. Missing, malformed, today or future DOB makes the row INVALID and prevents saving it. Missing gender is only a warning. Blank optional gender/status/note fields preserve existing profile values. This required-DOB rule replaced the earlier permissive import policy; see [ADR-0008](adr/0008-required-import-birth-dates.md).
+
+Performance headers determine the measurement: races/hurdles/miles/steeplechase use seconds, while jumps/vaults/throws use metres. `2:44.07` becomes a comparable score of 164.07 seconds; `5.18m` becomes 5.18 metres. Athlete-profile event results return raw result, normalized score, unit and status. Incompatible or unrecognized source values get an expected-unit warning and remain UNPARSED without a numeric score.
+
+Identity policy: the same name with a known different DOB represents a separate person and can be NEW. The same name and DOB as an existing athlete requires a supplied registration identifier before updating or skipping, even if only one existing athlete matches. Gender does not bypass this review. A supplied identifier can attach to one unkeyed exact name/DOB match; an existing source/identifier match takes priority and permits confirmed corrections. See [ADR-0009](adr/0009-name-dob-and-confirmed-identifiers.md).
 
 The `athlete` object contains parsed input, not necessarily the complete stored profile. A blank gender in this object does not prove the saved athlete's gender is blank. Use the athlete GET endpoint to inspect stored data.
 
@@ -141,6 +145,8 @@ An actual client file can legitimately be unchanged. Real data is compared again
 
 In the response discussed during testing, selected row 3 matched an existing athlete ID and was UNCHANGED. Selected row 6 also matched an existing athlete ID and was UNCHANGED. Therefore committing [3,6] produced no athlete writes. The response reported 440 skipped rows because counts covered the entire file, including unselected rows.
 
+That earlier response predates the identifier-required matching rule. Under the current policy, the same unkeyed name/DOB matches are AMBIGUOUS until a registration identifier is supplied. Confirmed identifier matches can still be UNCHANGED.
+
 This establishes that the matcher found equivalent supplied information in stored records. It does not establish when or by which request the records were originally populated. They may already be present from an earlier import, manual entry or migrated data. Check the active baseUrl/database if you expected an empty environment; do not delete the client's records to force a NEW result.
 
 To verify the match, use each row's athleteId with `GET /api/athletes/{id}` and compare the supplied profile/performance values. A missing incoming field is ignored for updates, so matching does not require the spreadsheet to repeat every stored value.
@@ -175,7 +181,7 @@ pm.test("Preview succeeded", function () {
 });
 ```
 
-Review explanations and select the intended NEW/UPDATE row numbers. A first import into a database without matching athletes normally produces NEW records; subsequent identical uploads normally produce UNCHANGED. Repeated identities within one file are rechecked in source order during commit, so not every previewed NEW row necessarily becomes a separate athlete.
+Review explanations and select the intended NEW/UPDATE row numbers. A first import into a database without matching athletes normally produces NEW records. Subsequent identical uploads with confirmed registration identifiers normally produce UNCHANGED; without identifiers, existing name/DOB matches are AMBIGUOUS. Repeated identities within one file are rechecked in source order during commit, so not every previewed NEW row necessarily becomes a separate athlete.
 
 ### C. Commit and verify
 
@@ -189,7 +195,7 @@ For an entire-file workflow without manual selection, `POST /api/athletes/import
 
 On a test copy of the client database/file:
 
-1. Choose one uniquely matched athlete and record their current athleteId and profile.
+1. Choose an athlete with a confirmed source/registration identifier and record their current athleteId and profile.
 2. Change a nonblank field in a CSV copy, such as the NOTE, without changing their identity.
 3. Create a new preview using the same source. Expect UPDATE and an explanation naming the changed field.
 4. Commit that row using the new importId. Expect UPDATED and the same athleteId.
@@ -200,7 +206,7 @@ An unchanged selection does not exercise the create/update save path. To test cr
 
 ## 7. Client-data limitations to review
 
-- The supplied client header has no registration identifier column. Matching therefore relies on name and available DOB/gender. A unique name match is a fallback, not proof of identity. Request a stable registration identifier where available rather than inventing one.
+- The supplied client header has no registration identifier column. Initial distinct name/DOB registrations can create athletes, but existing name/DOB matches are blocked until an actual identifier is supplied. Request registration identifiers from the client rather than inventing them. A known different DOB represents a different person, not a correction to an unkeyed name match.
 - Source and externalId together identify keyed registrations. Changing source for later imports can prevent identifier matching; keep the same source for that dataset.
 - Placeholder rows such as Person 1/Person 1 satisfy name validation. The parser cannot know they are examples; exclude them during review if the client confirms they are placeholders.
 - Original source bytes are preserved, including unrecognized administrative columns. Unknown values and suspicious performance formats still need review; importing is not official-result verification.

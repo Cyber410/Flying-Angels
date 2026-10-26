@@ -24,7 +24,7 @@ The backend manages athletes, meets, reusable event definitions, event participa
 14. [Security and CORS](#14-security-and-cors)
 15. [Configuration and environment variables](#15-configuration-and-environment-variables)
 16. [Running and building](#16-running-and-building)
-17. [Database migrations and upgrades](#17-database-migrations-and-upgrades)
+17. [Database schema management](#17-database-schema-management)
 18. [Testing and verification](#18-testing-and-verification)
 19. [Frontend integration](#19-frontend-integration)
 20. [Troubleshooting](#20-troubleshooting)
@@ -46,7 +46,7 @@ The backend manages athletes, meets, reusable event definitions, event participa
 | Results | Record multiple attempts, retrieve/correct/delete records, save batches, calculate an event leaderboard |
 | Notes | Append timestamped notes, optionally linked to a meet event, and retrieve newest first |
 | Imports | Parse CSV/TSV/XLSX, preview new/update/unchanged/invalid rows, import selected rows, and report outcomes |
-| Operations | Versioned migrations, automated tests, configurable authenticated production access |
+| Operations | Hibernate-managed schema, automated tests, configurable authenticated production access |
 
 ### Important names
 
@@ -71,17 +71,16 @@ Versions below are taken from [pom.xml](pom.xml) and the repository's runtime co
 | Java 17 language target | Backend source and compilation target in Maven |
 | Spring Boot 4.1.1 | Application startup, configuration, web and persistence integration |
 | Spring Web MVC | REST controllers and JSON request/response handling |
-| Spring Data JPA / Hibernate | Entity persistence, repositories, entity graphs, dirty checking |
+| Spring Data JPA / Hibernate | Entity persistence, repositories, schema creation/update, entity graphs, dirty checking |
 | Spring Security | HTTP Basic authentication, role authorization, CSRF and CORS integration |
 | Jakarta Validation | DTO field validation and nested request validation |
 | MySQL 8.4 | Relational database used by Docker Compose and integration tests |
-| Flyway | Versioned schema creation, upgrades, and migration history |
 | Apache Commons CSV 1.14.1 | CSV and tab-delimited text parsing |
 | Apache POI OOXML 5.4.1 | XLSX workbook parsing and typed Excel date handling |
 | Lombok | Generated getters, constructors, and dependency-injection constructors |
 | Maven Wrapper | Consistent Maven invocation without a separate Maven installation |
 | JUnit, Mockito, Spring test / MockMvc | Unit tests, HTTP contract tests, and service testing |
-| Testcontainers 1.21.3 | Disposable real MySQL databases for integration/migration tests |
+| Testcontainers 1.21.3 | Disposable real MySQL databases for startup and integration tests |
 
 The current backend Dockerfile uses **Eclipse Temurin JDK 21**, while Maven targets Java 17. It runs Maven's `spring-boot:run` inside the container. It is a development-oriented runner rather than a minimal packaged-JAR production image.
 
@@ -118,7 +117,7 @@ Docker Compose runs frontend, backend, and MySQL as separate services. Container
 | Repository | Execute queries and persist entities | `AthleteRepository`, `EventResultRepository` |
 | Entity | Represent stored state and relationships; apply local state updates | `Meet.updateFrom()`, `EventResult.update()` |
 | DTO | Define the external request/response contract | `MeetRequest`, `AthleteProfileResponse` |
-| Shared infrastructure | Configure security/CORS, normalize API errors, run migrations | `SecurityConfig`, `ApiExceptionHandler`, Flyway scripts |
+| Shared infrastructure | Configure security/CORS, normalize API errors, configure entity-generated schema | `SecurityConfig`, `ApiExceptionHandler`, Hibernate settings |
 
 Services generally return entities that controllers map using DTO `static from()` methods. Athlete profile assembly and note operations return their response objects from services. There is no separate mapper framework or generic mapper layer.
 
@@ -161,9 +160,6 @@ backend/
       resources/
         application.properties
         application-prod.properties
-        db/migration/
-          V1__legacy_schema.sql
-          V2__participation_notes_imports_and_dates.sql
     test/java/com/flyingangels/backend/
       athlete/
       event/
@@ -171,7 +167,6 @@ backend/
       config/
       DatabaseIntegrationTest.java
       ManagementIntegrationTest.java
-      LegacyMigrationTest.java
       BackendApplicationTests.java
 ```
 
@@ -281,7 +276,7 @@ The current `FLY`/`FLYA` team query checks whether the corresponding status is n
 }
 ```
 
-First/last names are required. DOB is optional but, when provided, must be in the past. Duplicate checking for normal create/update uses name, DOB and gender when a DOB exists. It is a service check rather than a unique demographic database constraint; it is not a universal identity guarantee.
+First/last names are required. For ordinary athlete CRUD, DOB is optional but, when provided, must be in the past. File imports require a valid DOB in every incoming row. Duplicate checking for normal create/update uses name, DOB and gender when a DOB exists. It is a service check rather than a unique demographic database constraint; it is not a universal identity guarantee.
 
 Updates are not general-purpose JSON PATCH operations. The same `AthleteRequest` shape is used for create and PUT:
 
@@ -483,19 +478,20 @@ These are not competing import implementations. Both HTTP workflows use the same
 
 | Incoming record | Behavior |
 | --- | --- |
-| New athlete, no DOB provided | Create with a null DOB; missing DOB is only a warning |
-| Existing athlete, later DOB supplied | Update the existing athlete rather than create a second record |
+| New or existing athlete, no DOB provided in the upload | INVALID; do not create or update the athlete |
+| Existing athlete, registered identifier confirms identity and later DOB supplied | Update the existing athlete rather than create a second record |
 | Existing athlete, changed nonblank details | Apply supplied changes and report UPDATED |
-| Existing athlete, blank cells | Preserve previously stored values |
+| Existing athlete, blank optional cells and valid DOB | Preserve previously stored optional values |
 | Existing athlete, new performance values | Append previously unseen values; retain earlier performances |
 | Existing athlete, no supplied changes | UNCHANGED; skip writing that row |
-| Several possible athlete matches | AMBIGUOUS; require identity clarification rather than update an arbitrary person |
-| Unusable or future DOB | Import with unknown DOB and a warning; preserve an existing valid DOB |
+| Existing name/DOB match without an identifier, or several unresolved exact matches | AMBIGUOUS; block until registration identity is supplied/resolved |
+| Same name, known different DOB, no registered-ID match | NEW; create a different athlete without changing the existing person |
+| Unusable, today or future DOB | INVALID; do not apply the row, even if the matched athlete has a stored DOB |
 | Other invalid required field | INVALID; explain the problem without blocking other valid rows |
 
 An existing athlete is not rejected merely because they already exist. Only unchanged rows are skipped as no-ops. Invalid rows and genuinely ambiguous identity matches are separately explained.
 
-Import updates are patches: a blank/missing DOB, gender, status or general note never erases existing information. Nonblank supplied notes replace the general note; separate timestamped note history remains untouched. Clearing a stored value must be an explicit profile-edit operation, not an empty spreadsheet cell.
+Import updates require a valid incoming DOB. Blank optional gender, status or general note cells preserve existing information. Nonblank supplied notes replace the general note; separate timestamped note history remains untouched. Invalid DOB rows never modify a matched athlete. Clearing a stored optional value must be an explicit profile-edit operation, not an empty spreadsheet cell. This required-DOB policy supersedes the earlier permissive import rule; see [ADR-0008](../docs/adr/0008-required-import-birth-dates.md).
 
 ### Parser behavior and headers
 
@@ -514,21 +510,25 @@ It requires first/last name headers, supports reordered columns and blank rows/s
 | gender | Gender / Sex |
 | externalId | MEMBER # / Member Number / Member ID / Registration ID |
 
-Recognized performance columns contain jump, put, discus, javelin, hammer, hurdle, mile or steeple, or match a numeric metre-distance heading. This covers all 31 event columns in the supplied club roster. Unknown administrative headings remain in the original file rather than being treated as results.
+Recognized performance columns include numeric metre-distance races and relays, hurdles, miles, steeplechase, jumps, vaults, throws and point/combined events. This covers all 31 event columns in the supplied club roster. Unknown administrative headings remain in the original file rather than being treated as results.
 
-Blank DOB and gender are allowed with warnings. Valid ISO dates and typed XLSX date cells are supported. Unusable/future dates such as `0000-00-00`, `40700` or `No birth date` become null with an explanation; the athlete still imports, a stored valid DOB is preserved, and no Excel epoch is guessed. Unknown gender text is retained with a warning. Malformed or qualifier-suffixed results remain historical UNPARSED values with a null comparison score; results over 50 characters are invalid.
+Every imported row requires a valid past DOB, supplied as an ISO date or typed XLSX date cell. Missing DOB, unusable values such as `0000-00-00`, `40700` or `No birth date`, and dates today/in the future make the row INVALID. Other valid rows remain selectable. Missing gender is allowed with a warning; unknown gender text is retained with a warning. Malformed or qualifier-suffixed results remain historical UNPARSED values with a null comparison score; results over 50 characters are invalid.
+
+Event-column recognition and default measurement units share `ResultValues`: races, hurdles, miles and steeplechase use SECONDS; jumps, vaults and throws use METRES; recognized combined-event/point definitions use POINTS. Imported definitions default to ASC for time and DESC for distance/points. A race value `2:44.07` normalizes to 164.07 seconds; a jump/throw value `5.18m` normalizes to 5.18 metres. Stored athlete-profile results include raw result, score, unit and parsing status. Values incompatible with their event unit are retained as UNPARSED with an expected-unit warning, rather than being treated as comparable scores.
+
+For XLSX, calendar-date conversion applies only to the DOB column. Event cells retain their displayed formatting, including Excel duration cells such as `2:44.07` and `5:43.80`; they must not become the Excel base date `1899-12-31`. CSV/TSV values are read as text. If an exported CSV already contains a base-date string instead of the performance, the time cannot be reconstructed from that string: correct the export or upload the original workbook and create a new preview. Re-uploading does not automatically delete earlier malformed historical values that were already committed.
 
 ### Matching an athlete
 
-1. If a registration identifier exists, look for its exact `(source, externalId)` pair.
-2. If no identifier match exists, look for the same first/last name, ignoring case.
-3. A single eligible name match is updated even when DOB is missing or is being corrected.
-4. A supplied identifier can attach to an existing unkeyed name match. An explicit different identifier is treated as a distinct identity rather than overwriting an already keyed athlete.
-5. With several name matches, use supplied DOB and, where still needed, gender to narrow the candidates. If no single match remains, return AMBIGUOUS.
+1. Validate the required incoming DOB, then match an exact `(source, externalId)` pair where supplied. Confirmed identifier matches support name/DOB corrections.
+2. Without an identifier match, compare first/last names ignoring case and compare DOB exactly. A known different DOB represents a different person, even when there is only one existing name match: NEW.
+3. If a name/DOB match exists but the upload has no identifier, return AMBIGUOUS and block saving. This applies even to one exact match and identical incoming information; gender does not bypass review.
+4. A supplied identifier can attach to one eligible unkeyed exact name/DOB match. Several exact candidates require resolution. An explicitly different existing identifier represents a distinct identity.
+5. A same-name legacy record with unknown DOB requires its registered identity; do not update by name alone or guess that it is a new person.
 
-Source defaults to `UPLOAD`, is trimmed/uppercased, and is limited to 80 characters. A source-scoped identifier is the strongest matching signal; without one, unique-name matching is a practical fallback and cannot prove identity. A renamed athlete generally needs their registration identifier to match reliably.
+Source defaults to `UPLOAD`, is trimmed/uppercased, and is limited to 80 characters. Keep it consistent for that registration dataset. To resolve a blocked unkeyed match, obtain the actual registration identifier, add it to the source and create a new preview. Do not fabricate an identifier. This matching policy is recorded in [ADR-0009](../docs/adr/0009-name-dob-and-confirmed-identifiers.md).
 
-Repeated names or identifiers within a file are not rejected automatically. Each selected row is evaluated against the state saved by earlier rows. Rows are processed in original source order: later nonblank values update earlier values, new performances accumulate, and identical repetitions become UNCHANGED. Previews classify rows against the database at preview time; commit rechecks each eligible row, so a previewed NEW row may ultimately become UPDATED or UNCHANGED.
+Rows are processed in original source order and eligible rows are rechecked against earlier saved rows. Confirmed identifiers allow later supplied information to update earlier values, append new performances and skip unchanged repetitions. Repeated unkeyed name/DOB rows instead become AMBIGUOUS after the first creation. A previewed NEW row can consequently become IMPORTED, UPDATED, UNCHANGED or AMBIGUOUS during commit.
 
 ### Workflow and persistence
 
@@ -835,9 +835,7 @@ CORS controls browser access; it does not replace authentication or restrict a n
 | HTTP port | 8080 |
 | JDBC URL | `jdbc:mysql://mysql:3306/flying_angels?createDatabaseIfNotExist=true&useSSL=false&serverTimezone=UTC` |
 | Default DB username/password | root / empty password; Compose overrides these |
-| Hibernate schema action | validate |
-| Flyway baseline-on-migrate | true |
-| Flyway baseline version | 1 |
+| Hibernate schema action | update; creates missing tables/columns from entity mappings |
 | Open EntityManager in View | false |
 | SQL logging | enabled in default profile |
 | Max file / multipart request | 10 MB / 11 MB |
@@ -882,7 +880,9 @@ For the full development stack:
 docker compose up --build
 ```
 
-The MySQL health check gates backend startup. MySQL data is persisted in the `mysql_data` named volume. Frontend listens on 5173, backend on 8080, and MySQL on host port 3306. Compose supplies the backend with its development app database credentials.
+The MySQL health check gates backend startup. For local import testing, MySQL currently uses a temporary `tmpfs` mount at `/var/lib/mysql`: its database contents are lost whenever the MySQL container stops or restarts. Recreate the containers after changing storage configuration (`docker compose down`, then the startup command above). An existing `mysql_data` volume is not mounted or deleted by this configuration. Frontend listens on 5173, backend on 8080, and MySQL on host port 3306. Compose supplies the backend with its development app database credentials.
+
+To restore persistent storage, replace the MySQL mount with `- mysql_data:/var/lib/mysql`, restore the top-level `volumes: { mysql_data: {} }` declaration, and recreate the containers. Use a persistent configuration for data you intend to retain.
 
 Check the API and logs:
 
@@ -928,48 +928,28 @@ The packaged application is `target/backend-0.0.1-SNAPSHOT.jar`:
 java -jar target/backend-0.0.1-SNAPSHOT.jar
 ```
 
-Database variables still apply when running the JAR. To use production settings, provide all five production account/database variables listed above and select `SPRING_PROFILES_ACTIVE=prod`. Startup runs Flyway migrations before Hibernate schema validation and normal request handling.
+Database variables still apply when running the JAR. To use production settings, provide all five production account/database variables listed above and select `SPRING_PROFILES_ACTIVE=prod`. Hibernate creates/updates the schema from entity mappings during startup before normal request handling.
 
-## 17. Database migrations and upgrades
+## 17. Database schema management
 
-### V1: original schema
+The application starts with an empty MySQL database and loads athlete data through the CSV/TSV/XLSX importer. Hibernate manages the current schema directly from the JPA entities:
 
-[V1__legacy_schema.sql](src/main/resources/db/migration/V1__legacy_schema.sql) creates the original athlete, legacy event, meet, category, event and result tables on a fresh database. It includes the old event/athlete result uniqueness constraint so V2 can consistently upgrade it.
-
-### V2: current model
-
-[V2__participation_notes_imports_and_dates.sql](src/main/resources/db/migration/V2__participation_notes_imports_and_dates.sql):
-
-1. Adds meet start/end dates and backfills them from meetDate.
-2. Expands note/URL storage and adds source-scoped external athlete identity.
-3. Adds meet/category uniqueness.
-4. Creates participation and backfills assignments from existing event-bound result rows.
-5. Finds and removes the old event/athlete result unique index, including Hibernate-generated names.
-6. Adds category/result units, result status, timestamp and provenance fields.
-7. Classifies old result data; does not invent recording timestamps.
-8. Removes empty event-bound result placeholders after participation backfill.
-9. Creates note-history and import-job/row tables.
-
-The migration uses a temporary stored procedure to find the old generated index name. The migration account needs appropriate schema/index/routine privileges.
-
-### Fresh versus existing database
-
-A fresh database applies V1 and V2. An existing original-schema database without Flyway history is baselined at V1, then applies V2. Baselining assumes the existing schema is compatible with the original version; it does not repair arbitrary schema drift.
-
-Before upgrading an existing database, back it up and check duplicate meet/category combinations:
-
-```sql
-SELECT meet_id, category_id, COUNT(*)
-FROM events
-GROUP BY meet_id, category_id
-HAVING COUNT(*) > 1;
+```properties
+spring.jpa.hibernate.ddl-auto=update
 ```
 
-Resolve returned rows intentionally before migration. V2 does not automatically merge duplicate events or decide which result history to retain.
+At startup Hibernate creates missing tables/columns and applies supported mapping changes. Table names, relationships, unique constraints, result precision, column lengths and the note-order index are declared in entity annotations. There are no SQL migration files or migration-runner dependencies. The decision is documented in [ADR-0006](../docs/adr/0006-hibernate-schema-management.md).
 
-MySQL DDL is not fully transactional. A failed migration may leave partial schema changes; inspect and reconcile them before repairing Flyway history and retrying. Do not blindly delete migration history or re-enable Hibernate automatic updates. No rollback SQL scripts or destructive automatic data reset are supplied.
+### Local workflow
 
-Add future changes as new numbered migration files. Do not edit already-applied migrations in a shared environment, because Flyway validates their checksums.
+1. Start MySQL and the backend.
+2. Hibernate creates the current tables, including participation, notes and import jobs/rows.
+3. Upload a client file, review the preview, and commit selected eligible rows.
+4. Use the meet, event, participation, result and note APIs normally.
+
+Restarting only the backend keeps the existing database rows. The current Compose MySQL mount is temporary: stopping/restarting MySQL clears its data, and the next backend startup creates fresh tables. CSV importing is an explicit API operation; startup does not automatically import the client file.
+
+For a persisted schema change, update the appropriate entity mapping and verify it against disposable MySQL. Hibernate schema update does not perform custom historical-data conversions; this sprint assumes a fresh initial database rather than an older deployed client schema.
 
 ## 18. Testing and verification
 
@@ -982,18 +962,17 @@ Add future changes as new numbered migration files. Do not edit already-applied 
 | `AthleteControllerWebMvcTest` | MVC slice, profile/directory responses and malformed IDs |
 | `AthleteDirectoryIntegrationTest` | Real database search and filter behavior |
 | `AthleteProfileIntegrationTest` | Own-result isolation, historical values and profile correctness |
-| `AthleteRegistrationParserSpreadsheetTest` | Shared TSV and XLSX parsing, including missing DOB |
-| `AthleteImportUpdateIntegrationTest` | Missing DOB, later registrations, blank preservation, updates, unchanged rows, identity and immediate-route consistency |
+| `AthleteRegistrationParserSpreadsheetTest` | Shared TSV/XLSX parsing, typed DOB, rejected missing DOB and preserved Excel duration formatting |
+| `AthleteImportUpdateIntegrationTest` | Required DOB across preview/commit/immediate routes, legacy preview revalidation, mixed time/distance profile results, updates, blank optional fields and retries |
 | `AthleteImportControllerTest` | Import endpoint validation and HTTP errors |
 | `AthleteRegistrationParserTest` | Header mapping, club format, warnings and row errors |
 | `ResultValuesTest` | Track/field normalization, statuses, precision/format mismatches |
 | `ManagementIntegrationTest` | Independent participation, attempts, rollback, copy, notes, imports, deletes and consistent updates |
-| `LegacyMigrationTest` | Baseline/upgrade of an original schema while preserving data and allowing multiple results |
 | `ProductionSecurityTest` | Authentication, role restrictions and CSRF enforcement |
-| `BackendApplicationTests` | Spring application startup against MySQL |
+| `BackendApplicationTests` | Hibernate creates every current table and the note-order index on empty MySQL, without a migration-history table |
 | `DatabaseIntegrationTest` | Shared MySQL container setup and child-before-parent cleanup for integration subclasses |
 
-The last completed backend verification recorded **79 tests passing**, using real MySQL for integration/migration tests. This is a recorded result from the implementation work, not a claim that every business edge case is covered.
+The last completed backend verification on 2026-10-26 recorded **92 tests passing**, using real MySQL for schema-startup and integration tests. This includes entity-generated tables, required-DOB enforcement, different-DOB separation, identifier-required name/DOB review and correct race/jump/throw result retrieval. The obsolete migration test was removed. This is a recorded result, not a claim that every business edge case is covered.
 
 ### Commands
 
@@ -1013,7 +992,7 @@ bash mvnw -Dapi.version=1.44 test
 
 Use that override if the failure says the Docker client API version is too old. Docker must be running and accessible; images may need downloading. Tests use disposable databases, not the Compose database volume. Test reports are under `target/surefire-reports/`.
 
-Mocked service tests cannot establish MySQL collation, JPQL filtering, foreign-key or migration behavior. Keep the real-database tests when changing these areas.
+Mocked service tests cannot establish MySQL collation, JPQL filtering, foreign-key or schema-generation behavior. Keep the real-database tests when changing these areas.
 
 ## 19. Frontend integration
 
@@ -1040,16 +1019,14 @@ The frontend build and its 27 tests passed during the preceding backend implemen
 | Host backend cannot resolve `mysql` | Use localhost in JDBC URL when running outside Compose |
 | DB connection refused or access denied | Confirm MySQL health, host/port and the active profile's credentials |
 | Port 8080 already in use | Stop the duplicate development runner or choose SERVER_PORT |
-| Schema validation fails | Check Flyway history, applied migrations, and original-schema compatibility |
-| V2 fails adding meet/category uniqueness | Run the duplicate query and resolve the existing data |
-| Migration fails on routine/index operations | Check migration-user privileges and inspect partial DDL state |
+| Tables are missing or schema update fails | Confirm ddl-auto=update, the active datasource and database account CREATE/ALTER privileges; inspect Hibernate startup logs |
 | `./mvnw` permission denied | Use `bash mvnw ...` as shown, or deliberately set wrapper execution permission |
 | Docker tests report old client API | Use the tested `-Dapi.version=1.44` override for this environment |
 | Secure GET returns 401 | Supply credentials and verify required production account variables |
 | Secure write returns 401/403 | Check credentials, role and CSRF token/cookie handling; live Basic-auth writes without valid CSRF currently return 401, while pre-authenticated role/CSRF tests can return 403 |
 | Browser request fails CORS | Current allowed origin is localhost:5173; proxy or configure production origin/credentials |
 | CSV import cannot find first/last name | Confirm the first record is the actual header and delimiter is comma/tab |
-| DOB imported as unknown with a warning | Supply a valid ISO date or typed XLSX date later; the next import fills it without creating a second athlete |
+| Import row has missing/invalid DOB | Supply a valid past ISO date or typed XLSX date and create a new preview; invalid rows cannot be saved |
 | Qualifier or malformed result is UNPARSED | Source is retained; parsing rules intentionally do not guess its meaning |
 | Import row is UNCHANGED | No supplied information differs; skipped without modifying stored data |
 | Import row is AMBIGUOUS | Several identities share the name; supply an identifier or resolve the match |
@@ -1091,7 +1068,7 @@ These are boundaries of the current implementation, not features already deliver
 | Single import module/service | Both upload routes use the same create/update/skip policy; athlete CRUD contains no file-import orchestration |
 | Separate row-writer bean | Makes per-row rollback effective through Spring's transaction proxy |
 | DTO responses | Avoids exposing recursive JPA relationships and keeps client contracts explicit |
-| Flyway plus Hibernate validate | Makes schema/data changes reviewable and reproducible |
+| Hibernate entity-generated schema | Keeps fresh-database setup simple; mappings define the current tables and constraints |
 | Compatibility routes/fields retained | Reduces disruption to current athlete screens and older callers |
 
 ### Adding or changing a feature
@@ -1100,7 +1077,7 @@ These are boundaries of the current implementation, not features already deliver
 2. Add/update DTO constraints and explicit response fields.
 3. Put workflow rules in the appropriate feature service; keep controller code focused on HTTP concerns.
 4. Add repository queries/entity-graph paths that satisfy response reads with Open-in-View disabled.
-5. Add a new migration for persisted changes and describe existing-data handling.
+5. Update entity mappings for persisted changes and verify schema generation against disposable MySQL.
 6. Add tests for the business outcome, transaction rollback and database constraint where relevant.
 7. Check production authorization/CSRF behavior for any new route.
 8. Update this guide and the relevant editable/SVG code diagram.

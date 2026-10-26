@@ -56,7 +56,7 @@
                 "exec": [
                   "pm.collectionVariables.set(\"runId\", pm.variables.replaceIn(\"{{$guid}}\"));",
                   "pm.collectionVariables.set(\"importSource\", \"POSTMAN_\" + pm.collectionVariables.get(\"runId\"));",
-                  "[\"csrfToken\",\"csrfHeader\",\"athleteAId\",\"athleteBId\",\"athleteCId\",\"athleteDId\",\"meetId\",\"targetMeetId\",\"category100Id\",\"category200Id\",\"categoryJumpId\",\"category400Id\",\"event100Id\",\"event200Id\",\"eventJumpId\",\"copiedEventId\",\"resultId\",\"importId\",\"updateImportId\",\"unchangedImportId\",\"importAthleteId\",\"importNoDobAthleteId\",\"immediateAthleteId\",\"tsvAthleteId\",\"xlsxAthleteId\"].forEach(k => pm.collectionVariables.unset(k));"
+                  "[\"ambiguousAId\",\"ambiguousBId\",\"ambiguousImportId\",\"differentDobImportId\",\"differentDobAthleteId\",\"confirmedIdentityImportId\",\"csrfToken\",\"csrfHeader\",\"athleteAId\",\"athleteBId\",\"athleteCId\",\"athleteDId\",\"meetId\",\"targetMeetId\",\"category100Id\",\"category200Id\",\"categoryJumpId\",\"category400Id\",\"event100Id\",\"event200Id\",\"eventJumpId\",\"copiedEventId\",\"resultId\",\"importId\",\"updateImportId\",\"unchangedImportId\",\"importAthleteId\",\"importDatedAthleteId\",\"immediateAthleteId\",\"tsvAthleteId\",\"xlsxAthleteId\"].forEach(k => pm.collectionVariables.unset(k));"
                 ]
               }
             },
@@ -339,7 +339,7 @@
               }
             ],
             "url": "{{baseUrl}}/api/athletes",
-            "description": "Import tolerates unusable DOB as unknown; ordinary athlete CRUD still validates supplied DOB.",
+            "description": "Imports require a valid past DOB; ordinary athlete CRUD permits an omitted DOB but validates a supplied value.",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"firstName\": \"InvalidDOB\",\n  \"lastName\": \"QA {{runId}}\",\n  \"gender\": \"Male\",\n  \"dateOfBirth\": \"2999-01-01\",\n  \"flyStatus\": \"In Roster\",\n  \"flyaStatus\": \"\",\n  \"note\": \"General note {{runId}}\",\n  \"events\": []\n}",
@@ -2350,7 +2350,7 @@
       "description": "Choose the fixture files if your Postman installation cannot resolve the relative paths. Keep the same source variable for the whole run.",
       "item": [
         {
-          "name": "Preview initial CSV - missing and unusable DOB allowed",
+          "name": "Preview initial CSV - reject missing invalid and future DOB",
           "request": {
             "method": "POST",
             "header": [],
@@ -2381,7 +2381,7 @@
                   "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
                   "var responseBody = pm.response.json();",
                   "pm.test(\"Expected behavior\", () => {",
-                  "pm.expect(responseBody.rows.map(r=>r.status)).to.eql([\"NEW\",\"INVALID\",\"NEW\",\"NEW\"]); pm.expect(responseBody.rows[0].athlete.dateOfBirth).to.equal(null); pm.expect(responseBody.rows[2].athlete.dateOfBirth).to.equal(null); pm.collectionVariables.set(\"importId\",responseBody.importId);",
+                  "pm.expect(responseBody.rows.map(r=>r.status)).to.eql([\"NEW\",\"INVALID\",\"NEW\",\"NEW\",\"INVALID\",\"INVALID\",\"INVALID\"]); pm.expect(responseBody.rows[0].athlete.dateOfBirth).to.equal(\"2010-03-20\"); pm.expect(responseBody.rows.slice(4).every(r=>r.status===\"INVALID\" && r.explanation.includes(\"Birth date\"))).to.equal(true); pm.collectionVariables.set(\"importId\",responseBody.importId);",
                   "});"
                 ]
               }
@@ -2405,7 +2405,7 @@
                   "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
                   "var responseBody = pm.response.json();",
                   "pm.test(\"Expected behavior\", () => {",
-                  "pm.expect(responseBody.rows).to.have.lengthOf(4);",
+                  "pm.expect(responseBody.rows).to.have.lengthOf(7);",
                   "});"
                 ]
               }
@@ -2477,7 +2477,7 @@
                   "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
                   "var responseBody = pm.response.json();",
                   "pm.test(\"Expected behavior\", () => {",
-                  "pm.expect(responseBody.imported).to.equal(2); pm.expect(responseBody.updated).to.equal(0); pm.expect(responseBody.skipped).to.equal(2); pm.expect(responseBody.failed).to.equal(0); pm.collectionVariables.set(\"importAthleteId\",responseBody.rows.find(r=>r.rowNumber===2).athleteId); pm.collectionVariables.set(\"importNoDobAthleteId\",responseBody.rows.find(r=>r.rowNumber===4).athleteId);",
+                  "pm.expect(responseBody.imported).to.equal(2); pm.expect(responseBody.updated).to.equal(0); pm.expect(responseBody.skipped).to.equal(5); pm.expect(responseBody.failed).to.equal(0); pm.collectionVariables.set(\"importAthleteId\",responseBody.rows.find(r=>r.rowNumber===2).athleteId); pm.collectionVariables.set(\"importDatedAthleteId\",responseBody.rows.find(r=>r.rowNumber===4).athleteId);",
                   "});"
                 ]
               }
@@ -2523,7 +2523,7 @@
           ]
         },
         {
-          "name": "Selecting an invalid row preserves successful earlier imports",
+          "name": "Reject selected invalid names and DOB while preserving earlier imports",
           "request": {
             "method": "POST",
             "header": [
@@ -2536,7 +2536,7 @@
             "description": "",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"rowNumbers\": [\n    3\n  ]\n}",
+              "raw": "{\n  \"rowNumbers\": [\n    3,\n    6,\n    7,\n    8\n  ]\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -2553,7 +2553,7 @@
                   "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
                   "var responseBody = pm.response.json();",
                   "pm.test(\"Expected behavior\", () => {",
-                  "pm.expect(responseBody.imported).to.equal(2); pm.expect(responseBody.failed).to.equal(1); pm.expect(responseBody.rows.find(r=>r.rowNumber===2).status).to.equal(\"IMPORTED\");",
+                  "pm.expect(responseBody.imported).to.equal(2); pm.expect(responseBody.failed).to.equal(4); pm.expect(responseBody.rows.find(r=>r.rowNumber===2).status).to.equal(\"IMPORTED\");",
                   "});"
                 ]
               }
@@ -2638,7 +2638,7 @@
           ]
         },
         {
-          "name": "Confirm DOB filled and performances preserved",
+          "name": "Confirm DOB corrected and performances preserved",
           "request": {
             "method": "GET",
             "header": [],
@@ -2654,7 +2654,8 @@
                   "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
                   "var responseBody = pm.response.json();",
                   "pm.test(\"Expected behavior\", () => {",
-                  "pm.expect(responseBody.dateOfBirth).to.equal(\"2010-03-21\"); pm.expect(responseBody.note).to.equal(\"Updated registration note\"); pm.expect(responseBody.flyStatus).to.equal(\"In Roster\"); pm.expect(responseBody.events).to.have.lengthOf(2); pm.expect(responseBody.events.every(r=>r.meetId===null)).to.equal(true);",
+                  "pm.expect(responseBody.dateOfBirth).to.equal(\"2010-03-21\"); pm.expect(responseBody.note).to.equal(\"Updated registration note\"); pm.expect(responseBody.flyStatus).to.equal(\"In Roster\"); pm.expect(responseBody.events).to.have.lengthOf(5); pm.expect(responseBody.events.every(r=>r.meetId===null)).to.equal(true);",
+                  "const race = responseBody.events.find(r=>r.categoryName===\"800M\"); pm.expect(race.unit).to.equal(\"SECONDS\"); pm.expect(race.score).to.equal(164.07); const jump = responseBody.events.find(r=>r.categoryName===\"LONG JUMP\"); pm.expect(jump.unit).to.equal(\"METRES\"); pm.expect(jump.score).to.equal(5.18); const shot = responseBody.events.find(r=>r.categoryName===\"SHOT PUT\"); pm.expect(shot.unit).to.equal(\"METRES\"); pm.expect(shot.score).to.equal(11.34);",
                   "});"
                 ]
               }
@@ -3125,7 +3126,7 @@
           ]
         },
         {
-          "name": "Create same-name identity ambiguousAId",
+          "name": "Create same-name athlete A - DOB 2010-01-01",
           "request": {
             "method": "POST",
             "header": [
@@ -3135,7 +3136,7 @@
               }
             ],
             "url": "{{baseUrl}}/api/athletes",
-            "description": "",
+            "description": "Test setup: first synthetic athlete. Its ID is saved as ambiguousAId.",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"firstName\": \"PostmanAmbiguous\",\n  \"lastName\": \"Sample\",\n  \"dateOfBirth\": \"2010-01-01\",\n  \"gender\": \"Male\",\n  \"events\": []\n}",
@@ -3161,7 +3162,7 @@
           ]
         },
         {
-          "name": "Create same-name identity ambiguousBId",
+          "name": "Create same-name athlete B - DOB 2011-01-01",
           "request": {
             "method": "POST",
             "header": [
@@ -3171,7 +3172,7 @@
               }
             ],
             "url": "{{baseUrl}}/api/athletes",
-            "description": "",
+            "description": "Test setup: a different person with the same name and a different DOB. Its ID is saved as ambiguousBId.",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"firstName\": \"PostmanAmbiguous\",\n  \"lastName\": \"Sample\",\n  \"dateOfBirth\": \"2011-01-01\",\n  \"gender\": \"Male\",\n  \"events\": []\n}",
@@ -3197,12 +3198,89 @@
           ]
         },
         {
-          "name": "Flag multiple possible identities for review",
+          "name": "Preview same name with different DOB - new person",
           "request": {
             "method": "POST",
             "header": [],
             "url": "{{baseUrl}}/api/athletes/import/preview",
+            "description": "Synthetic identity-matching fixture. Use the named fixture, not the client roster.",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": "fixtures/athletes-different-dob.csv"
+                },
+                {
+                  "key": "source",
+                  "type": "text",
+                  "value": "{{importSource}}"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "var responseBody = pm.response.json();",
+                  "pm.test(\"Expected behavior\", () => {",
+                  "pm.expect(responseBody.rows[0].status).to.equal(\"NEW\"); pm.collectionVariables.set(\"differentDobImportId\",responseBody.importId);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Commit different-DOB athlete as a separate person",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/athletes/import/{{differentDobImportId}}/commit",
             "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"rowNumbers\": [\n    2\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "var responseBody = pm.response.json();",
+                  "pm.test(\"Expected behavior\", () => {",
+                  "pm.expect(responseBody.imported).to.equal(1); pm.expect(responseBody.updated).to.equal(0); pm.expect(responseBody.failed).to.equal(0); const createdId = responseBody.rows[0].athleteId; pm.expect(createdId).not.to.equal(Number(pm.collectionVariables.get(\"ambiguousAId\"))); pm.expect(createdId).not.to.equal(Number(pm.collectionVariables.get(\"ambiguousBId\"))); pm.collectionVariables.set(\"differentDobAthleteId\",createdId);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Preview existing name and DOB without ID - review required",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/athletes/import/preview",
+            "description": "Upload athletes-ambiguous.csv: name and DOB match athlete A, but MEMBER # is absent. The confirmed policy blocks even one exact demographic match until an identifier is supplied.",
             "body": {
               "mode": "formdata",
               "formdata": [
@@ -3228,7 +3306,7 @@
                   "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
                   "var responseBody = pm.response.json();",
                   "pm.test(\"Expected behavior\", () => {",
-                  "pm.expect(responseBody.rows[0].status).to.equal(\"AMBIGUOUS\"); pm.collectionVariables.set(\"ambiguousImportId\",responseBody.importId);",
+                  "pm.expect(responseBody.rows[0].status).to.equal(\"AMBIGUOUS\"); pm.expect(responseBody.rows[0].explanation).to.include(\"registration identifier\"); pm.collectionVariables.set(\"ambiguousImportId\",responseBody.importId);",
                   "});"
                 ]
               }
@@ -3236,7 +3314,7 @@
           ]
         },
         {
-          "name": "Ambiguous row does not overwrite an arbitrary athlete",
+          "name": "Reject unconfirmed same-name DOB match",
           "request": {
             "method": "POST",
             "header": [
@@ -3246,7 +3324,7 @@
               }
             ],
             "url": "{{baseUrl}}/api/athletes/import/{{ambiguousImportId}}/commit",
-            "description": "",
+            "description": "Expected rejection: no athlete is created or updated because the matching name and DOB lack a registration identifier.",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"rowNumbers\": [\n    2\n  ]\n}",
@@ -3267,6 +3345,131 @@
                   "var responseBody = pm.response.json();",
                   "pm.test(\"Expected behavior\", () => {",
                   "pm.expect(responseBody.imported).to.equal(0); pm.expect(responseBody.updated).to.equal(0); pm.expect(responseBody.failed).to.equal(1);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Preview name and DOB with supplied ID - confirmed update",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/athletes/import/preview",
+            "description": "Synthetic identity-matching fixture. Use the named fixture, not the client roster.",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": "fixtures/athletes-confirmed-identity.csv"
+                },
+                {
+                  "key": "source",
+                  "type": "text",
+                  "value": "{{importSource}}"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "var responseBody = pm.response.json();",
+                  "pm.test(\"Expected behavior\", () => {",
+                  "pm.expect(responseBody.rows[0].status).to.equal(\"UPDATE\"); pm.expect(responseBody.rows[0].athleteId).to.equal(Number(pm.collectionVariables.get(\"ambiguousAId\"))); pm.collectionVariables.set(\"confirmedIdentityImportId\",responseBody.importId);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Commit identifier-confirmed athlete A update",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/athletes/import/{{confirmedIdentityImportId}}/commit",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"rowNumbers\": [\n    2\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "var responseBody = pm.response.json();",
+                  "pm.test(\"Expected behavior\", () => {",
+                  "pm.expect(responseBody.imported).to.equal(0); pm.expect(responseBody.updated).to.equal(1); pm.expect(responseBody.failed).to.equal(0); pm.expect(responseBody.rows[0].athleteId).to.equal(Number(pm.collectionVariables.get(\"ambiguousAId\")));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Verify confirmed athlete A was updated",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/athletes/{{ambiguousAId}}",
+            "description": "Verify the targeted identity and preserve the other same-name athlete."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "var responseBody = pm.response.json();",
+                  "pm.test(\"Expected behavior\", () => {",
+                  "pm.expect(responseBody.dateOfBirth).to.equal(\"2010-01-01\"); pm.expect(responseBody.note).to.equal(\"Confirmed registration\"); pm.expect(responseBody.flyStatus).to.equal(\"Added\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Verify different-DOB athlete B was preserved",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/athletes/{{ambiguousBId}}",
+            "description": "Verify the targeted identity and preserve the other same-name athlete."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "var responseBody = pm.response.json();",
+                  "pm.test(\"Expected behavior\", () => {",
+                  "pm.expect(responseBody.dateOfBirth).to.equal(\"2011-01-01\"); pm.expect(responseBody.flyStatus).to.equal(\"\"); pm.expect(responseBody.note).not.to.equal(\"Confirmed registration\");",
                   "});"
                 ]
               }
@@ -3572,11 +3775,11 @@
           ]
         },
         {
-          "name": "Delete created athlete importNoDobAthleteId",
+          "name": "Delete created athlete importDatedAthleteId",
           "request": {
             "method": "DELETE",
             "header": [],
-            "url": "{{baseUrl}}/api/athletes/{{importNoDobAthleteId}}",
+            "url": "{{baseUrl}}/api/athletes/{{importDatedAthleteId}}",
             "description": ""
           },
           "event": [
@@ -3710,6 +3913,26 @@
                   "pm.test(\"Expected behavior\", () => {",
                   "pm.expect(responseBody.code).to.equal(\"ATHLETE_NOT_FOUND\");",
                   "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Delete different-DOB synthetic athlete",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/api/athletes/{{differentDobAthleteId}}",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 204\", () => pm.response.to.have.status(204));"
                 ]
               }
             }

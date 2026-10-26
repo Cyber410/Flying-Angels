@@ -1,6 +1,6 @@
 # Backend testing in Postman
 
-This test pack covers **all 39 controller endpoints** and the main backend changes. It includes 115 ordered functional requests, 8 separate secured-mode requests, response assertions, captured IDs, and synthetic import files. No frontend changes are required.
+This test pack covers **all 39 controller endpoints** and the main backend changes. It includes 122 ordered functional requests, 8 separate secured-mode requests, response assertions, captured IDs, and synthetic import files. No frontend changes are required.
 
 For choosing endpoints by task and testing the real client CSV, read [Backend workflows](../backend-workflows.md). The bundled fixture assertions and cleanup are intended for synthetic data; use a separate manual collection for client records.
 
@@ -54,7 +54,7 @@ Leave the multipart `source` value as `{{importSource}}` for the entire run. Cha
 | 02 — Participation | Assign without a fake result, reject duplicate assignments, bulk rollback, same athlete in different events |
 | 03 — Results | Multiple attempts, correction by result ID, mm:ss normalization, field metres, NT/FOUL statuses, unit/score validation, bulk rollback and best-attempt leaderboard |
 | 04 — Notes/copy | Newest-first note history, meet context, validation, selected copying without source athletes/results |
-| 05 — Imports | Missing/unusable DOB, selected create, later profile update, unchanged skip, blank preservation, retry, invalid/ambiguous rows, immediate route, TSV/XLSX |
+| 05 — Imports | Reject missing/invalid/future DOB, selected create, later profile update, time/distance profile results, unchanged skip, blank optional fields, retry, ambiguous identity, immediate route, TSV/XLSX |
 | 06 — Deletion/cleanup | Result deletion preserves participation, removal deletes attempts, event/meet cascade, notes survive detached, athlete deletion and 404 |
 
 Tests check both HTTP status and response values. A returned 200 alone is not sufficient evidence of correct updates or rollback.
@@ -159,18 +159,21 @@ A 400 caused by a literal `{{athleteAId}}` usually means setup did not run or a 
 
 ### Initial CSV
 
-[athletes-initial.csv](fixtures/athletes-initial.csv) has four source records:
+[athletes-initial.csv](fixtures/athletes-initial.csv) has seven source records:
 
 | Source row | Input | Initial preview |
 | --- | --- | --- |
-| 2 | Athlete with missing DOB, ID QA-101, historical 100m value | NEW |
+| 2 | Valid DOB, ID QA-101, historical 100m/800m/Long Jump/Shot Put values | NEW |
 | 3 | Missing last name | INVALID |
-| 4 | Athlete with unusable `0000-00-00` DOB, ID QA-103 | NEW, unknown DOB warning |
+| 4 | Valid DOB, ID QA-103 | NEW |
 | 5 | Valid athlete deliberately excluded | NEW |
+| 6 | Missing DOB | INVALID |
+| 7 | Unusable `0000-00-00` DOB | INVALID |
+| 8 | Future DOB | INVALID |
 
-Commit rows `[2,4]`: expect `imported=2`, `updated=0`, `skipped=2`, `failed=0`. Repeating that commit retains the same IDs and cumulative imported count; it does not insert two more people.
+Commit rows `[2,4]`: expect `imported=2`, `updated=0`, `skipped=5`, `failed=0`. Repeating that commit retains the same IDs and cumulative imported count; it does not insert two more people.
 
-Selecting the invalid row separately reports a failed row while the two earlier successful imports remain stored.
+Selecting invalid rows `[3,6,7,8]` separately reports four failed rows while the two earlier successful imports remain stored. No athlete is created from a missing, invalid or future DOB row.
 
 ### Later registration update
 
@@ -178,21 +181,37 @@ Selecting the invalid row separately reports a failed row while the two earlier 
 
 1. Preview should show UPDATE for both rows.
 2. Commit `[2,3]`: expect `imported=0`, `updated=2`.
-3. Retrieve the first athlete: DOB is filled, status/note are updated, and both old and new performance values remain.
+3. Retrieve the first athlete: DOB is corrected, status/note are updated, and both old and new performance values remain. The 800m score is 164.07 SECONDS; Long Jump is 5.18 METRES and Shot Put is 11.34 METRES.
 4. Preview the updated file again: both rows should be UNCHANGED.
 5. Commit unchanged rows: no new athlete or update; `skipped=2`.
-6. [athletes-blanks.csv](fixtures/athletes-blanks.csv) supplies blanks against that profile: UNCHANGED, with no deletion of DOB/status/note.
+6. [athletes-blanks.csv](fixtures/athletes-blanks.csv) keeps the required valid DOB and supplies blank optional fields: UNCHANGED, with no deletion of gender/status/note.
 
 ### Other uploads
 
-- [athletes-immediate.csv](fixtures/athletes-immediate.csv): immediate-route creation without DOB.
+- [athletes-immediate.csv](fixtures/athletes-immediate.csv): immediate-route creation with valid DOB.
 - [athletes-immediate-updated.csv](fixtures/athletes-immediate-updated.csv): same identifier, later update; repeating it skips unchanged.
 - [athletes.tsv](fixtures/athletes.tsv): tab-delimited registration.
 - [athletes.xlsx](fixtures/athletes.xlsx): workbook containing a typed date cell.
 - [invalid-headers.csv](fixtures/invalid-headers.csv): missing required first/last headers, expect 400.
-- [athletes-ambiguous.csv](fixtures/athletes-ambiguous.csv): used after creating two same-name people; expect AMBIGUOUS and no arbitrary update.
+- [athletes-different-dob.csv](fixtures/athletes-different-dob.csv): same name with DOB 2012-01-01; creates a third person alongside existing DOBs 2010-01-01 and 2011-01-01.
+- [athletes-ambiguous.csv](fixtures/athletes-ambiguous.csv): name/DOB matches athlete A, but has no MEMBER #; expect AMBIGUOUS and no write.
+- [athletes-confirmed-identity.csv](fixtures/athletes-confirmed-identity.csv): supplies synthetic MEMBER # QA-401 for the exact unkeyed athlete A; expect UPDATE and preserve athlete B.
 
-The ambiguous scenario is about multiple possible people, not a blanket rejection of missing DOB. Missing or unusable DOB alone does not discard an athlete.
+Missing or unusable DOB is independently INVALID before identity matching. This required-DOB rule applies to updates too, even when an existing athlete has a stored DOB. Manual athlete CRUD still permits an omitted DOB.
+
+### Identity matching walkthrough
+
+These are synthetic tests, not required registration steps:
+
+1. Create athlete A named PostmanAmbiguous Sample, DOB 2010-01-01; capture ambiguousAId.
+2. Create athlete B with the same name, DOB 2011-01-01; capture ambiguousBId. Different DOBs represent different people.
+3. Preview athletes-different-dob.csv with DOB 2012-01-01. Expect NEW, then commit to create a third athlete with a separate ID. Existing A/B remain untouched.
+4. Preview athletes-ambiguous.csv with DOB 2010-01-01 but no MEMBER #. It matches A's demographics, but the confirmed policy requires an identifier: expect AMBIGUOUS even though only one DOB matches.
+5. Try committing that row: expect imported=0, updated=0, failed=1. This is a passing rejection test.
+6. Preview athletes-confirmed-identity.csv. Its supplied synthetic QA-401 identifier can attach to the unique unkeyed exact name/DOB match A: expect UPDATE. Commit it and verify A's note/status changed while B retained its original DOB/status.
+7. Cleanup deletes the three synthetic athlete IDs. It is not part of importing real registrations.
+
+For real client records, obtain the actual registration identifier rather than reusing synthetic QA identifiers. Known source/ID matches permit subsequent updates and unchanged skips. Without an ID, existing name/DOB matches remain blocked, including repeated identical uploads. Multiple exact candidates are never resolved by gender alone. See [ADR-0009](../adr/0009-name-dob-and-confirmed-identifiers.md).
 
 Import counters are job-wide/cumulative. `VALID` performance status means parseable, not official verification. Imported roster performances have no invented meet ID and are not automatically eligible personal bests/rankings.
 
@@ -225,7 +244,7 @@ Only the bootstrap ADMIN account is provisioned by current prod properties. Post
 
 The collection demonstrates API-visible outcomes. Continue running the JUnit suite for:
 
-- Original-schema migration/backfill and generated-index handling.
+- Hibernate schema creation and entity-defined indexes on empty MySQL.
 - Injected database/write failures and rollback of partially updated profiles.
 - Role checks using controlled test principals.
 - Cases not represented by the bundled fixtures, including concurrency and larger datasets.
@@ -250,7 +269,7 @@ Example traceability:
 | Participation | Assign/bulk/list; same athlete in two events | Duplicate assignment; rollback of a partially valid batch |
 | Results | Multiple attempts, correction, track/field normalization | Wrong unit/score/format; invalid bulk rollback |
 | Notes | Newest-first retrieval and meet context | Empty text rejected; deletion detaches context but preserves text |
-| Athlete import | Missing DOB create, later update, unchanged skip | Missing required name/header; ambiguous identity; excluded selection |
+| Athlete import | Valid DOB create, later update, time/distance values, unchanged skip | Missing/invalid/future DOB; missing name/header; ambiguous identity; excluded selection |
 | Athlete profile | Required fields and result/participation context | Malformed/deleted ID and duplicate demographics |
 
 ADRs explain design rationale rather than test execution. Link the relevant [decision record](../adr/README.md) beside implementation and test evidence.

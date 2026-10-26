@@ -29,12 +29,13 @@
 <rect x="590" y="420" width="500" height="150" fill="#ffffff" stroke="#555"/>
 <text x="604" y="444" font-family="Arial,sans-serif" font-size="16" font-weight="bold">Service: AthleteImportService / AthleteRegistrationParser</text>
 <text x="604" y="465" font-family="Arial,sans-serif" font-size="14" font-weight="normal">Header mapping; NEW / UPDATE / UNCHANGED classification</text>
-<text x="604" y="486" font-family="Arial,sans-serif" font-size="14" font-weight="normal">ImportRowWriter commits one selected row atomically</text>
-<text x="604" y="507" font-family="Arial,sans-serif" font-size="14" font-weight="normal">AthleteImportMatcher compares supplied profile and values</text>
+<text x="604" y="486" font-family="Arial,sans-serif" font-size="14" font-weight="normal">Valid DOB required; race seconds / field metres</text>
+<text x="604" y="507" font-family="Arial,sans-serif" font-size="14" font-weight="normal">ImportRowWriter commits one selected row atomically</text>
+<text x="604" y="528" font-family="Arial,sans-serif" font-size="14" font-weight="normal">AthleteImportMatcher compares supplied profile and values</text>
 <rect x="590" y="625" width="500" height="150" fill="#ffffff" stroke="#555"/>
 <text x="604" y="649" font-family="Arial,sans-serif" font-size="16" font-weight="bold">Repository: ImportJobRepository / ImportRowRepository</text>
 <text x="604" y="670" font-family="Arial,sans-serif" font-size="14" font-weight="normal">Persist original file + row outcomes; lock row on commit</text>
-<text x="604" y="691" font-family="Arial,sans-serif" font-size="14" font-weight="normal">Match external ID or unique name; preserve missing fields</text>
+<text x="604" y="691" font-family="Arial,sans-serif" font-size="14" font-weight="normal">Different DOB: new person; matching name/DOB requires ID</text>
 <rect x="1170" y="420" width="380" height="210" fill="#ffffff" stroke="#555"/>
 <text x="1184" y="444" font-family="Arial,sans-serif" font-size="16" font-weight="bold">Entity / Database: ImportJob + ImportRow +</text>
 <text x="1184" y="465" font-family="Arial,sans-serif" font-size="14" font-weight="normal">Athlete + EventResult</text>

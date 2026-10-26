@@ -8,10 +8,23 @@ public final class ResultValues {
     private ResultValues() {}
     public record Measurement(BigDecimal score, ResultUnit unit, ResultStatus status) {}
     public static ResultUnit unitFor(String name, RankingOrder order) {
-        String n=name.toLowerCase(Locale.ROOT);
-        if (n.contains("point") || n.contains("athlon")) return ResultUnit.POINTS;
-        if (n.contains("jump") || n.contains("put") || n.contains("discus") || n.contains("javelin") || n.contains("hammer")) return ResultUnit.METRES;
+        ResultUnit recognized = recognizedUnit(name);
+        if (recognized != null) return recognized;
         return order == RankingOrder.DESC ? ResultUnit.METRES : ResultUnit.SECONDS;
+    }
+    /** Use the same event recognition for spreadsheet columns and stored result units. */
+    public static boolean isPerformanceEvent(String name) {
+        return recognizedUnit(name) != null;
+    }
+    private static ResultUnit recognizedUnit(String name) {
+        String n=name.trim().toLowerCase(Locale.ROOT);
+        if (n.contains("point") || n.contains("athlon")) return ResultUnit.POINTS;
+        if (n.contains("jump") || n.contains("put") || n.contains("discus") || n.contains("javelin")
+                || n.contains("hammer") || n.contains("throw") || n.contains("vault")) return ResultUnit.METRES;
+        if (n.matches("(?:\\d+\\s*[x×]\\s*)?\\d+\\s*m(?:\\s+(?:run|race))?")
+                || n.contains("hurdle") || n.contains("mile") || n.contains("steeple")
+                || n.contains("sprint") || n.contains("relay") || n.contains("race")) return ResultUnit.SECONDS;
+        return null;
     }
     public static ResultStatus status(String raw) {
         try { return ResultStatus.valueOf(raw.trim().toUpperCase(Locale.ROOT)); }

@@ -655,9 +655,7 @@ const clearAll = () => {
 
       <main className="directory-container">
         <section className="page-heading">
-          <p className="page-eyebrow">
-            ATHLETE MANAGEMENT
-          </p>
+          <h1>Athletes</h1>
 
           <p className="page-description">
             Search, edit and update Flying Angels athlete

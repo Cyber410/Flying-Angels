@@ -1,5 +1,7 @@
 package com.flyingangels.backend.athlete;
 
+import static org.junit.jupiter.api.Assertions.fail;
+
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -19,96 +21,96 @@ class AthleteCsvImportIntegrationTest extends DatabaseIntegrationTest {
 	@Test
 	@DisplayName("T84 upload a valid CSV lists every record with its status in Review")
 	void reviewListsEveryRecordWithStatus() {
-		// TODO: pending API contract
+		fail("Not written yet - pending UC-06 API contract");
 	}
 
 	@Test
 	@DisplayName("T85 Review counts on mixed.csv match the fixture: 6 valid, 2 duplicate, 2 invalid")
 	void reviewCountsMatchMixedFixture() {
-		// TODO: pending API contract
+		fail("Not written yet - pending UC-06 API contract");
 	}
 
 	@Test
 	@DisplayName("T87 no athletes are written after upload and review, before confirm")
 	void nothingSavedBeforeConfirm() {
-		// TODO: pending API contract
+		fail("Not written yet - pending UC-06 API contract");
 	}
 
 	@Test
 	@DisplayName("T88 confirm creates exactly the selected athletes, summary counts match the database")
 	void confirmCreatesExactlySelectedAthletes() {
-		// TODO: pending API contract
+		fail("Not written yet - pending UC-06 API contract");
 	}
 
 	@Test
 	@DisplayName("T90 non-CSV file is rejected, nothing imported (per I1)")
 	void nonCsvFileIsRejected() {
-		// TODO: pending API contract
+		fail("Not written yet - pending UC-06 API contract");
 	}
 
 	@Test
 	@DisplayName("T91 empty and header-only CSV report no athlete records, nothing imported")
 	void emptyAndHeaderOnlyFilesAreRejected() {
-		// TODO: pending API contract
+		fail("Not written yet - pending UC-06 API contract");
 	}
 
 	@Test
 	@DisplayName("T92 missing required column is named in the error (per I2)")
 	void missingRequiredColumnIsNamed() {
-		// TODO: pending API contract
+		fail("Not written yet - pending UC-06 API contract");
 	}
 
 	@Test
 	@DisplayName("T93 rows with missing required values are marked invalid with the reason")
 	void rowsWithMissingValuesAreInvalid() {
-		// TODO: pending API contract
+		fail("Not written yet - pending UC-06 API contract");
 	}
 
 	@Test
 	@DisplayName("T94 same athlete twice in the file is flagged and excluded (per I3, I6)")
 	void duplicatesInFileAreFlagged() {
-		// TODO: pending API contract
+		fail("Not written yet - pending UC-06 API contract");
 	}
 
 	@Test
 	@DisplayName("T95 athlete already in the database is flagged as duplicate, no second record")
 	void athleteAlreadyInDatabaseIsFlagged() {
-		// TODO: pending API contract
+		fail("Not written yet - pending UC-06 API contract");
 	}
 
 	@Test
 	@DisplayName("T96 confirm request with an invalid or duplicate row is rechecked, only valid rows created")
 	void confirmRechecksInvalidAndDuplicateRows() {
-		// TODO: pending API contract
+		fail("Not written yet - pending UC-06 API contract");
 	}
 
 	@Test
 	@DisplayName("T98 deselected valid athlete is not imported, the rest are")
 	void deselectedAthleteIsNotImported() {
-		// TODO: pending API contract
+		fail("Not written yet - pending UC-06 API contract");
 	}
 
 	@Test
 	@DisplayName("T99 confirm with an empty selection returns 400")
 	void emptySelectionIsRejected() {
-		// TODO: pending API contract
+		fail("Not written yet - pending UC-06 API contract");
 	}
 
 	@Test
 	@DisplayName("T100 cancel before confirm imports nothing (per I5)")
 	void cancelBeforeConfirmImportsNothing() {
-		// TODO: pending API contract
+		fail("Not written yet - pending UC-06 API contract");
 	}
 
 	@Test
 	@DisplayName("T103 uploading the same file again flags every row duplicate, 0 new athletes")
 	void reuploadingImportedFileCreatesNothing() {
-		// TODO: pending API contract
+		fail("Not written yet - pending UC-06 API contract");
 	}
 
 	@Test
 	@DisplayName("T104 accents, apostrophes, extra spaces and a UTF-8 BOM are stored exactly and trimmed")
 	void specialCharactersStoredExactly() {
-		// TODO: pending API contract
+		fail("Not written yet - pending UC-06 API contract");
 	}
 }

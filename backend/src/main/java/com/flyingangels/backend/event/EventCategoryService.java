@@ -28,7 +28,7 @@ public class EventCategoryService {
 		if (repository.findByNameIgnoreCase(request.name().trim()).isPresent()) {
 			throw new DuplicateEventCategoryException(request.name());
 		}
-		return repository.save(new EventCategory(request.name(), request.rankingOrder()));
+		return repository.save(new EventCategory(request.name(), request.rankingOrder(),request.unit()));
 	}
 
 	@Transactional

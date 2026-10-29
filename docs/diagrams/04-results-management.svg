@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="820" viewBox="0 0 1600 820">
+<defs><marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto"><path d="M0,0 L9,3 L0,6" fill="none" stroke="#444"/></marker></defs>
+<rect width="1600" height="820" fill="white"/>
+<rect x="30" y="20" width="1540" height="55" fill="#f5f5f5" stroke="#555"/>
+<text x="44" y="44" font-family="Arial,sans-serif" font-size="16" font-weight="bold">Results Management — code flow</text>
+<text x="44" y="65" font-family="Arial,sans-serif" font-size="14" font-weight="normal">Frontend / HTTP API / Spring Boot / JPA / MySQL</text>
+<rect x="30" y="100" width="390" height="230" fill="#f8fafc" stroke="#555"/>
+<text x="44" y="124" font-family="Arial,sans-serif" font-size="16" font-weight="bold">Frontend — React + TypeScript</text>
+<rect x="460" y="100" width="650" height="230" fill="#f8fafc" stroke="#555"/>
+<text x="474" y="124" font-family="Arial,sans-serif" font-size="16" font-weight="bold">HTTP API</text>
+<rect x="30" y="370" width="1080" height="430" fill="#f8fafc" stroke="#555"/>
+<text x="44" y="394" font-family="Arial,sans-serif" font-size="16" font-weight="bold">Backend — Java + Spring Boot / JPA</text>
+<rect x="1150" y="370" width="420" height="430" fill="#f8fafc" stroke="#555"/>
+<text x="1164" y="394" font-family="Arial,sans-serif" font-size="16" font-weight="bold">Database — MySQL 8.4</text>
+<rect x="50" y="145" width="350" height="160" fill="#ffffff" stroke="#555"/>
+<text x="64" y="169" font-family="Arial,sans-serif" font-size="16" font-weight="bold">Frontend: AthleteProfilePage.tsx</text>
+<text x="64" y="190" font-family="Arial,sans-serif" font-size="14" font-weight="normal">getAthleteById() displays historical + meet</text>
+<text x="64" y="211" font-family="Arial,sans-serif" font-size="14" font-weight="normal">results</text>
+<text x="64" y="232" font-family="Arial,sans-serif" font-size="14" font-weight="normal">HTTP API consumers record and correct</text>
+<text x="64" y="253" font-family="Arial,sans-serif" font-size="14" font-weight="normal">attempts</text>
+<rect x="480" y="145" width="610" height="160" fill="#ffffff" stroke="#555"/>
+<text x="494" y="169" font-family="Arial,sans-serif" font-size="16" font-weight="bold">HTTP API: Result routes</text>
+<text x="494" y="190" font-family="Arial,sans-serif" font-size="14" font-weight="normal">GET, POST /api/events/{id}/results</text>
+<text x="494" y="211" font-family="Arial,sans-serif" font-size="14" font-weight="normal">POST /api/events/{id}/results/bulk</text>
+<text x="494" y="232" font-family="Arial,sans-serif" font-size="14" font-weight="normal">PUT, DELETE /api/events/{id}/results/{resultId}</text>
+<text x="494" y="253" font-family="Arial,sans-serif" font-size="14" font-weight="normal">GET /api/events/{id}/leaderboard</text>
+<rect x="50" y="420" width="510" height="150" fill="#ffffff" stroke="#555"/>
+<text x="64" y="444" font-family="Arial,sans-serif" font-size="16" font-weight="bold">Controller: EventController</text>
+<text x="64" y="465" font-family="Arial,sans-serif" font-size="14" font-weight="normal">addResult(), results(), resultsBulk()</text>
+<text x="64" y="486" font-family="Arial,sans-serif" font-size="14" font-weight="normal">updateResult(), deleteResult(), leaderboard()</text>
+<rect x="590" y="420" width="500" height="150" fill="#ffffff" stroke="#555"/>
+<text x="604" y="444" font-family="Arial,sans-serif" font-size="16" font-weight="bold">Service: EventService + ResultValues</text>
+<text x="604" y="465" font-family="Arial,sans-serif" font-size="14" font-weight="normal">Append attempts; validate unit and normalized value</text>
+<text x="604" y="486" font-family="Arial,sans-serif" font-size="14" font-weight="normal">Parse seconds/metres/points and performance statuses</text>
+<text x="604" y="507" font-family="Arial,sans-serif" font-size="14" font-weight="normal">Bulk saves are atomic; leaderboard uses best attempt</text>
+<rect x="590" y="625" width="500" height="150" fill="#ffffff" stroke="#555"/>
+<text x="604" y="649" font-family="Arial,sans-serif" font-size="16" font-weight="bold">Repository: EventResultRepository + participation repositories</text>
+<text x="604" y="670" font-family="Arial,sans-serif" font-size="14" font-weight="normal">save(), findByIdAndEventId(), delete()</text>
+<text x="604" y="691" font-family="Arial,sans-serif" font-size="14" font-weight="normal">Create participation if missing when recording result</text>
+<rect x="1170" y="420" width="380" height="210" fill="#ffffff" stroke="#555"/>
+<text x="1184" y="444" font-family="Arial,sans-serif" font-size="16" font-weight="bold">Entity / Database: EventResult / event_results</text>
+<text x="1184" y="465" font-family="Arial,sans-serif" font-size="14" font-weight="normal">Independent IDs allow repeated athlete/event</text>
+<text x="1184" y="486" font-family="Arial,sans-serif" font-size="14" font-weight="normal">results</text>
+<text x="1184" y="507" font-family="Arial,sans-serif" font-size="14" font-weight="normal">Raw result, score, unit, status, recordedAt,</text>
+<text x="1184" y="528" font-family="Arial,sans-serif" font-size="14" font-weight="normal">source</text>
+<text x="1184" y="549" font-family="Arial,sans-serif" font-size="14" font-weight="normal">EventParticipation stores unique assignment</text>
+<text x="1184" y="570" font-family="Arial,sans-serif" font-size="14" font-weight="normal">separately</text>
+<rect x="50" y="625" width="510" height="150" fill="#ffffff" stroke="#555"/>
+<text x="64" y="649" font-family="Arial,sans-serif" font-size="16" font-weight="bold">Response: EventResultResponse</text>
+<text x="64" y="670" font-family="Arial,sans-serif" font-size="14" font-weight="normal">resultId, athlete, category, raw result, numeric score</text>
+<text x="64" y="691" font-family="Arial,sans-serif" font-size="14" font-weight="normal">eventId/name, meetId/name, unit, status, source</text>
+<polyline points="400,220 480,220" fill="none" stroke="#444" marker-end="url(#arrow)"/>
+<polyline points="785,305 785,350 305,350 305,420" fill="none" stroke="#444" marker-end="url(#arrow)"/>
+<polyline points="560,490 590,490" fill="none" stroke="#444" marker-end="url(#arrow)"/>
+<polyline points="840,570 840,625" fill="none" stroke="#444" marker-end="url(#arrow)"/>
+<polyline points="1090,700 1130,700 1130,525 1170,525" fill="none" stroke="#444" marker-end="url(#arrow)"/>
+<polyline points="305,570 305,625" fill="none" stroke="#444" marker-end="url(#arrow)" stroke-dasharray="5 5"/>
+<polyline points="50,700 20,700 20,345 1125,345 1125,220 1090,220" fill="none" stroke="#444" marker-end="url(#arrow)" stroke-dasharray="5 5"/>
+</svg>

@@ -24,7 +24,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Entity
-@Table(name = "events")
+@Table(name = "events", uniqueConstraints = @jakarta.persistence.UniqueConstraint(name="uk_meet_category", columnNames={"meet_id","category_id"}))
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Event {
@@ -37,7 +37,7 @@ public class Event {
 	private LocalDate eventDate;
 	private String location;
 	private String eventType;
-	private String externalUrl;
+	@jakarta.persistence.Column(length=500) private String externalUrl;
 
 	@ManyToOne(optional = false)
 	@JoinColumn(name = "meet_id", nullable = false)
@@ -51,7 +51,10 @@ public class Event {
 	private RankingOrder rankingOrder;
 
 	@OneToMany(mappedBy = "event", cascade = CascadeType.ALL, orphanRemoval = true)
-	private List<EventResult> results = new ArrayList<>();
+	private java.util.Set<EventResult> results = new java.util.LinkedHashSet<>();
+
+    @OneToMany(mappedBy="event", cascade=CascadeType.ALL, orphanRemoval=true)
+    private java.util.Set<EventParticipation> participations = new java.util.LinkedHashSet<>();
 
 	public Event(EventRequest request, EventCategory category, Meet meet) {
 		updateFrom(request, category, meet);

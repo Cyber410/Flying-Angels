@@ -5,17 +5,16 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
-import java.util.stream.Collectors;
-import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
 public class AthleteService {
 
 	private final AthleteRepository repository;
+    private final com.flyingangels.backend.event.EventResultRepository resultRepository;
+    private final com.flyingangels.backend.event.EventParticipationRepository participationRepository;
+    private final com.flyingangels.backend.note.AthleteNoteRepository noteRepository;
 
 	@Transactional(readOnly = true)
 	public List<Athlete> search(String search, String gender, String team) {
@@ -28,6 +27,15 @@ public class AthleteService {
 				.orElseThrow(() -> new AthleteNotFoundException(id));
 	}
 
+    @Transactional(readOnly=true)
+    public com.flyingangels.backend.athlete.dto.AthleteProfileResponse profile(Long id) {
+        return com.flyingangels.backend.athlete.dto.AthleteProfileResponse.from(get(id),resultRepository.findByAthleteId(id),
+            participationRepository.findByAthleteId(id));
+    }
+    @Transactional
+    public com.flyingangels.backend.athlete.dto.AthleteProfileResponse createProfile(AthleteRequest request) { return profile(create(request).getId()); }
+    @Transactional
+    public com.flyingangels.backend.athlete.dto.AthleteProfileResponse updateProfile(Long id,AthleteRequest request) { update(id,request); return profile(id); }
 	@Transactional
 	public Athlete save(Athlete athlete) {
 		return repository.save(athlete);
@@ -53,7 +61,10 @@ public class AthleteService {
 	@Transactional
 	public void delete(Long id) {
 		Athlete athlete = get(id);
-		repository.delete(athlete);
+		noteRepository.deleteByAthleteId(id);
+        resultRepository.deleteByAthleteId(id);
+        participationRepository.deleteByAthleteId(id);
+        repository.delete(athlete);
 	}
 
 	private void ensureNoDuplicate(AthleteRequest request, Long excludedId) {
@@ -65,62 +76,6 @@ public class AthleteService {
 		if (matches.stream().anyMatch(athlete -> !athlete.getId().equals(excludedId))) {
 			throw new DuplicateAthleteException(request.firstName(), request.lastName());
 		}
-	}
-
-	@Transactional
-	public boolean saveIfNew(Athlete athlete) {
-		if (repository.existsByImportKey(athlete.getImportKey())) {
-			return false;
-		}
-		if (athlete.getDateOfBirth() != null && !repository
-				.findByFirstNameIgnoreCaseAndLastNameIgnoreCaseAndDateOfBirthAndGenderIgnoreCase(
-						athlete.getFirstName(), athlete.getLastName(), athlete.getDateOfBirth(), athlete.getGender())
-				.isEmpty()) {
-			return false;
-		}
-		if (athlete.getDateOfBirth() == null && repository
-				.findByFirstNameIgnoreCaseAndLastNameIgnoreCaseAndDateOfBirthIsNullAndGenderIgnoreCase(
-						athlete.getFirstName(), athlete.getLastName(), athlete.getGender())
-				.stream().anyMatch(existing -> sameLegacyRecord(existing, athlete))) {
-			return false;
-		}
-		repository.save(athlete);
-		return true;
-	}
-
-	@Transactional(readOnly = true)
-	public Optional<Athlete> findExistingForImport(Athlete candidate) {
-		if (candidate.getImportKey() != null) {
-			Optional<Athlete> keyed = repository.findByImportKey(candidate.getImportKey());
-			if (keyed.isPresent()) {
-				return keyed;
-			}
-		}
-		if (candidate.getDateOfBirth() != null) {
-			return repository.findByFirstNameIgnoreCaseAndLastNameIgnoreCaseAndDateOfBirthAndGenderIgnoreCase(
-					candidate.getFirstName(), candidate.getLastName(), candidate.getDateOfBirth(), candidate.getGender())
-					.stream().findFirst();
-		}
-		return repository.findByFirstNameIgnoreCaseAndLastNameIgnoreCaseAndDateOfBirthIsNullAndGenderIgnoreCase(
-				candidate.getFirstName(), candidate.getLastName(), candidate.getGender()).stream()
-				.filter(existing -> sameLegacyRecord(existing, candidate)).findFirst();
-	}
-
-	private boolean sameLegacyRecord(Athlete existing, Athlete incoming) {
-		Set<String> existingEvents = existing.getEvents().stream()
-				.map(event -> event.getEventName() + "=" + event.getResult())
-				.collect(Collectors.toCollection(HashSet::new));
-		Set<String> incomingEvents = incoming.getEvents().stream()
-				.map(event -> event.getEventName() + "=" + event.getResult())
-				.collect(Collectors.toCollection(HashSet::new));
-		return normalized(existing.getNote()).equals(normalized(incoming.getNote()))
-				&& normalized(existing.getFlyStatus()).equals(normalized(incoming.getFlyStatus()))
-				&& normalized(existing.getFlyaStatus()).equals(normalized(incoming.getFlyaStatus()))
-				&& existingEvents.equals(incomingEvents);
-	}
-
-	private String normalized(String value) {
-		return value == null ? "" : value.trim().replaceAll("\\s+", " ").toLowerCase();
 	}
 
 	private String normalize(String value) {

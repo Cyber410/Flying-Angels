@@ -8,12 +8,14 @@ import java.util.Optional;
 
 public interface EventRepository extends JpaRepository<Event, Long> {
 
-	@EntityGraph(attributePaths = {"meet", "category", "results", "results.athlete"})
+	@EntityGraph(attributePaths = {"meet", "category", "results", "results.athlete", "participations", "participations.athlete"})
 	List<Event> findAllByOrderByEventDateDescNameAsc();
 
-	@EntityGraph(attributePaths = {"meet", "category", "results", "results.athlete"})
+	@EntityGraph(attributePaths = {"meet", "category", "results", "results.athlete", "participations", "participations.athlete"})
 	Optional<Event> findById(Long id);
 
-	@EntityGraph(attributePaths = {"meet", "category", "results", "results.athlete"})
+	@EntityGraph(attributePaths = {"meet", "category", "results", "results.athlete", "participations", "participations.athlete"})
 	Optional<Event> findByIdAndMeetId(Long eventId, Long meetId);
+    boolean existsByMeetIdAndCategoryId(Long meetId, Long categoryId);
+    boolean existsByMeetIdAndCategoryIdAndIdNot(Long meetId, Long categoryId, Long id);
 }

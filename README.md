@@ -1,5 +1,11 @@
 # Flying Angels Management System
 
+For the implemented backend's architecture, project structure, API reference, database design, setup, and testing, see the [complete backend guide](backend/README.md).
+
+For which endpoint to use and when, including preview/commit behavior with the real client CSV, start with [Backend workflows](docs/backend-workflows.md).
+
+Backend review assets: [Postman tests](docs/postman/README.md) and [Architecture Decision Records](docs/adr/README.md).
+
 ## Overview
 The Flying Angels Management System is a centralized platform designed to support the operations of Flying Angels, a youth sports development organization serving athletes and families across the GTA and Southwestern Ontario.
 

@@ -8,9 +8,9 @@ import java.util.Optional;
 
 public interface MeetRepository extends JpaRepository<Meet, Long> {
 
-	@EntityGraph(attributePaths = {"events", "events.category"})
+	@EntityGraph(attributePaths = {"events", "events.category", "events.meet", "events.participations"})
 	List<Meet> findAllByOrderByMeetDateDescNameAsc();
 
-	@EntityGraph(attributePaths = {"events", "events.category"})
+	@EntityGraph(attributePaths = {"events", "events.category", "events.meet", "events.participations"})
 	Optional<Meet> findById(Long id);
 }

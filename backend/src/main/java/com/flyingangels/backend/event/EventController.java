@@ -67,9 +67,9 @@ public class EventController {
 
 	@PostMapping("/api/events/{id}/participants")
 	@ResponseStatus(HttpStatus.CREATED)
-	public EventResultResponse assignParticipant(@PathVariable Long id,
+	public com.flyingangels.backend.event.dto.EventParticipationResponse assignParticipant(@PathVariable Long id,
 			@Valid @RequestBody EventParticipantRequest request) {
-		return EventResultResponse.from(eventService.assignParticipant(id, request));
+		return com.flyingangels.backend.event.dto.EventParticipationResponse.from(eventService.assignParticipant(id, request));
 	}
 
 	@PutMapping("/api/events/{id}/participants/{athleteId}/result")
@@ -89,4 +89,21 @@ public class EventController {
 	public void deleteResult(@PathVariable Long id, @PathVariable Long resultId) {
 		eventService.deleteResult(id, resultId);
 	}
+    @GetMapping("/api/events/{id}/participants")
+    public List<com.flyingangels.backend.event.dto.EventParticipationResponse> participants(@PathVariable Long id) {
+        return eventService.participants(id).stream().map(com.flyingangels.backend.event.dto.EventParticipationResponse::from).toList();
+    }
+    @PostMapping("/api/events/{id}/participants/bulk") @ResponseStatus(HttpStatus.CREATED)
+    public List<com.flyingangels.backend.event.dto.EventParticipationResponse> assignBulk(@PathVariable Long id,
+            @Valid @RequestBody com.flyingangels.backend.event.dto.ParticipantBatchRequest request) {
+        return eventService.assignBatch(id,request.athleteIds()).stream().map(com.flyingangels.backend.event.dto.EventParticipationResponse::from).toList();
+    }
+    @DeleteMapping("/api/events/{id}/participants/{athleteId}") @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void removeParticipant(@PathVariable Long id,@PathVariable Long athleteId) { eventService.removeParticipant(id,athleteId); }
+    @GetMapping("/api/events/{id}/results")
+    public List<EventResultResponse> results(@PathVariable Long id) { return eventService.get(id).getResults().stream().map(EventResultResponse::from).toList(); }
+    @PostMapping("/api/events/{id}/results/bulk") @ResponseStatus(HttpStatus.CREATED)
+    public List<EventResultResponse> resultsBulk(@PathVariable Long id,@Valid @RequestBody com.flyingangels.backend.event.dto.ResultBatchRequest request) {
+        return eventService.addResults(id,request.results()).stream().map(EventResultResponse::from).toList();
+    }
 }

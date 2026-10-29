@@ -62,7 +62,9 @@ All PRs must pass the required workflow checks before merging, including:
 - any other project quality gates defined for the repo
 
 ### GitHub Actions CI/CD Setup
-We will use GitHub Actions to enforce code quality and prevent broken code from entering the protected branches.
+The `CI and ECR publishing` workflow builds the application, runs unit tests, builds runtime images, starts an isolated Docker Compose stack, and runs database and HTTP integration tests. After successful checks, pushes to `development` or `main` automatically publish the tested images to Amazon ECR. Pull requests run checks only. Sprint work merges into `development`; release-ready work merges into `main` at the end of the sprint.
+
+Follow [ECR publishing instructions](docs/ecr-publishing.md) for the exact GitHub secrets and variables, first-run steps, image references, and troubleshooting. ECS deployment is a later setup step; this workflow does not start AWS compute.
 
 #### Required checks for every pull request
 For the frontend (React + TypeScript):
@@ -80,7 +82,8 @@ For the backend (Spring Boot):
 
 The workflow should run on:
 - pull requests targeting `main` and `development`
-- pushes to `main` and `development`
+- pushes to `main` and `development`, automatically publishing images after successful checks
+- manual runs, with optional ECR publishing on `development` or `main`
 
 #### Merge protection rule
 To make sure failed checks block merges:
@@ -92,27 +95,26 @@ To make sure failed checks block merges:
    - Require a pull request before merging
    - Require at least 1 approval
    - Require status checks to pass before merging
-   - Select the workflow checks such as `frontend-check` and `backend-check`
+   - Select `Build, test and verify containers` after its first run; remove requirements for the old frontend/backend checks
    - Require branches to be up to date before merging
    - Optionally require conversation resolution
 
 This ensures that if a CI check fails, the merge button is disabled until the problem is fixed.
 
-#### Recommended CI workflow structure
-- `frontend` job: runs lint, typecheck, tests, and build
-- `backend` job: runs Java tests and build
-- both jobs are required for a PR to be mergeable
+#### CI workflow structure
+- One required job runs frontend and backend checks before building images.
+- Backend unit and database integration tests run in separate Maven profiles.
+- HTTP integration checks exercise the built frontend, Nginx, backend, and disposable MySQL database.
+- Logs and backend test reports are uploaded even if checks fail; the isolated Compose stack is always removed.
 
 #### Deployment step
-For the first version, the repository can focus on CI gate enforcement. Once the application is ready for deployment, we can add a deployment workflow for:
-- frontend hosting via Vercel or Netlify
-- backend hosting via Render, Railway, Azure App Service, or EC2
+Automatic publishing on pushes to `development` and `main` sends versioned images to the existing private ECR repositories after every check passes. Manual publishing remains available for reruns. The run summary and `published-images.json` artifact provide image digest references for configuring ECS/Fargate. Automatic ECS updates are not part of this workflow yet.
 
 ## Testing Strategy and File Structure
 The MVP is complete only after Flying Angels approves it.
 
 ### Test Folder Structure
-We will keep automated tests close to the code they validate. The root `tests/` folder is not where the main CI test files live; it is used for project-level QA and validation artifacts.
+Unit and database integration tests live with their applications. The root `tests/` folder contains project-level QA assets and `tests/integration/test_deployed_stack.py`, which CI runs against the built Docker images.
 
 ```text
 tests/
@@ -170,7 +172,7 @@ The root `tests/` folder should contain:
 - release verification documentation
 - non-code QA records for Flying Angels sign-off
 
-This folder is for human-facing validation and documentation, not for the actual automated tests that GitHub Actions runs.
+This folder includes human-facing QA documentation and automated deployed-stack checks under `tests/integration/`.
 
 ### What goes in frontend test folders
 Frontend test files should live alongside the feature or component they validate.
@@ -207,13 +209,13 @@ These tests should cover:
 - PB and rankings calculation
 - invalid data rejection and error handling
 
-### CI runs only the real automated tests
-GitHub Actions should execute the tests that live in the application folders, not the root QA folder.
+### CI runs automated application and deployed-stack tests
+GitHub Actions executes the tests in the application folders and the HTTP checks in `tests/integration/`.
 
 This means:
-- frontend CI job runs frontend unit tests and build
-- backend CI job runs backend tests and build
-- root `tests/` folder is not treated as the main CI test source unless you explicitly add a separate QA workflow later
+- frontend checks run lint, type checks, build and unit tests
+- backend checks run build, unit tests and database integration tests
+- deployed-stack checks validate runtime images through Nginx using an isolated Compose database
 
 This separation keeps development clean and ensures the repo has both automated engineering validation and project-level QA tracking.
 

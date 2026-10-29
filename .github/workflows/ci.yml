@@ -1,107 +1,218 @@
-name: CI
+name: CI and ECR publishing
 
 on:
   pull_request:
-    branches:
-      - main
-      - development
+    branches: [main, development]
   push:
-    branches:
-      - main
-      - development
+    branches: [main, development]
+  workflow_dispatch:
+    inputs:
+      publish_images:
+        description: Publish tested images to ECR (development/main; does not deploy ECS)
+        type: boolean
+        required: true
+        default: false
+
+permissions:
+  contents: read
+
+# Keep runs sequential for each branch, including automatic publishing runs.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
-  frontend-check:
-    name: Frontend checks
-    runs-on: ubuntu-latest
+  verify:
+    name: Build, test and verify containers
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    env:
+      COMPOSE_PROJECT_NAME: fa-ci-${{ github.run_id }}-${{ github.run_attempt }}
+      BACKEND_IMAGE: flying-angels-backend:ci-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+      FRONTEND_IMAGE: flying-angels-frontend:ci-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+      IMAGE_TAG: sha-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+      CI_HTTP_PORT: '18080'
+      TEST_BASE_URL: http://127.0.0.1:18080
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Skip if frontend project does not exist
-        if: ${{ hashFiles('frontend/package.json') == '' }}
+      - name: Validate publishing configuration
+        if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.publish_images)
+        env:
+          PUBLISH_ENABLED: ${{ vars.AWS_PUBLISH_ENABLED }}
+          AWS_REGION: ${{ vars.AWS_REGION }}
+          BACKEND_REPOSITORY: ${{ vars.ECR_BACKEND_REPOSITORY }}
+          FRONTEND_REPOSITORY: ${{ vars.ECR_FRONTEND_REPOSITORY }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_SESSION_TOKEN: ${{ secrets.AWS_SESSION_TOKEN }}
         run: |
-          echo "Frontend project not found, skipping frontend checks."
-
-      - name: Set up Node.js
-        if: ${{ hashFiles('frontend/package.json') != '' }}
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          #cache: npm
-          #cache-dependency-path: frontend/package-lock.json
-
-      - name: Install dependencies
-        if: ${{ hashFiles('frontend/package.json') != '' }}
-        working-directory: frontend
-        run: |
-          if [ -f package-lock.json ]; then
-            npm ci
-          else
-            npm install
+          set -euo pipefail
+          if [[ "$GITHUB_REF" != refs/heads/development && "$GITHUB_REF" != refs/heads/main ]]; then
+            echo '::error::Publish only from development or main. Select one in the Run workflow menu.'
+            exit 1
+          fi
+          if [[ "$PUBLISH_ENABLED" != true ]]; then
+            echo '::error::Set repository variable AWS_PUBLISH_ENABLED to true.'
+            exit 1
+          fi
+          for setting in AWS_REGION BACKEND_REPOSITORY FRONTEND_REPOSITORY AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN; do
+            if [[ -z "${!setting}" ]]; then
+              echo "::error::Missing publishing setting: $setting. See docs/ecr-publishing.md."
+              exit 1
+            fi
+          done
+          if [[ "$AWS_REGION" != us-east-1 && "$AWS_REGION" != us-west-2 ]]; then
+            echo '::error::Learner Lab requires us-east-1 or us-west-2.'
+            exit 1
+          fi
+          if [[ "$BACKEND_REPOSITORY" == "$FRONTEND_REPOSITORY" ]]; then
+            echo '::error::Backend and frontend must use different ECR repositories.'
+            exit 1
           fi
 
-      - name: Lint code
-        if: ${{ hashFiles('frontend/package.json') != '' }}
-        working-directory: frontend
-        run: npm run lint -- --max-warnings=0
-
-      - name: Type check
-        if: ${{ hashFiles('frontend/package.json') != '' }}
-        working-directory: frontend
-        run: npm run typecheck
-
-      - name: Run unit tests
-        if: ${{ hashFiles('frontend/package.json') != '' }}
-        working-directory: frontend
-        run: npm test -- --watch=false
-
-      - name: Build frontend
-        if: ${{ hashFiles('frontend/package.json') != '' }}
-        working-directory: frontend
-        run: npm run build
-
-  backend-check:
-    name: Backend checks
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Skip if backend project does not exist
-        if: ${{ hashFiles('backend/pom.xml') == '' }}
-        run: |
-          echo "Backend project not found, skipping backend checks."
-
-      - name: Set up Java 17
-        if: ${{ hashFiles('backend/pom.xml') != '' }}
+      - name: Set up Java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
-          #cache: maven
-          #cache-dependency-path: backend/pom.xml
+          cache: maven
+          cache-dependency-path: backend/pom.xml
 
-      - name: Run backend tests
-        if: ${{ hashFiles('backend/pom.xml') != '' }}
-        working-directory: backend
-        run: |
-          if [ -f mvnw ]; then
-            chmod +x mvnw
-            ./mvnw test
-          else
-            mvn test
-          fi
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
 
-      - name: Build backend
-        if: ${{ hashFiles('backend/pom.xml') != '' }}
-        working-directory: backend
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Lint and type check frontend
+        working-directory: frontend
         run: |
-          if [ -f mvnw ]; then
-            chmod +x mvnw
-            ./mvnw package -DskipTests
-          else
-            mvn package -DskipTests
-          fi
+          npm run lint -- --max-warnings=0
+          npm run typecheck
+
+      - name: Build backend application
+        working-directory: backend
+        run: bash mvnw -B -DskipTests clean package
+
+      - name: Build frontend application
+        working-directory: frontend
+        run: npm run build
+
+      - name: Run backend unit tests
+        working-directory: backend
+        run: bash mvnw -B -Punit-tests test
+
+      - name: Run frontend unit tests
+        working-directory: frontend
+        run: npm test
+
+      # Build once, then test and publish these same images. ECS uses Linux/X86_64.
+      - name: Build runtime Docker images
+        run: |
+          docker build --platform linux/amd64 --label "org.opencontainers.image.revision=$GITHUB_SHA" -f deploy/backend.Dockerfile -t "$BACKEND_IMAGE" .
+          docker build --platform linux/amd64 --label "org.opencontainers.image.revision=$GITHUB_SHA" -f deploy/frontend.Dockerfile -t "$FRONTEND_IMAGE" .
+
+      - name: Start isolated Docker Compose stack
+        run: |
+          docker pull mysql:8.4
+          docker compose -f deploy/compose.ci.yml up -d --no-build --pull never --wait --wait-timeout 240
+
+      - name: Run backend database integration tests
+        working-directory: backend
+        run: bash mvnw -B -Pintegration-tests -Dapi.version=1.44 test
+
+      - name: Test deployed images through Nginx
+        run: |
+          mkdir -p artifacts
+          set -o pipefail
+          python3 tests/integration/test_deployed_stack.py 2>&1 | tee artifacts/deployed-stack-tests.log
+
+      # AWS credentials are used only after every build and test has passed.
+      - name: Configure temporary AWS credentials
+        if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.publish_images)
+        uses: aws-actions/configure-aws-credentials@v6.3.0
+        with:
+          aws-region: ${{ vars.AWS_REGION }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+
+      - name: Check existing ECR repositories
+        if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.publish_images)
+        env:
+          BACKEND_REPOSITORY: ${{ vars.ECR_BACKEND_REPOSITORY }}
+          FRONTEND_REPOSITORY: ${{ vars.ECR_FRONTEND_REPOSITORY }}
+        run: |
+          aws ecr describe-repositories --repository-names "$BACKEND_REPOSITORY" "$FRONTEND_REPOSITORY" --query 'repositories[].repositoryName' --output table
+
+      - name: Log in to ECR
+        if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.publish_images)
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Publish verified images and record ECR digests
+        if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.publish_images)
+        env:
+          ECR_REGISTRY: ${{ steps.ecr.outputs.registry }}
+          BACKEND_REPOSITORY: ${{ vars.ECR_BACKEND_REPOSITORY }}
+          FRONTEND_REPOSITORY: ${{ vars.ECR_FRONTEND_REPOSITORY }}
+        run: |
+          set -euo pipefail
+          backend_uri="$ECR_REGISTRY/$BACKEND_REPOSITORY:$IMAGE_TAG"
+          frontend_uri="$ECR_REGISTRY/$FRONTEND_REPOSITORY:$IMAGE_TAG"
+          docker tag "$BACKEND_IMAGE" "$backend_uri"
+          docker tag "$FRONTEND_IMAGE" "$frontend_uri"
+          docker push "$backend_uri"
+          docker push "$frontend_uri"
+          backend_digest=$(aws ecr describe-images --repository-name "$BACKEND_REPOSITORY" --image-ids "imageTag=$IMAGE_TAG" --query 'imageDetails[0].imageDigest' --output text)
+          frontend_digest=$(aws ecr describe-images --repository-name "$FRONTEND_REPOSITORY" --image-ids "imageTag=$IMAGE_TAG" --query 'imageDetails[0].imageDigest' --output text)
+          export BACKEND_IMAGE_URI="$ECR_REGISTRY/$BACKEND_REPOSITORY@$backend_digest"
+          export FRONTEND_IMAGE_URI="$ECR_REGISTRY/$FRONTEND_REPOSITORY@$frontend_digest"
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          images = {
+              "commit": os.environ["GITHUB_SHA"],
+              "tag": os.environ["IMAGE_TAG"],
+              "backend": os.environ["BACKEND_IMAGE_URI"],
+              "frontend": os.environ["FRONTEND_IMAGE_URI"],
+          }
+          Path("artifacts/published-images.json").write_text(json.dumps(images, indent=2) + "\n")
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as summary:
+              summary.write("## Published images\n\nAll build, unit, database and deployed-stack checks passed.\n\n")
+              summary.write(f"Commit: `{images['commit']}`\n\nTag: `{images['tag']}`\n\n")
+              for container in ("backend", "frontend"):
+                  summary.write(f"**{container}**\n\n```text\n{images[container]}\n```\n\n")
+              summary.write("Use these digest references in the ECS task definition. This workflow does not deploy ECS or start AWS compute.\n")
+          PY
+
+      - name: Collect Compose status and logs
+        if: always()
+        run: |
+          mkdir -p artifacts
+          docker compose -f deploy/compose.ci.yml ps -a > artifacts/compose-status.txt 2>&1
+          docker compose -f deploy/compose.ci.yml logs --no-color > artifacts/compose.log 2>&1
+
+      - name: Remove isolated test containers
+        if: always()
+        run: docker compose -f deploy/compose.ci.yml down --volumes --remove-orphans
+
+      - name: Upload verification reports and published image references
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: verification-${{ github.run_id }}-${{ github.run_attempt }}
+          retention-days: 7
+          if-no-files-found: warn
+          path: |
+            artifacts/
+            backend/target/unit-test-reports/
+            backend/target/integration-test-reports/

@@ -211,7 +211,7 @@ Request DTOs represent individual operations and batch wrappers. Response DTOs e
 | `EventResult` / `event_results` | ID, optional event ID, category/athlete IDs, raw result, decimal score, unit/status, recorded time, source | Multiple rows for an athlete/event are allowed; numeric score is `DECIMAL(12,4)` |
 | `AthleteNote` / `athlete_notes` | ID, athlete ID, optional event ID, text, created time | Indexed by athlete/time/ID for ordered retrieval |
 | `ImportJob` / `athlete_import_jobs` | UUID, filename, source, original file bytes, created time | Original upload stored as a large binary object |
-| `ImportRow` / `athlete_import_rows` | ID, job ID, source row number, status, explanation, imported athlete ID | Unique `(job_id, file_row_number)` |
+| `ImportRow` / `athlete_import_rows` | ID, job ID, source row number, status, explanation, imported athlete ID, repeated source-row number | Unique `(job_id, file_row_number)` |
 
 `ImportRow.athleteId` is an outcome reference stored as a scalar value, not a JPA athlete relationship. There is no endpoint that automatically deletes jobs when an athlete is deleted.
 
@@ -251,7 +251,7 @@ These are physical deletions. The project does not currently implement archival,
 
 ### Search
 
-`GET /api/athletes` accepts optional `search`, `gender`, and `team` query parameters, defaulting to empty strings.
+`GET /api/athletes` accepts optional `search`, `gender`, and `team` query parameters, defaulting to empty strings. It also accepts inclusive `minAge`/`maxAge` bounds with a required `ageAsOf` reference date when either bound is used. Age is completed years on that date; unknown DOBs are excluded only by active age filters. See [Sprint 2 API contracts](../docs/sprint2-api-updates.md).
 
 - Search matches a case-insensitive substring of the concatenated first/last name.
 - Gender is a case-insensitive exact filter.
@@ -391,7 +391,7 @@ Create a performance using:
 
 The compatibility route `PUT /api/events/{id}/participants/{athleteId}/result` requires an existing assignment and **appends** a result. Its behavior is not idempotent despite using PUT; new clients should use POST results for new performances.
 
-The result-batch wrapper is `{"results": [...]}`. One invalid record rolls back the complete batch.
+The result-batch wrapper is `{"results": [...]}`. One invalid record rolls back the complete batch. Bulk POST creates attempts. New `PUT /api/events/{id}/results/bulk` corrects existing attempts using `resultId`, `result`, optional `score` and `unit`; it preserves athlete/event ownership, IDs and recording timestamps. See [bulk editing and Results Overview](../docs/sprint2-api-updates.md).
 
 ### Numeric measurement rules
 
@@ -424,6 +424,10 @@ Colon-form track times support minutes and seconds, with seconds from 00 to 59 a
 Non-performance inputs such as `NT` require a null/omitted numeric score. `PENDING` and `UNPARSED` are not accepted as manual performance inputs. Manual unrecognized formats return a validation error; historical import keeps them as `UNPARSED` with a null score.
 
 Results have `recordedAt` and `source`. New manual results use source `MANUAL`; historical imports use `LEGACY_IMPORT`. Recording time is insertion time, not necessarily competition time. Migrated rows may have unknown/null recording times. There is no author, verifier, official-result flag, or row-level import-job foreign key on `EventResult`.
+
+### Results Overview
+
+`GET /api/results` provides paginated competition results across meets, with athlete search, meet/event/category/gender filters, inclusive age bounds at each meet's start date, and date/athlete/event-appropriate performance ordering. It returns every matching attempt; event-less historical imports remain in athlete history. See [query parameters and response](../docs/sprint2-api-updates.md).
 
 ### Leaderboard algorithm
 
@@ -528,7 +532,7 @@ For XLSX, calendar-date conversion applies only to the DOB column. Event cells r
 
 Source defaults to `UPLOAD`, is trimmed/uppercased, and is limited to 80 characters. Keep it consistent for that registration dataset. To resolve a blocked unkeyed match, obtain the actual registration identifier, add it to the source and create a new preview. Do not fabricate an identifier. This matching policy is recorded in [ADR-0009](../docs/adr/0009-name-dob-and-confirmed-identifiers.md).
 
-Rows are processed in original source order and eligible rows are rechecked against earlier saved rows. Confirmed identifiers allow later supplied information to update earlier values, append new performances and skip unchanged repetitions. Repeated unkeyed name/DOB rows instead become AMBIGUOUS after the first creation. A previewed NEW row can consequently become IMPORTED, UPDATED, UNCHANGED or AMBIGUOUS during commit.
+Rows are processed in original source order and eligible rows are rechecked against earlier saved rows. Confirmed identifiers allow later supplied information to update earlier values, append new performances and skip unchanged repetitions. Identical parsed registrations repeated within the same file are marked DUPLICATE during preview and skipped. Other repeated identities carry `repeatedOfRowNumber` and an explanation while retaining their normal classification. Non-identical unkeyed name/DOB rows can still become AMBIGUOUS after an earlier row creates the athlete. A previewed NEW row can consequently become IMPORTED, UPDATED, UNCHANGED or AMBIGUOUS during commit.
 
 ### Workflow and persistence
 
@@ -553,7 +557,7 @@ Original bytes are stored in `ImportJob`; classifications/outcomes are stored in
 
 During commit:
 
-1. Reject repeated selections or row numbers outside the job.
+1. Reject empty/repeated selections or row numbers outside the job.
 2. Process selected NEW/UPDATE rows (and legacy stored VALID previews).
 3. Lock the preview row and recheck current athlete identity and changes.
 4. Lock/refresh an existing matched profile before applying its changes.
@@ -569,6 +573,7 @@ There is no outer batch transaction: successful rows remain saved when another r
 | NEW | No existing athlete matched; ready to create |
 | UPDATE | Existing athlete has supplied changes; ready to update |
 | UNCHANGED | Existing information and supplied performance values have not changed; skip |
+| DUPLICATE | Identical registration already appears in this upload; skipped with a source-row reference |
 | INVALID | Row validation failed |
 | AMBIGUOUS | Multiple possible identities require review |
 | IMPORTED | New athlete successfully created |
@@ -638,10 +643,12 @@ Base URL in local development: `http://localhost:8080`. Paths below are relative
 | GET | `/api/events/{id}/results` | Event ID | 200; EventResultResponse array |
 | POST | `/api/events/{id}/results` | `{athleteId, result, score?, unit?}` | 201; EventResultResponse |
 | POST | `/api/events/{id}/results/bulk` | `{results: [...]}` | 201; result array |
+| PUT | `/api/events/{id}/results/bulk` | `{results: [{resultId, result, score?, unit?}]}` | 200; atomic correction array |
 | PUT | `/api/events/{id}/results/{resultId}` | Result request | 200; corrected result |
 | DELETE | `/api/events/{id}/results/{resultId}` | Both IDs | 204 |
 | PUT | `/api/events/{id}/participants/{athleteId}/result` | `{result, score?, unit?}` | 200; newly appended result |
 | GET | `/api/events/{id}/leaderboard` | Event ID | 200; best result per athlete |
+| GET | `/api/results` | Optional athlete search, meet/event/category/gender/age filters, sort and paging | 200; paged Results Overview |
 
 ### Notes, imports and security
 
@@ -961,18 +968,23 @@ For a persisted schema change, update the appropriate entity mapping and verify 
 | `AthleteControllerTest` | Standalone MockMvc status/validation/error contracts |
 | `AthleteControllerWebMvcTest` | MVC slice, profile/directory responses and malformed IDs |
 | `AthleteDirectoryIntegrationTest` | Real database search and filter behavior |
+| `AgeRangeTest`, `AthleteAgeFilteringIntegrationTest` | Exact birthday/leap-day age, supplied reference date and combined directory filters |
 | `AthleteProfileIntegrationTest` | Own-result isolation, historical values and profile correctness |
 | `AthleteRegistrationParserSpreadsheetTest` | Shared TSV/XLSX parsing, typed DOB, rejected missing DOB and preserved Excel duration formatting |
 | `AthleteImportUpdateIntegrationTest` | Required DOB across preview/commit/immediate routes, legacy preview revalidation, mixed time/distance profile results, updates, blank optional fields and retries |
 | `AthleteImportControllerTest` | Import endpoint validation and HTTP errors |
+| `ImportPreviewValidationIntegrationTest` | Empty/header-only files, empty selections, repeated registrations, accented names, cancellation and commit-time identity rechecks |
 | `AthleteRegistrationParserTest` | Header mapping, club format, warnings and row errors |
 | `ResultValuesTest` | Track/field normalization, statuses, precision/format mismatches |
 | `ManagementIntegrationTest` | Independent participation, attempts, rollback, copy, notes, imports, deletes and consistent updates |
+| `EventParticipationIntegrationTest` | Empty/duplicate/missing athlete selections, assignment rollback, multiple events and scoped result deletion |
+| `ResultEditingIntegrationTest` | Atomic bulk PUT, existing result identity, malformed values and wrong-event/not-found records |
+| `ResultsOverviewIntegrationTest` | Cross-meet filters, age at meet start, discipline-appropriate performance sorting, all attempts and pagination |
 | `ProductionSecurityTest` | Authentication, role restrictions and CSRF enforcement |
 | `BackendApplicationTests` | Hibernate creates every current table and the note-order index on empty MySQL, without a migration-history table |
 | `DatabaseIntegrationTest` | Shared MySQL container setup and child-before-parent cleanup for integration subclasses |
 
-The last completed backend verification on 2026-10-26 recorded **92 tests passing**, using real MySQL for schema-startup and integration tests. This includes entity-generated tables, required-DOB enforcement, different-DOB separation, identifier-required name/DOB review and correct race/jump/throw result retrieval. The obsolete migration test was removed. This is a recorded result, not a claim that every business edge case is covered.
+The completed working-tree verification on 2026-10-30 recorded **127 JUnit tests passing**, using real MySQL for schema-startup and integration tests. The functional Newman run also passed **139 requests and 226 assertions** against a fresh temporary database. This includes import preview/selection guards, exact age filtering, participation removal scope, atomic result corrections and Results Overview, alongside the existing identity and measurement tests. See [execution evidence](../docs/postman/verification.md) for the tested base commit, profiles and limits; the separate security collection was not rerun in this update.
 
 ### Commands
 

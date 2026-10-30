@@ -15,6 +15,7 @@ These records describe the current implementation. Their status is **Implemented
 | [ADR-0007](0007-production-access-boundary.md) | Separate anonymous development access from authenticated production access |
 | [ADR-0008](0008-required-import-birth-dates.md) | Require valid past DOB on every imported row; replaces ADR-0003's permissive DOB policy |
 | [ADR-0009](0009-name-dob-and-confirmed-identifiers.md) | Different DOB means a separate person; existing name/DOB matches require a supplied identifier |
+| [ADR-0010](0010-sprint2-import-and-result-contracts.md) | Repeated-registration previews, exact meet-start age, participation removal, atomic result editing and Results Overview |
 
 ## Workflow
 

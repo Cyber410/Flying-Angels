@@ -1,6 +1,6 @@
 # Backend testing in Postman
 
-This test pack covers **all 39 controller endpoints** and the main backend changes. It includes 122 ordered functional requests, 8 separate secured-mode requests, response assertions, captured IDs, and synthetic import files. No frontend changes are required.
+This test pack covers **all 41 controller endpoints** and the main backend changes. It includes 139 ordered functional requests, 8 separate secured-mode requests, response assertions, captured IDs, and synthetic import files. No frontend changes are required to run this test pack. See [new backend contracts](../sprint2-api-updates.md) for the API integration changes.
 
 For choosing endpoints by task and testing the real client CSV, read [Backend workflows](../backend-workflows.md). The bundled fixture assertions and cleanup are intended for synthetic data; use a separate manual collection for client records.
 
@@ -67,7 +67,7 @@ The following tables are generated from the existing backend API guide; every me
 
 | Method | Path | Input | Success / response |
 | --- | --- | --- | --- |
-| GET | `/api/athletes` | search, gender, team query strings | 200; summary array |
+| GET | `/api/athletes` | search/gender/team; minAge/maxAge with ageAsOf | 200; summary array |
 | GET | `/api/athletes/{id}` | Athlete ID | 200; AthleteProfileResponse |
 | POST | `/api/athletes` | AthleteRequest | 201; AthleteProfileResponse |
 | PUT | `/api/athletes/{id}` | AthleteRequest | 200; AthleteProfileResponse |
@@ -105,6 +105,8 @@ The following tables are generated from the existing backend API guide; every me
 | GET | `/api/events/{id}/results` | Event ID | 200; EventResultResponse array |
 | POST | `/api/events/{id}/results` | `{athleteId, result, score?, unit?}` | 201; EventResultResponse |
 | POST | `/api/events/{id}/results/bulk` | `{results: [...]}` | 201; result array |
+| PUT | `/api/events/{id}/results/bulk` | `{results: [{resultId, result, unit?}]}` | 200; corrected result array, atomic |
+| GET | `/api/results` | search, meetId/eventId/categoryId, gender, minAge/maxAge, sort, page/size | 200; paginated overview |
 | PUT | `/api/events/{id}/results/{resultId}` | Result request | 200; corrected result |
 | DELETE | `/api/events/{id}/results/{resultId}` | Both IDs | 204 |
 | PUT | `/api/events/{id}/participants/{athleteId}/result` | `{result, score?, unit?}` | 200; newly appended result |

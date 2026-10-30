@@ -1,5 +1,22 @@
 # Postman pack verification
 
+## 2026-10-30: Sprint 2 import, participation and result contracts
+
+Tested the **uncommitted working tree on `fix/meet-result`, based on `cfe4ca4`**. This record covers the implementation described in [Sprint 2 API contracts](../sprint2-api-updates.md) and [ADR-0010](../adr/0010-sprint2-import-and-result-contracts.md); it does not claim that a new commit or deployment has been published.
+
+| Check | Executed | Failures / errors / skipped |
+| --- | ---: | --- |
+| Full JUnit suite with disposable MySQL | 127 tests | 0 / 0 / 0 |
+| Newman 6 functional collection, anonymous default profile | 139 requests; 226 assertions | 0 request or assertion failures |
+| Collection source/fixture validator | 41 controller method/path combinations; 139 functional and 8 security requests | Passed |
+| Backend package and runtime image | Current JAR and local `sprint2-fixes` image | Passed |
+
+JUnit was run with `bash mvnw -o -B -Dapi.version=1.44 clean test` in `backend`. New tests cover import no-record/selection validation, repeated registrations, commit-time identity checks, exact age filtering, participation assignment/removal scope, atomic result corrections and Results Overview. The existing suite also continues to cover row-write failure recovery and secure-mode behavior.
+
+Newman used `deploy/compose.ci.yml` with isolated project `fa-sprint2-newman-20261030`, a fresh MySQL 8.4 **tmpfs** database, the newly packaged backend and synthetic fixture uploads. It executed the entire ordered functional collection against `http://backend:8080`; the test stack was removed afterward. It did not reuse or reset the developer's usual database. Local run evidence is in `/tmp/fa-sprint2-full-tests.log`, `/tmp/fa-sprint2-newman.log` and `/tmp/fa-sprint2-newman-reports/functional.json` / `functional.xml`; those temporary paths are not repository artifacts.
+
+The separate security Postman collection was **not rerun** in this update. The default-profile Newman run is not a production-security verification or a load/performance benchmark. Earlier execution records below remain historical.
+
 ## 2026-10-26: Hibernate-managed schema
 
 The backend passed **92 JUnit tests** after removing Flyway dependencies, baseline configuration, SQL migration files and the legacy-upgrade test. Startup verification checks that Hibernate creates all current tables and the note-order index on empty MySQL, with no migration-history table. Business, import and security tests continue to use disposable databases. The Postman API contracts and 122 functional/8 security request counts are unchanged by this schema-initialization change. Earlier migration-related results below are historical; they do not describe the current setup.

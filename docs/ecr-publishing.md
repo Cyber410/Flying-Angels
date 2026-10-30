@@ -1,6 +1,6 @@
 # Build, test and publish images to ECR
 
-The `CI and ECR publishing` workflow in `.github/workflows/ci.yml` verifies the application and automatically publishes the tested Docker images after successful pushes to `development` or `main`. It does not deploy ECS, start RDS, create AWS resources, or import athlete data.
+The `CI and ECR publishing` workflow in `.github/workflows/ci.yml` verifies the application and automatically publishes the tested Docker images after successful pushes to `development` or `main`. After successful CI on a `main` push, the separate `.github/workflows/ce.yaml` CD workflow deploys the published image digests to the existing ECS service when `AWS_DEPLOY_ENABLED=true`. See [ECS continuous delivery](aws-deployment.md). Neither job creates infrastructure or imports athlete data.
 
 ## What runs and when
 
@@ -37,7 +37,7 @@ The required GitHub status check is **Build, test and verify containers**. If br
 
 Repository values are names, not full ECR URLs. Both private repositories must already exist in the selected region and account. The workflow discovers the registry address after authentication. Learner Lab supports `us-east-1` and `us-west-2` according to its Readme.
 
-ECS variables and `AWS_DEPLOY_ENABLED` are not read by this publishing workflow. Keep deployment disabled while setting up ECS. The database password belongs in AWS Secrets Manager for the future ECS task, not in these GitHub secrets.
+`AWS_DEPLOY_ENABLED=true` enables deployment after successful publishing on a push to `main`. Configure `ECS_CLUSTER` and `ECS_SERVICE` for the infrastructure you create once, as described in [ECS continuous delivery](aws-deployment.md). Database settings and secret references remain in the existing ECS task definition. No database password is needed in GitHub.
 
 The lab's temporary user credentials provide publishing access. The existing `LabRole` is intended for ECS task and execution roles; the lab documents its ECR access as read-only, so the workflow does not assume that role to push images.
 
@@ -61,7 +61,7 @@ Manual runs remain available for verification or republishing. Select **Actions 
 
 GitHub requires a `workflow_dispatch` workflow on the repository's default branch for manual runs. If this updated workflow exists only on `development` while the default branch is `main`, manual runs may not be available yet. Automatic publishing after a push to `development` works regardless; changing the default branch is unnecessary for the automatic path.
 
-Tags have the form `sha-<commit>-<run-id>-<attempt>`, so a rerun does not overwrite a previous release. The summary also provides immutable references such as `ACCOUNT.dkr.ecr.REGION.amazonaws.com/flying-angels-backend@sha256:...`. Use those full digest references as the images for the `backend` and `frontend` containers when creating the ECS task definition.
+Tags have the form `sha-<commit>-<run-id>-<attempt>`, so a rerun does not overwrite a previous release. The summary also provides immutable references such as `ACCOUNT.dkr.ecr.REGION.amazonaws.com/flying-angels-backend@sha256:...`. CI uploads a dedicated `release-images-<run-id>-<attempt>` artifact containing `published-images.json`. The separate CD workflow downloads that exact run/attempt artifact and verifies its commit before deploying the image digests; you do not copy image references manually.
 
 The run's `verification-<run-id>-<attempt>` artifact contains `published-images.json`, backend test reports, HTTP test output, and Compose logs. The JSON is generated only after both pushes and digest lookups succeed. ECR pushes are separate operations: if the second push fails, the first image can still exist. A failed run must not be treated as a completed release; fix the error and rerun.
 
@@ -76,8 +76,9 @@ The run's `verification-<run-id>-<attempt>` artifact contains `published-images.
 7. Run `tests/integration/test_deployed_stack.py` against the built images. It checks React routes, athlete create/read/search/update/delete through Nginx, and rejection of invalid athlete data.
 8. On pushes to `development` or `main`, or an explicitly requested manual publication on either branch, authenticate to AWS, verify both repositories, and push the same images that passed the HTTP tests.
 9. Collect logs, remove the isolated Compose stack, and upload reports even when a step fails.
+10. After this CI workflow finishes successfully for a push to `main`, GitHub triggers the separate CD workflow in `ce.yaml`. Failed CI, PR runs, development pushes and manual publishing do not deploy. See [ECS continuous delivery](aws-deployment.md).
 
-The test stack uses synthetic data and the default development security configuration, bound to loopback. `ProductionSecurityTest` separately checks authorization and CSRF behavior. Publishing does not configure production authentication, database access, or HTTPS. The existing `application-prod.properties` expects `DATABASE_URL`, `DATABASE_USERNAME`, `DATABASE_PASSWORD`, `APP_ADMIN_USERNAME`, and `APP_ADMIN_PASSWORD` when that profile is enabled; supply those through the ECS task and secret references during deployment setup.
+The test stack uses synthetic data and the default development security configuration, bound to loopback. `ProductionSecurityTest` separately checks authorization and CSRF behavior. Publishing alone does not configure the runtime. The deployment job preserves the existing ECS task configuration, including production authentication, database settings and secret references; HTTPS and frontend login/CSRF integration remain separate work. The existing `application-prod.properties` expects `DATABASE_URL`, `DATABASE_USERNAME`, `DATABASE_PASSWORD`, `APP_ADMIN_USERNAME`, and `APP_ADMIN_PASSWORD` when that profile is enabled; supply those through the ECS task and secret references during deployment setup.
 
 ## Run the same checks locally
 
@@ -122,7 +123,7 @@ Local builds use the machine's native architecture. GitHub's Ubuntu runner expli
 | Docker image pull/TLS timeout | Check Docker Hub/network status and retry; no code change is normally required. |
 | Compose startup timeout | Inspect `compose.log`, especially backend database connection errors. |
 
-Before each new publication, verify the lab session and credentials. This workflow starts no AWS compute; retained ECR image storage can still use lab budget. Add an ECR lifecycle policy to retain only the image versions you need.
+Before each new publication, verify the lab session and credentials. Publishing alone starts no AWS compute. Main deployments preserve the existing service desired count and do not start/stop RDS. Retained ECR image storage and database/secret/log storage can still use lab budget. Add an ECR lifecycle policy to retain only the image versions you need.
 
 ## References
 

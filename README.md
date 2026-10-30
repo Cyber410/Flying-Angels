@@ -64,7 +64,7 @@ All PRs must pass the required workflow checks before merging, including:
 ### GitHub Actions CI/CD Setup
 The `CI and ECR publishing` workflow builds the application, runs unit tests, builds runtime images, starts an isolated Docker Compose stack, and runs database and HTTP integration tests. After successful checks, pushes to `development` or `main` automatically publish the tested images to Amazon ECR. Pull requests run checks only. Sprint work merges into `development`; release-ready work merges into `main` at the end of the sprint.
 
-Follow [ECR publishing instructions](docs/ecr-publishing.md) for the exact GitHub secrets and variables, first-run steps, image references, and troubleshooting. ECS deployment is a later setup step; this workflow does not start AWS compute.
+Follow [ECR publishing instructions](docs/ecr-publishing.md) for the exact GitHub secrets and variables, first-run steps, image references, and troubleshooting. CI lives in `.github/workflows/ci.yml`. The separate CD workflow in `.github/workflows/ce.yaml` automatically deploys after successful main-push CI when `AWS_DEPLOY_ENABLED=true`. Create the AWS infrastructure once; follow [ECS continuous delivery](docs/aws-deployment.md) for configuration and presentation operations.
 
 #### Required checks for every pull request
 For the frontend (React + TypeScript):
@@ -108,7 +108,7 @@ This ensures that if a CI check fails, the merge button is disabled until the pr
 - Logs and backend test reports are uploaded even if checks fail; the isolated Compose stack is always removed.
 
 #### Deployment step
-Automatic publishing on pushes to `development` and `main` sends versioned images to the existing private ECR repositories after every check passes. Manual publishing remains available for reruns. The run summary and `published-images.json` artifact provide image digest references for configuring ECS/Fargate. Automatic ECS updates are not part of this workflow yet.
+Automatic publishing on pushes to `development` and `main` sends versioned images to the existing private ECR repositories after every check passes. Manual publishing remains available for reruns. The run summary and `published-images.json` artifact provide image digest references for configuring ECS/Fargate. The separate `CD - Deploy to ECS` workflow is triggered by successful CI for pushes to `main` when enabled. It downloads the exact CI run's release metadata and checks its commit before deployment. AWS actions render the service's existing task definition with the new image digests, register a revision, update the service and wait for stability. Existing infrastructure, database settings and desired task count are preserved. The pipeline does not merge PRs or create AWS resources.
 
 ## Testing Strategy and File Structure
 The MVP is complete only after Flying Angels approves it.

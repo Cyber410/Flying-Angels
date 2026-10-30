@@ -159,6 +159,7 @@ jobs:
         uses: aws-actions/amazon-ecr-login@v2
 
       - name: Publish verified images and record ECR digests
+        id: publish
         if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.publish_images)
         env:
           ECR_REGISTRY: ${{ steps.ecr.outputs.registry }}
@@ -191,8 +192,17 @@ jobs:
               summary.write(f"Commit: `{images['commit']}`\n\nTag: `{images['tag']}`\n\n")
               for container in ("backend", "frontend"):
                   summary.write(f"**{container}**\n\n```text\n{images[container]}\n```\n\n")
-              summary.write("Use these digest references in the ECS task definition. This workflow does not deploy ECS or start AWS compute.\n")
+              summary.write("The separate CD workflow in ce.yaml deploys this release after successful CI on a main push when AWS_DEPLOY_ENABLED is true. Development pushes publish images only.\n")
           PY
+
+      - name: Upload published release metadata for CD
+        if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.publish_images)
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-images-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/published-images.json
+          if-no-files-found: error
+          retention-days: 7
 
       - name: Collect Compose status and logs
         if: always()

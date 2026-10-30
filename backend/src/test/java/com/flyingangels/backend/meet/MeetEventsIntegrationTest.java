@@ -236,23 +236,25 @@ class MeetEventsIntegrationTest extends MeetContractTestSupport {
 
 	@ParameterizedTest(name = "{0}")
 	@ValueSource(strings = { "GET", "DELETE" })
-	@Disabled("Duplicates Dev's Postman collection - keep or delete pending Newman-in-CI decision")
-	@DisplayName("T41 event ID that doesn't exist in an existing meet returns 404 EVENT_NOT_FOUND, nothing changed")
+	@DisplayName("T41 event ID that doesn't exist returns 404 EVENT_NOT_FOUND on GET in a meet and DELETE, nothing changed")
 	void unknownEventReturnsEventNotFound(String method) throws Exception {
 		long meet = springMeet();
-		addEvents(meet, sprint100);
+		long event = addEvents(meet, sprint100).get(0);
 		long unknown = unknownEventId();
+		// Dev's API reads an event through its meet, but deletes it by event ID alone.
+		String path = "GET".equals(method)
+				? "/api/meets/" + meet + "/events/" + unknown
+				: "/api/events/" + unknown;
 
-		mockMvc.perform("GET".equals(method)
-					? get("/api/meets/{meetId}/events/{eventId}", meet, unknown)
-					: delete("/api/meets/{meetId}/events/{eventId}", meet, unknown))
+		mockMvc.perform("GET".equals(method) ? get(path) : delete(path))
 				.andExpect(status().isNotFound())
 				.andExpect(jsonPath("$.status").value(404))
 				.andExpect(jsonPath("$.code").value("EVENT_NOT_FOUND"))
-				.andExpect(jsonPath("$.path").value("/api/meets/" + meet + "/events/" + unknown))
-				.andExpect(jsonPath("$.categoryName").doesNotExist());
+				.andExpect(jsonPath("$.path").value(path))
+				.andExpect(jsonPath("$.category").doesNotExist());
 
-		assertEquals(1, eventCountForMeet(meet));
+		assertEquals(1, eventCount());
+		assertEquals(1, eventExists(event));
 	}
 
 	@Test

@@ -25,6 +25,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.RequestBuilder;
 
@@ -310,10 +311,11 @@ class MeetIntegrationTest extends MeetContractTestSupport {
 		assertEquals(1, eventCount());
 	}
 
-	@Test
+	@ParameterizedTest(name = "ID \"{0}\"")
+	@ValueSource(strings = { "abc", "12abc", "1.5" })
 	@DisplayName("T43 non-numeric meet ID returns 400 INVALID_REQUEST, not a server error")
-	void nonNumericMeetIdReturnsBadRequest() throws Exception {
-		mockMvc.perform(get("/api/meets/abc"))
+	void nonNumericMeetIdReturnsBadRequest(String malformedId) throws Exception {
+		mockMvc.perform(get("/api/meets/{id}", malformedId))
 				.andExpect(status().isBadRequest())
 				.andExpect(jsonPath("$.status").value(400))
 				.andExpect(jsonPath("$.code").value("INVALID_REQUEST"));

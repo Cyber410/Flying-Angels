@@ -6,6 +6,7 @@ import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.not;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -114,22 +115,35 @@ class AthleteCsvImportIntegrationTest extends DatabaseIntegrationTest {
 
 	@ParameterizedTest(name = "{0}")
 	@MethodSource("nonCsvFiles")
-	@DisplayName("T90 non-CSV file returns 400, nothing imported (per I1)")
+	@DisplayName("T90 non-CSV file returns 400 INVALID_REQUEST, nothing imported (per I1)")
 	void nonCsvFileIsRejected(String name, MockMultipartFile file) throws Exception {
+		// File type is not validated; rejected only because headers are missing. Pending ADR I1.
 		mockMvc.perform(multipart("/api/athletes/import/preview").file(file))
-				.andExpect(status().isBadRequest());
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
 
 		assertEquals(0, athleteRepository.count());
+		assertEquals(0, importJobRepository.count());
 	}
 
 	@Test
 	@DisplayName("T91 empty CSV returns 400 INVALID_REQUEST, nothing imported")
 	void emptyFileIsRejected() throws Exception {
-		// header-only.csv is not covered yet: its expected outcome is pending a team decision.
 		mockMvc.perform(multipart("/api/athletes/import/preview").file(fixture("empty.csv")))
 				.andExpect(status().isBadRequest())
 				.andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
 
+		assertEquals(0, athleteRepository.count());
+	}
+
+	@Test
+	@DisplayName("T91 header-only CSV creates no athletes and is not a server error")
+	void headerOnlyFileImportsNothing() throws Exception {
+		// Expected status pending Dev (currently 200 + empty import job).
+		int status = mockMvc.perform(multipart("/api/athletes/import/preview").file(fixture("header-only.csv")))
+				.andReturn().getResponse().getStatus();
+
+		assertTrue(status < 500, "Expected a non-5xx status but was " + status);
 		assertEquals(0, athleteRepository.count());
 	}
 

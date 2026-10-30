@@ -130,7 +130,7 @@ class ResultsIntegrationTest extends EventApiTestSupport {
 	}
 
 	@Test
-	@DisplayName("T82 unknown result ID on PUT and DELETE, or unknown event ID on GET results, returns 404; nothing changed")
+	@DisplayName("T82 unknown result, event or athlete ID returns 404; nothing changed")
 	void unknownResultOrEventReturnsNotFound() throws Exception {
 		long event = createEvent();
 		long athlete = createAthlete("Jane", "Doe");
@@ -148,7 +148,14 @@ class ResultsIntegrationTest extends EventApiTestSupport {
 		mockMvc.perform(get("/api/events/{id}/results", unknownId("events")))
 				.andExpect(status().isNotFound());
 
+		mockMvc.perform(post("/api/events/{id}/results", event)
+					.contentType(MediaType.APPLICATION_JSON)
+					.content(resultJson(unknownId("athletes"), "11.90")))
+				.andExpect(status().isNotFound())
+				.andExpect(jsonPath("$.code").value("ATHLETE_NOT_FOUND"));
+
 		assertEquals(1, eventResultRepository.count());
+		assertEquals(1, participationRepository.count());
 		assertEquals(1, count("SELECT COUNT(*) FROM event_results WHERE id = ? AND event_id = ? AND result = ?",
 				stored, event, "12.40"));
 	}

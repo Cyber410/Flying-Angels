@@ -19,11 +19,14 @@ class AthleteAgeFilterGapIntegrationTest extends DatabaseIntegrationTest {
         athletes.create(new AthleteRequest("Unknown","Birthday","","","",null,"Female",List.of()));
     }
 
-    @Test @DisplayName("UC-04 ageAsOf without age bounds returns 200 with the athletes whose age is known")
-    void referenceDateAloneDoesNotFilterKnownAges() throws Exception {
-        // Whether the unknown-DOB athlete is also returned is not stated by the contract; not asserted here.
+    @Test @DisplayName("UC-04 ageAsOf without age bounds returns the same athletes as no filter, unknown DOB included")
+    void referenceDateAloneDoesNotFilter() throws Exception {
+        // ADR-0010 point 4: unknown DOBs excluded only when an age bound is given
+        String unfiltered=mockMvc.perform(get("/api/athletes")).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
         mockMvc.perform(get("/api/athletes").param("ageAsOf","2026-05-15"))
-                .andExpect(status().isOk()).andExpect(jsonPath("$[*].firstName",hasItems("Ada","Ben")));
+                .andExpect(status().isOk()).andExpect(content().json(unfiltered,true))
+                .andExpect(jsonPath("$[*].firstName",containsInAnyOrder("Ada","Ben","Unknown")));
     }
 
     @Test @DisplayName("UC-04 minAge alone is an inclusive lower bound and excludes unknown DOB")

@@ -18,7 +18,6 @@ import java.util.List;
 import java.util.stream.Stream;
 
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -35,8 +34,8 @@ import com.jayway.jsonpath.JsonPath;
  * UC-03 integration tests for meets: list, create, edit, delete, against Dev's API on development (MeetController,
  * MeetEventController and docs/postman/flying-angels-backend.postman_collection.json).
  *
- * Tests that only repeat a request in Dev's Postman collection are disabled until the team decides whether Newman
- * runs in CI.
+ * Only cases that neither Dev's JUnit tests nor the Postman collection check are kept here; the cascade tests stay
+ * for their database-state checks.
  *
  * Seeded catalog: 100M (ASC) and LONG JUMP (DESC), inserted with SQL. Meets are created through the API.
  */
@@ -79,35 +78,6 @@ class MeetIntegrationTest extends MeetContractTestSupport {
 				.andExpect(jsonPath("$[*].id").value(contains(json(summer), json(spring), json(winter))))
 				.andExpect(jsonPath("$[*].startDate").value(contains("2026-07-04", "2026-05-16", "2026-01-10")))
 				.andExpect(jsonPath("$[*].meetDate").value(contains("2026-07-04", "2026-05-16", "2026-01-10")));
-	}
-
-	@Test
-	@Disabled("Duplicates Dev's Postman collection - keep or delete pending Newman-in-CI decision")
-	@DisplayName("T22 create a meet with all fields returns 201 and the meet is saved and can be opened")
-	void createsMeetWithAllFields() throws Exception {
-		String body = mockMvc.perform(post("/api/meets")
-					.contentType(MediaType.APPLICATION_JSON)
-					.content(VALID_MEET))
-				.andExpect(status().isCreated())
-				.andExpect(jsonPath("$.id").isNumber())
-				.andExpect(jsonPath("$.name").value("Spring Meet"))
-				.andExpect(jsonPath("$.startDate").value("2026-05-16"))
-				.andExpect(jsonPath("$.endDate").value("2026-05-17"))
-				.andExpect(jsonPath("$.location").value("GTA Stadium"))
-				.andReturn().getResponse().getContentAsString();
-		long id = ((Number) JsonPath.read(body, "$.id")).longValue();
-
-		assertEquals(1, meetCount());
-		assertEquals(1, count("SELECT COUNT(*) FROM meets WHERE id = ? AND name = ? AND location = ?",
-				id, "Spring Meet", "GTA Stadium"));
-
-		// "Create & Add Events" lands on Meet Details: the new meet opens with no events yet.
-		mockMvc.perform(get("/api/meets/{id}", id))
-				.andExpect(status().isOk())
-				.andExpect(jsonPath("$.meet.id").value(json(id)))
-				.andExpect(jsonPath("$.meet.startDate").value("2026-05-16"))
-				.andExpect(jsonPath("$.meet.endDate").value("2026-05-17"))
-				.andExpect(jsonPath("$.events", hasSize(0)));
 	}
 
 	static Stream<Arguments> meetsWithRequiredFieldMissing() {
@@ -169,7 +139,6 @@ class MeetIntegrationTest extends MeetContractTestSupport {
 	}
 
 	@Test
-	@Disabled("Duplicates Dev's Postman collection - keep or delete pending Newman-in-CI decision")
 	@DisplayName("T29 edit a meet returns 200 with the same ID and new values; an invalid edit leaves it unchanged")
 	void editKeepsIdAndInvalidEditChangesNothing() throws Exception {
 		long id = createMeet("Spring Meet", LocalDate.of(2026, 5, 16), LocalDate.of(2026, 5, 17), "GTA Stadium");
@@ -194,7 +163,7 @@ class MeetIntegrationTest extends MeetContractTestSupport {
 					.content(meetJson("Broken Edit", "2026-05-24", "2026-05-23", "Nowhere")))
 				.andExpect(status().isBadRequest())
 				.andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
-				.andExpect(jsonPath("$.message").value(containsString("endDate:")));
+				.andExpect(jsonPath("$.message").value(containsString("dateRangeValid:")));
 
 		assertEquals(1, count("SELECT COUNT(*) FROM meets WHERE id = ? AND name = ? AND location = ?",
 				id, "Spring Classic", "York Stadium"));
@@ -206,7 +175,6 @@ class MeetIntegrationTest extends MeetContractTestSupport {
 	}
 
 	@Test
-	@Disabled("Duplicates Dev's Postman collection - keep or delete pending Newman-in-CI decision")
 	@DisplayName("T38 delete a meet returns 204; it and its events are gone, other meets untouched, no orphan rows")
 	void deletingMeetRemovesItsEventsWithNoOrphans() throws Exception {
 		long doomed = createMeet("Spring Meet", LocalDate.of(2026, 5, 16), LocalDate.of(2026, 5, 17), "GTA");
@@ -232,19 +200,17 @@ class MeetIntegrationTest extends MeetContractTestSupport {
 	}
 
 	@Test
-	@Disabled("Duplicates Dev's Postman collection - keep or delete pending Newman-in-CI decision")
 	@DisplayName("T40 delete a meet whose events have participants and results cascades cleanly; athletes kept")
 	void deletingMeetWithResultsCascades() throws Exception {
-		// Assumes D3 = cascade, because that is what the current code does (Meet -> events -> results).
-		// If the team picks "block", this becomes 409 MEET_HAS_RESULTS with every row below still present.
+		// Cascade is what the current code does (Meet -> events -> participations and results).
 		long meet = createMeet("Spring Meet", LocalDate.of(2026, 5, 16), LocalDate.of(2026, 5, 17), "GTA");
 		List<Long> events = addEvents(meet, sprint100, longJump);
 		long jane = insertAthlete("Jane", "Doe", LocalDate.of(2004, 3, 15), "Female");
 		long mark = insertAthlete("Mark", "Smith", LocalDate.of(2002, 1, 9), "Male");
-		// Current schema: one event_results row per athlete per event; a null result means assigned, no result yet.
-		insertEventResult(events.get(0), sprint100, jane, "12.40", "12.40");
-		insertEventResult(events.get(0), sprint100, mark, null, null);
-		insertEventResult(events.get(1), longJump, jane, "4.85", "4.85");
+		// Jane has results in both events; Mark is assigned to the 100M with no result yet.
+		recordResult(events.get(0), jane, "12.40");
+		assignParticipant(events.get(0), mark);
+		recordResult(events.get(1), jane, "4.85m");
 		// An imported result that belongs to no event must survive the delete.
 		long imported = insertEventResult(null, longJump, mark, "5.10", "5.10");
 
@@ -254,11 +220,13 @@ class MeetIntegrationTest extends MeetContractTestSupport {
 		assertEquals(0, meetExists(meet));
 		assertEquals(0, eventCount());
 		assertEquals(0, count("SELECT COUNT(*) FROM event_results WHERE event_id IS NOT NULL"));
+		assertEquals(0, count("SELECT COUNT(*) FROM event_participations"));
 		assertEquals(1, count("SELECT COUNT(*) FROM event_results WHERE id = ?", imported));
 		assertEquals(1, athleteExists(jane));
 		assertEquals(1, athleteExists(mark));
 		assertEquals(0, orphanEventCount());
 		assertEquals(0, orphanResultCount());
+		assertEquals(0, orphanParticipationCount());
 	}
 
 	/** The five requests T41 sends to a meet that doesn't exist. */

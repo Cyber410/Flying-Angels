@@ -57,11 +57,6 @@ abstract class MeetContractTestSupport extends DatabaseIntegrationTest {
 		return "{\"name\":" + jsonString(name) + ",\"startDate\":" + jsonString(startDate) + "}";
 	}
 
-	/** Body of the old proposed POST /api/meets/{meetId}/events. Only the disabled tests still send it. */
-	protected static String categoryIdsJson(long... categoryIds) {
-		return "{\"categoryIds\":" + jsonArray(categoryIds) + "}";
-	}
-
 	/**
 	 * Body for POST /api/meets/{meetId}/events/bulk: one event per category, named after the category and held on
 	 * eventDate. Category name and ranking order are read from the database.
@@ -138,6 +133,27 @@ abstract class MeetContractTestSupport extends DatabaseIntegrationTest {
 		return eventIds;
 	}
 
+	/** Assigns the athlete to the event through POST /api/events/{id}/participants. */
+	protected void assignParticipant(long eventId, long athleteId) throws Exception {
+		String request = "POST /api/events/" + eventId + "/participants";
+		MockHttpServletResponse response = mockMvc.perform(post("/api/events/{id}/participants", eventId)
+					.contentType(MediaType.APPLICATION_JSON)
+					.content("{\"athleteId\":" + athleteId + "}"))
+				.andReturn().getResponse();
+		requireSeedStatus(response, 201, request);
+	}
+
+	/** Records a result through POST /api/events/{id}/results (which also assigns the athlete) and returns its ID. */
+	protected long recordResult(long eventId, long athleteId, String result) throws Exception {
+		String request = "POST /api/events/" + eventId + "/results";
+		MockHttpServletResponse response = mockMvc.perform(post("/api/events/{id}/results", eventId)
+					.contentType(MediaType.APPLICATION_JSON)
+					.content("{\"athleteId\":" + athleteId + ",\"result\":" + jsonString(result) + "}"))
+				.andReturn().getResponse();
+		requireSeedStatus(response, 201, request);
+		return readLong(response, "$.resultId", request);
+	}
+
 	private static void requireSeedStatus(MockHttpServletResponse response, int expected, String request)
 			throws Exception {
 		if (response.getStatus() != expected) {
@@ -180,9 +196,13 @@ abstract class MeetContractTestSupport extends DatabaseIntegrationTest {
 
 	// ---------- Seeding with SQL ----------
 
-	/** Inserts an event category (the catalog the Add Events dialog shows) and returns its ID. */
+	/**
+	 * Inserts an event category (the catalog the Add Events dialog shows) and returns its ID. ASC categories are
+	 * timed in seconds and DESC ones measured in metres, so results can be recorded against them.
+	 */
 	protected long insertCategory(String name, String rankingOrder) {
-		return insert("event_categories", Map.of("name", name, "ranking_order", rankingOrder));
+		return insert("event_categories", Map.of("name", name, "ranking_order", rankingOrder,
+				"unit", "ASC".equals(rankingOrder) ? "SECONDS" : "METRES"));
 	}
 
 	/** Inserts an athlete with only the columns these tests need and returns its ID. */
@@ -246,11 +266,6 @@ abstract class MeetContractTestSupport extends DatabaseIntegrationTest {
 		return count("SELECT COUNT(*) FROM event_results WHERE event_id = ?", eventId);
 	}
 
-	protected long resultCountForMeet(long meetId) {
-		return count("SELECT COUNT(*) FROM event_results r JOIN events e ON r.event_id = e.id WHERE e.meet_id = ?",
-				meetId);
-	}
-
 	protected long athleteExists(long athleteId) {
 		return count("SELECT COUNT(*) FROM athletes WHERE id = ?", athleteId);
 	}
@@ -264,6 +279,12 @@ abstract class MeetContractTestSupport extends DatabaseIntegrationTest {
 	protected long orphanResultCount() {
 		return count("SELECT COUNT(*) FROM event_results r LEFT JOIN events e ON r.event_id = e.id "
 				+ "WHERE r.event_id IS NOT NULL AND e.id IS NULL");
+	}
+
+	/** Participations that point at an event that no longer exists. */
+	protected long orphanParticipationCount() {
+		return count("SELECT COUNT(*) FROM event_participations p LEFT JOIN events e ON p.event_id = e.id "
+				+ "WHERE e.id IS NULL");
 	}
 
 	/** Categories that appear more than once in the same meet. Must always be 0. */

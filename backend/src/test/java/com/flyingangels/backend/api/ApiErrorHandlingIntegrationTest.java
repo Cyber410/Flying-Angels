@@ -13,7 +13,7 @@ import com.flyingangels.backend.DatabaseIntegrationTest;
 class ApiErrorHandlingIntegrationTest extends DatabaseIntegrationTest {
 
 	@Test
-	@Disabled("Bug?: GET /api/nope returns 500 INTERNAL_ERROR (NoResourceFoundException falls through to the catch-all handler)")
+	@Disabled("Bug: unmapped route returns 500 INTERNAL_ERROR instead of 404 - reported to Dev")
 	@DisplayName("T44a unknown API path returns 404, not a server error")
 	void unknownPathReturnsNotFound() throws Exception {
 		mockMvc.perform(get("/api/nope"))

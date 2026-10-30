@@ -9,7 +9,11 @@ import java.util.List;
 import java.util.Optional;
 import java.time.LocalDate;
 
-public interface AthleteRepository extends JpaRepository<Athlete, Long> {
+public interface AthleteRepository extends JpaRepository<Athlete, Long>, org.springframework.data.jpa.repository.JpaSpecificationExecutor<Athlete> {
+
+    @Override
+    @EntityGraph(attributePaths = "events")
+    List<Athlete> findAll(org.springframework.data.jpa.domain.Specification<Athlete> specification, org.springframework.data.domain.Sort sort);
 
 	@EntityGraph(attributePaths = "events")
 	@Query("""

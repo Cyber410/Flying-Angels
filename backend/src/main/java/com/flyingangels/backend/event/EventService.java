@@ -101,6 +101,29 @@ public class EventService {
     }
     @Transactional
     public List<EventResult> addResults(Long eventId,List<EventResultRequest> requests) { return requests.stream().map(r->addResult(eventId,r)).toList(); }
+    /** Edit All Results is atomic and changes existing attempts without changing their identity. */
+    @Transactional
+    public List<EventResult> updateResults(Long eventId,List<ResultUpdateRequest> requests) {
+        Event event = get(eventId);
+        if (requests == null || requests.isEmpty()) throw new IllegalArgumentException("Select at least one result to update");
+        Set<Long> selected = new HashSet<>();
+        List<ResultCorrection> corrections = new ArrayList<>();
+        for (var request : requests) {
+            if (request == null || request.resultId() == null || !selected.add(request.resultId()))
+                throw new IllegalArgumentException("Result IDs must be supplied once each");
+            var result = resultRepository.findByIdAndEventId(request.resultId(),eventId)
+                    .orElseThrow(() -> new EventResultNotFoundException(request.resultId(),eventId));
+            var value = measurement(event,new EventResultRequest(result.getAthlete().getId(),request.result(),request.score(),request.unit()));
+            corrections.add(new ResultCorrection(result,request,value));
+        }
+        for (var correction : corrections) {
+            var result = correction.result();
+            result.update(result.getAthlete(),correction.request().result(),correction.measurement().score());
+            result.setMeasurement(correction.measurement().unit(),correction.measurement().status());
+        }
+        return resultRepository.saveAll(corrections.stream().map(ResultCorrection::result).toList());
+    }
+    private record ResultCorrection(EventResult result,ResultUpdateRequest request,ResultValues.Measurement measurement) {}
     /** Legacy endpoint now appends an attempt; explicit result-ID PUT remains the correction operation. */
     @Transactional
     public EventResult recordParticipantResult(Long eventId,Long athleteId,ParticipantResultRequest request) {

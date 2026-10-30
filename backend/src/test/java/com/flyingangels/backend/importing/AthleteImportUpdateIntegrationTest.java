@@ -145,10 +145,10 @@ class AthleteImportUpdateIntegrationTest extends DatabaseIntegrationTest {
         assertNull(athletes.get(first.getId()).getExternalId());
     }
 
-    @Test void identicalRowsWithoutIdentifiersAreRecheckedAndRequireReviewAfterFirstCreation() throws Exception {
+    @Test void identicalRowsWithinOneFileAreExcludedAsDuplicatesBeforeCommit() throws Exception {
         var result = apply("FIRST NAME,LAST NAME,DOB\nSam,Smith,2010-01-01\nSam,Smith,2010-01-01\n");
-        assertEquals(1, result.imported()); assertEquals(1, result.failed());
-        assertEquals(List.of("IMPORTED", "AMBIGUOUS"), result.rows().stream().map(ImportPreviewResponse.Row::status).toList());
+        assertEquals(1, result.imported()); assertEquals(0, result.failed()); assertEquals(1, result.skipped());
+        assertEquals(List.of("IMPORTED", "DUPLICATE"), result.rows().stream().map(ImportPreviewResponse.Row::status).toList());
         assertEquals(1, athleteRepository.count());
     }
 

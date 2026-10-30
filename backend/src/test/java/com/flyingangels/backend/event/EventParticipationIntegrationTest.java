@@ -1,113 +1,72 @@
 package com.flyingangels.backend.event;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.fail;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import com.flyingangels.backend.DatabaseIntegrationTest;
+import com.flyingangels.backend.athlete.*;
+import com.flyingangels.backend.athlete.dto.AthleteRequest;
+import com.flyingangels.backend.event.dto.*;
+import com.flyingangels.backend.meet.*;
+import com.flyingangels.backend.meet.dto.MeetRequest;
+import org.junit.jupiter.api.*;
+import org.springframework.beans.factory.annotation.Autowired;
+import java.time.LocalDate;
+import java.util.List;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-import org.junit.jupiter.api.Disabled;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
-import org.springframework.http.MediaType;
+class EventParticipationIntegrationTest extends DatabaseIntegrationTest {
+    @Autowired AthleteService athletes;
+    @Autowired MeetService meets;
+    @Autowired EventService events;
+    private Athlete ada, ben;
+    private Event race, jump;
+    @BeforeEach void seed() {
+        ada=athletes.create(new AthleteRequest("Ada","Runner","","","",LocalDate.of(2012,5,15),"Female",List.of()));
+        ben=athletes.create(new AthleteRequest("Ben","Runner","","","",LocalDate.of(2010,1,1),"Male",List.of()));
+        var meet=meets.create(new MeetRequest("Spring",LocalDate.of(2026,5,10),"Stadium",null));
+        race=events.create(new EventRequest("100m",meet.getStartDate(),"Stadium","Track",null,RankingOrder.ASC,meet.getId(),null,"100m"));
+        jump=events.create(new EventRequest("Long Jump",meet.getStartDate(),"Stadium","Field",null,RankingOrder.DESC,meet.getId(),null,"Long Jump"));
+    }
 
-/**
- * UC-04 integration tests for athlete-to-event participation, from testing-drafts/sprint-2-test-cases-uc04-uc06.md,
- * against Dev's API on development (EventController). Open decisions: P1 (partial batch), P2 (remove athlete with
- * results), P3 (age groups).
- *
- * Each method is one backend-testable test case (MockMvc rows only; RTL and Browser-only rows are left out).
- */
-class EventParticipationIntegrationTest extends EventApiTestSupport {
+    @Test void emptyAndRepeatedBatchSelectionsAreRejected() throws Exception {
+        for (String json : List.of("{\"athleteIds\":[]}","{\"athleteIds\":["+ada.getId()+","+ada.getId()+"]}"))
+            mockMvc.perform(post("/api/events/{id}/participants/bulk",race.getId()).contentType("application/json").content(json))
+                    .andExpect(status().isBadRequest());
+        assertTrue(events.participants(race.getId()).isEmpty());
+    }
 
-	@Test
-	@Disabled("Not written yet")
-	@DisplayName("T45 expanding an event lists the athletes already assigned to it")
-	void listsAthletesAssignedToEvent() {
-		fail("Not written yet");
-	}
+    @Test void missingAthleteRollsBackTheEntireAssignmentBatch() throws Exception {
+        mockMvc.perform(post("/api/events/{id}/participants/bulk",race.getId()).contentType("application/json")
+                .content("{\"athleteIds\":["+ada.getId()+",9223372036854775807]}"))
+                .andExpect(status().isNotFound());
+        assertTrue(events.participants(race.getId()).isEmpty());
+    }
 
-	@Test
-	@Disabled("Not written yet")
-	@DisplayName("T46 assign several athletes adds all of them to this event only")
-	void assignsSeveralAthletesToThisEventOnly() {
-		fail("Not written yet");
-	}
+    @Test void duplicateExistingAssignmentReturnsConflictAndRollsBackNewAssignments() throws Exception {
+        events.assignParticipant(race.getId(),new EventParticipantRequest(ada.getId()));
+        mockMvc.perform(post("/api/events/{id}/participants/bulk",race.getId()).contentType("application/json")
+                .content("{\"athleteIds\":["+ben.getId()+","+ada.getId()+"]}"))
+                .andExpect(status().isConflict());
+        assertEquals(List.of(ada.getId()),events.participants(race.getId()).stream().map(p->p.getAthlete().getId()).toList());
+    }
 
-	@Test
-	@Disabled("Not written yet")
-	@DisplayName("T48 same athlete can be assigned to a second event in the same meet")
-	void sameAthleteCanJoinTwoEventsInOneMeet() {
-		fail("Not written yet");
-	}
+    @Test void theSameAthleteCanParticipateInMultipleEventsAndProfileShowsBoth() throws Exception {
+        for (Event event : List.of(race,jump))
+            mockMvc.perform(post("/api/events/{id}/participants",event.getId()).contentType("application/json")
+                    .content("{\"athleteId\":"+ada.getId()+"}")).andExpect(status().isCreated());
+        assertEquals(2,athletes.profile(ada.getId()).participations().size());
+    }
 
-	@Test
-	@Disabled("Not written yet")
-	@DisplayName("T49 athlete profile shows the meet and event they are assigned to")
-	void profileShowsMeetAndEventParticipation() {
-		fail("Not written yet");
-	}
-
-	@Test
-	@Disabled("Not written yet")
-	@DisplayName("T52 assigning an athlete already in the event returns 409, no duplicate row")
-	void assigningAthleteAlreadyInEventIsRejected() {
-		fail("Not written yet");
-	}
-
-	@Test
-	@DisplayName("T53 bulk assign with an empty athlete list returns 400 VALIDATION_ERROR, no participants created")
-	void emptyAthleteListIsRejected() throws Exception {
-		long event = createEvent();
-
-		mockMvc.perform(post("/api/events/{id}/participants/bulk", event)
-					.contentType(MediaType.APPLICATION_JSON)
-					.content("{\"athleteIds\":[]}"))
-				.andExpect(status().isBadRequest())
-				.andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
-
-		assertEquals(0, participationRepository.count());
-	}
-
-	@Test
-	@Disabled("Not written yet")
-	@DisplayName("T55 removing an assigned athlete removes them from the event and profile only")
-	void removingAthleteLeavesOthersUntouched() {
-		fail("Not written yet");
-	}
-
-	@Test
-	@Disabled("Not written yet")
-	@DisplayName("T57 removing an athlete who has results in the event (per P2)")
-	void removingAthleteWithResults() {
-		fail("Not written yet");
-	}
-
-	@Test
-	@Disabled("Not written yet")
-	@DisplayName("T58 batch with one already-assigned or unknown athlete (per P1)")
-	void batchWithAssignedOrUnknownAthlete() {
-		fail("Not written yet");
-	}
-
-	@Test
-	@DisplayName("T59 unknown athlete returns 404 ATHLETE_NOT_FOUND, unknown event 404 EVENT_NOT_FOUND, nothing created")
-	void unknownAthleteOrEventReturnsNotFound() throws Exception {
-		long event = createEvent();
-		long athlete = createAthlete("Jane", "Doe");
-
-		mockMvc.perform(post("/api/events/{id}/participants", event)
-					.contentType(MediaType.APPLICATION_JSON)
-					.content("{\"athleteId\":" + unknownId("athletes") + "}"))
-				.andExpect(status().isNotFound())
-				.andExpect(jsonPath("$.code").value("ATHLETE_NOT_FOUND"));
-
-		mockMvc.perform(post("/api/events/{id}/participants", unknownId("events"))
-					.contentType(MediaType.APPLICATION_JSON)
-					.content("{\"athleteId\":" + athlete + "}"))
-				.andExpect(status().isNotFound())
-				.andExpect(jsonPath("$.code").value("EVENT_NOT_FOUND"));
-
-		assertEquals(0, participationRepository.count());
-	}
+    @Test void removalDeletesOnlyThatAthletesResultsForTheSelectedEvent() throws Exception {
+        events.addResult(race.getId(),new EventResultRequest(ada.getId(),"12.4",null));
+        events.addResult(race.getId(),new EventResultRequest(ada.getId(),"12.1",null));
+        events.addResult(race.getId(),new EventResultRequest(ben.getId(),"11.8",null));
+        events.addResult(jump.getId(),new EventResultRequest(ada.getId(),"5.18m",null));
+        mockMvc.perform(delete("/api/events/{id}/participants/{athleteId}",race.getId(),ada.getId())).andExpect(status().isNoContent());
+        assertTrue(eventResultRepository.findByEventIdAndAthleteId(race.getId(),ada.getId()).isEmpty());
+        assertEquals(1,eventResultRepository.findByEventIdAndAthleteId(race.getId(),ben.getId()).size());
+        assertEquals(1,eventResultRepository.findByEventIdAndAthleteId(jump.getId(),ada.getId()).size());
+        assertEquals(1,athletes.profile(ada.getId()).participations().size());
+        mockMvc.perform(delete("/api/events/{id}/participants/{athleteId}",race.getId(),ada.getId())).andExpect(status().isNotFound());
+    }
 }

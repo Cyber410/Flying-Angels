@@ -106,4 +106,9 @@ public class EventController {
     public List<EventResultResponse> resultsBulk(@PathVariable Long id,@Valid @RequestBody com.flyingangels.backend.event.dto.ResultBatchRequest request) {
         return eventService.addResults(id,request.results()).stream().map(EventResultResponse::from).toList();
     }
+    @PutMapping("/api/events/{id}/results/bulk")
+    public List<EventResultResponse> updateResultsBulk(@PathVariable Long id,
+            @Valid @RequestBody com.flyingangels.backend.event.dto.ResultUpdateBatchRequest request) {
+        return eventService.updateResults(id,request.results()).stream().map(EventResultResponse::from).toList();
+    }
 }

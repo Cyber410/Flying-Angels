@@ -29,8 +29,12 @@ public class AthleteController {
 	@GetMapping("/api/athletes")
 	public List<AthleteSummaryResponse> search(@RequestParam(defaultValue = "") String search,
 			@RequestParam(defaultValue = "") String gender,
-			@RequestParam(defaultValue = "") String team) {
-		return athleteService.search(search, gender, team).stream().map(AthleteSummaryResponse::from).toList();
+			@RequestParam(defaultValue = "") String team,
+            @RequestParam(required=false) Integer minAge, @RequestParam(required=false) Integer maxAge,
+            @RequestParam(required=false) @org.springframework.format.annotation.DateTimeFormat(iso=org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate ageAsOf) {
+        var athletes = minAge == null && maxAge == null ? athleteService.search(search,gender,team)
+                : athleteService.search(search,gender,team,minAge,maxAge,ageAsOf);
+		return athletes.stream().map(AthleteSummaryResponse::from).toList();
 	}
 
 	@GetMapping("/api/athletes/{id}")

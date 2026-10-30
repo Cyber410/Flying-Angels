@@ -276,7 +276,13 @@ Example traceability:
 
 ADRs explain design rationale rather than test execution. Link the relevant [decision record](../adr/README.md) beside implementation and test evidence.
 
-## 10. Optional command-line execution
+## 10. CI and command-line execution
+
+The [CI workflow](../../.github/workflows/ci.yml) runs this functional collection using Newman after the deployed-stack Nginx checks and before configuring AWS credentials or publishing images. It uses the isolated Compose application and temporary MySQL database. `baseUrl` is overridden with CI's `TEST_BASE_URL`; the working directory is `docs/postman` so fixture uploads resolve correctly.
+
+A failed request/assertion makes the Newman step fail and prevents image publishing. JSON and JUnit reports are written to `artifacts/newman/` and included in the existing verification artifact upload, which runs even if tests fail. No Postman account or API key is needed. The separate security collection is not included in this default-profile CI step.
+
+This collection provides API integration tests against the running application and database. It complements the JUnit database integration tests and the deployed-stack checks; it does not exercise browser interactions.
 
 With Node/npm and Newman available, run from this directory:
 

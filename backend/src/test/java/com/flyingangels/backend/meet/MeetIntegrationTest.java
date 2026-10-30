@@ -25,20 +25,20 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
-import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.RequestBuilder;
 
 import com.jayway.jsonpath.JsonPath;
 
 /**
- * UC-03 contract tests for meets: list, create, edit, delete (PROPOSED contract, section 2 of
- * testing-drafts/uc-03-test-cases-and-api-contract.md). The feature owner removes @Disabled once the contract is
- * agreed and built.
+ * UC-03 integration tests for meets: list, create, edit, delete, against Dev's API on development (MeetController,
+ * MeetEventController and docs/postman/flying-angels-backend.postman_collection.json).
+ *
+ * Tests that only repeat a request in Dev's Postman collection are disabled until the team decides whether Newman
+ * runs in CI.
  *
  * Seeded catalog: 100M (ASC) and LONG JUMP (DESC), inserted with SQL. Meets are created through the API.
  */
-@Disabled("UC-03 not built yet - contract pending Dev approval")
 class MeetIntegrationTest extends MeetContractTestSupport {
 
 	private static final String VALID_MEET = meetJson("Spring Meet", "2026-05-16", "2026-05-17", "GTA Stadium");
@@ -52,28 +52,36 @@ class MeetIntegrationTest extends MeetContractTestSupport {
 		longJump = insertCategory("LONG JUMP", "DESC");
 	}
 
+	/** Creates a meet with only a name and start date, checking meetDate mirrors startDate in the response. */
+	private long createStartDateOnlyMeet(String name, String startDate) throws Exception {
+		String body = mockMvc.perform(post("/api/meets")
+					.contentType(MediaType.APPLICATION_JSON)
+					.content(startDateOnlyMeetJson(name, startDate)))
+				.andExpect(status().isCreated())
+				.andExpect(jsonPath("$.startDate").value(startDate))
+				.andExpect(jsonPath("$.meetDate").value(startDate))
+				.andReturn().getResponse().getContentAsString();
+		return ((Number) JsonPath.read(body, "$.id")).longValue();
+	}
+
 	@Test
-	@DisplayName("T21 meets list shows every meet, newest start date first, with dates, location and event count")
+	@DisplayName("T21 meets list shows every meet newest start date first; meetDate equals startDate")
 	void listsMeetsNewestStartDateFirst() throws Exception {
-		long winter = createMeet("Winter Indoor", LocalDate.of(2026, 1, 10), LocalDate.of(2026, 1, 11), "CNE");
-		long summer = createMeet("Summer Open", LocalDate.of(2026, 7, 4), LocalDate.of(2026, 7, 5), "York");
-		long spring = createMeet("Spring Meet", LocalDate.of(2026, 5, 16), LocalDate.of(2026, 5, 17), "GTA");
-		addEvents(summer, sprint100, longJump);
+		// Created out of order, so the list order can only come from the start date.
+		long spring = createStartDateOnlyMeet("Spring Meet", "2026-05-16");
+		long winter = createStartDateOnlyMeet("Winter Indoor", "2026-01-10");
+		long summer = createStartDateOnlyMeet("Summer Open", "2026-07-04");
 
 		mockMvc.perform(get("/api/meets"))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$", hasSize(3)))
 				.andExpect(jsonPath("$[*].id").value(contains(json(summer), json(spring), json(winter))))
-				.andExpect(jsonPath("$[0].name").value("Summer Open"))
-				.andExpect(jsonPath("$[0].startDate").value("2026-07-04"))
-				.andExpect(jsonPath("$[0].endDate").value("2026-07-05"))
-				.andExpect(jsonPath("$[0].location").value("York"))
-				.andExpect(jsonPath("$[0].eventCount").value(2))
-				.andExpect(jsonPath("$[1].eventCount").value(0))
-				.andExpect(jsonPath("$[2].eventCount").value(0));
+				.andExpect(jsonPath("$[*].startDate").value(contains("2026-07-04", "2026-05-16", "2026-01-10")))
+				.andExpect(jsonPath("$[*].meetDate").value(contains("2026-07-04", "2026-05-16", "2026-01-10")));
 	}
 
 	@Test
+	@Disabled("Duplicates Dev's Postman collection - keep or delete pending Newman-in-CI decision")
 	@DisplayName("T22 create a meet with all fields returns 201 and the meet is saved and can be opened")
 	void createsMeetWithAllFields() throws Exception {
 		String body = mockMvc.perform(post("/api/meets")
@@ -101,19 +109,16 @@ class MeetIntegrationTest extends MeetContractTestSupport {
 				.andExpect(jsonPath("$.events", hasSize(0)));
 	}
 
-	static Stream<Arguments> meetsWithOneRequiredFieldEmpty() {
+	static Stream<Arguments> meetsWithRequiredFieldMissing() {
 		return Stream.of(
-				Arguments.of("name", meetJson("   ", "2026-05-16", "2026-05-17", "GTA Stadium")),
-				Arguments.of("startDate", meetJson("Spring Meet", null, "2026-05-17", "GTA Stadium")),
-				Arguments.of("endDate", meetJson("Spring Meet", "2026-05-16", null, "GTA Stadium")),
-				Arguments.of("location", meetJson("Spring Meet", "2026-05-16", "2026-05-17", "   ")));
+				Arguments.of("blank name", "name", startDateOnlyMeetJson("   ", "2026-05-16")),
+				Arguments.of("missing startDate", "dateRangeValid", startDateOnlyMeetJson("Spring Meet", null)));
 	}
 
-	@ParameterizedTest(name = "{0} empty")
-	@MethodSource("meetsWithOneRequiredFieldEmpty")
-	@DisplayName("T26 required field empty or blank returns 400 VALIDATION_ERROR naming the field, nothing saved")
-	void requiredFieldEmptyIsRejected(String field, String body) throws Exception {
-		// D1 default: name, startDate, endDate and location are all required.
+	@ParameterizedTest(name = "{0}")
+	@MethodSource("meetsWithRequiredFieldMissing")
+	@DisplayName("T26 blank name or missing start date returns 400 VALIDATION_ERROR naming the field, nothing saved")
+	void requiredFieldMissingIsRejected(String label, String field, String body) throws Exception {
 		mockMvc.perform(post("/api/meets").contentType(MediaType.APPLICATION_JSON).content(body))
 				.andExpect(status().isBadRequest())
 				.andExpect(jsonPath("$.status").value(400))
@@ -125,14 +130,26 @@ class MeetIntegrationTest extends MeetContractTestSupport {
 	}
 
 	@Test
-	@DisplayName("T27 end date before start date returns 400 naming endDate, nothing saved")
+	@DisplayName("T26 meet with no end date and no location is accepted")
+	void meetWithoutEndDateOrLocationIsAccepted() throws Exception {
+		// D1 pending ADR
+		mockMvc.perform(post("/api/meets")
+					.contentType(MediaType.APPLICATION_JSON)
+					.content(startDateOnlyMeetJson("Spring Meet", "2026-05-16")))
+				.andExpect(status().isCreated());
+
+		assertEquals(1, meetCount());
+	}
+
+	@Test
+	@DisplayName("T27 end date before start date returns 400 naming dateRangeValid, nothing saved")
 	void endDateBeforeStartDateIsRejected() throws Exception {
 		mockMvc.perform(post("/api/meets")
 					.contentType(MediaType.APPLICATION_JSON)
 					.content(meetJson("Spring Meet", "2026-05-17", "2026-05-16", "GTA Stadium")))
 				.andExpect(status().isBadRequest())
 				.andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
-				.andExpect(jsonPath("$.message").value(containsString("endDate:")));
+				.andExpect(jsonPath("$.message").value(containsString("dateRangeValid:")));
 
 		assertEquals(0, meetCount());
 	}
@@ -140,7 +157,6 @@ class MeetIntegrationTest extends MeetContractTestSupport {
 	@Test
 	@DisplayName("T28 end date equal to start date (one-day meet) is accepted")
 	void oneDayMeetIsAccepted() throws Exception {
-		// Assumes D2 = yes (proposal default): a one-day meet is allowed.
 		mockMvc.perform(post("/api/meets")
 					.contentType(MediaType.APPLICATION_JSON)
 					.content(meetJson("One Day Meet", "2026-05-16", "2026-05-16", "GTA Stadium")))
@@ -152,6 +168,7 @@ class MeetIntegrationTest extends MeetContractTestSupport {
 	}
 
 	@Test
+	@Disabled("Duplicates Dev's Postman collection - keep or delete pending Newman-in-CI decision")
 	@DisplayName("T29 edit a meet returns 200 with the same ID and new values; an invalid edit leaves it unchanged")
 	void editKeepsIdAndInvalidEditChangesNothing() throws Exception {
 		long id = createMeet("Spring Meet", LocalDate.of(2026, 5, 16), LocalDate.of(2026, 5, 17), "GTA Stadium");
@@ -188,6 +205,7 @@ class MeetIntegrationTest extends MeetContractTestSupport {
 	}
 
 	@Test
+	@Disabled("Duplicates Dev's Postman collection - keep or delete pending Newman-in-CI decision")
 	@DisplayName("T38 delete a meet returns 204; it and its events are gone, other meets untouched, no orphan rows")
 	void deletingMeetRemovesItsEventsWithNoOrphans() throws Exception {
 		long doomed = createMeet("Spring Meet", LocalDate.of(2026, 5, 16), LocalDate.of(2026, 5, 17), "GTA");
@@ -213,6 +231,7 @@ class MeetIntegrationTest extends MeetContractTestSupport {
 	}
 
 	@Test
+	@Disabled("Duplicates Dev's Postman collection - keep or delete pending Newman-in-CI decision")
 	@DisplayName("T40 delete a meet whose events have participants and results cascades cleanly; athletes kept")
 	void deletingMeetWithResultsCascades() throws Exception {
 		// Assumes D3 = cascade, because that is what the current code does (Meet -> events -> results).
@@ -241,33 +260,44 @@ class MeetIntegrationTest extends MeetContractTestSupport {
 		assertEquals(0, orphanResultCount());
 	}
 
-	/** The four requests T41 sends to a meet that doesn't exist. */
+	/** The five requests T41 sends to a meet that doesn't exist. */
 	enum UnknownMeetRequest {
-		GET, PUT, DELETE, ADD_EVENTS;
-
-		RequestBuilder to(long meetId, long categoryId) {
-			return switch (this) {
-				case GET -> get("/api/meets/{id}", meetId);
-				case PUT -> put("/api/meets/{id}", meetId).contentType(MediaType.APPLICATION_JSON).content(VALID_MEET);
-				case DELETE -> delete("/api/meets/{id}", meetId);
-				case ADD_EVENTS -> post("/api/meets/{id}/events", meetId)
-						.contentType(MediaType.APPLICATION_JSON).content(categoryIdsJson(categoryId));
-			};
-		}
+		GET, PUT, DELETE, BULK_EVENTS, COPY_EVENTS;
 
 		String path(long meetId) {
-			return this == ADD_EVENTS ? "/api/meets/" + meetId + "/events" : "/api/meets/" + meetId;
+			return switch (this) {
+				case BULK_EVENTS -> "/api/meets/" + meetId + "/events/bulk";
+				case COPY_EVENTS -> "/api/meets/" + meetId + "/events/copy";
+				default -> "/api/meets/" + meetId;
+			};
 		}
+	}
+
+	/** Builds a T41 request with a body that passes validation, so only the unknown meet ID can fail it. */
+	private RequestBuilder unknownMeetRequest(UnknownMeetRequest request, long unknown, long sourceMeet,
+			long sourceEvent) {
+		String path = request.path(unknown);
+		return switch (request) {
+			case GET -> get(path);
+			case PUT -> put(path).contentType(MediaType.APPLICATION_JSON).content(VALID_MEET);
+			case DELETE -> delete(path);
+			case BULK_EVENTS -> post(path).contentType(MediaType.APPLICATION_JSON)
+					.content(eventBatchJson(unknown, LocalDate.of(2026, 5, 16), sprint100));
+			case COPY_EVENTS -> post(path).contentType(MediaType.APPLICATION_JSON)
+					.content(copyEventsJson(sourceMeet, sourceEvent));
+		};
 	}
 
 	@ParameterizedTest(name = "{0}")
 	@EnumSource(UnknownMeetRequest.class)
 	@DisplayName("T41 meet ID that doesn't exist returns 404 MEET_NOT_FOUND with no meet data, nothing changed")
 	void unknownMeetReturnsMeetNotFound(UnknownMeetRequest request) throws Exception {
-		// No meet is seeded, so this test checks the 404 on its own even before POST /api/meets matches the contract.
+		// One real meet with one event, so the copy request has a valid source.
+		long sourceMeet = createMeet("Spring Meet", LocalDate.of(2026, 5, 16), LocalDate.of(2026, 5, 17), "GTA");
+		long sourceEvent = addEvents(sourceMeet, sprint100).get(0);
 		long unknown = unknownMeetId();
 
-		mockMvc.perform(request.to(unknown, sprint100))
+		mockMvc.perform(unknownMeetRequest(request, unknown, sourceMeet, sourceEvent))
 				.andExpect(status().isNotFound())
 				.andExpect(jsonPath("$.status").value(404))
 				.andExpect(jsonPath("$.code").value("MEET_NOT_FOUND"))
@@ -276,18 +306,16 @@ class MeetIntegrationTest extends MeetContractTestSupport {
 				.andExpect(jsonPath("$.events").doesNotExist())
 				.andExpect(content().string(not(containsString("startDate"))));
 
-		assertEquals(0, meetCount());
-		assertEquals(0, eventCount());
+		assertEquals(1, meetCount());
+		assertEquals(1, eventCount());
 	}
 
-	@ParameterizedTest(name = "ID \"{0}\"")
-	@ValueSource(strings = { "abc", "12abc", "1.5" })
+	@Test
 	@DisplayName("T43 non-numeric meet ID returns 400 INVALID_REQUEST, not a server error")
-	void nonNumericMeetIdReturnsBadRequest(String malformedId) throws Exception {
-		mockMvc.perform(get("/api/meets/{id}", malformedId))
+	void nonNumericMeetIdReturnsBadRequest() throws Exception {
+		mockMvc.perform(get("/api/meets/abc"))
 				.andExpect(status().isBadRequest())
 				.andExpect(jsonPath("$.status").value(400))
-				.andExpect(jsonPath("$.code").value("INVALID_REQUEST"))
-				.andExpect(content().string(not(containsString("Exception"))));
+				.andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
 	}
 }

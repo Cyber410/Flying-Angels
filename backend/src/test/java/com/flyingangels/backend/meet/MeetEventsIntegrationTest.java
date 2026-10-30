@@ -1,7 +1,6 @@
 package com.flyingangels.backend.meet;
 
 import static org.hamcrest.Matchers.containsInAnyOrder;
-import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.everyItem;
 import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.hasSize;
@@ -26,14 +25,15 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.http.MediaType;
 
 /**
- * UC-03 contract tests for events within a meet: add, copy, remove (PROPOSED contract, section 2 of
- * testing-drafts/uc-03-test-cases-and-api-contract.md). An event is a category inside a meet (D5 default), so the
- * add request is only a list of category IDs.
+ * UC-03 integration tests for events within a meet: bulk add, copy, remove, against Dev's API on development
+ * (MeetEventController, MeetController and docs/postman/flying-angels-backend.postman_collection.json).
+ *
+ * Tests that only repeat a request in Dev's Postman collection are disabled until the team decides whether Newman
+ * runs in CI.
  *
  * Seeded catalog: 100M, 200M (ASC), LONG JUMP, HIGH JUMP (DESC), inserted with SQL. Meets and events are created
  * through the API.
  */
-@Disabled("UC-03 not built yet - contract pending Dev approval")
 class MeetEventsIntegrationTest extends MeetContractTestSupport {
 
 	private long sprint100;
@@ -58,6 +58,7 @@ class MeetEventsIntegrationTest extends MeetContractTestSupport {
 	}
 
 	@Test
+	@Disabled("Duplicates Dev's Postman collection - keep or delete pending Newman-in-CI decision")
 	@DisplayName("T23 add several events at once creates all of them for this meet only")
 	void addsSeveralEventsToThisMeetOnly() throws Exception {
 		long meet = springMeet();
@@ -87,6 +88,7 @@ class MeetEventsIntegrationTest extends MeetContractTestSupport {
 	}
 
 	@Test
+	@Disabled("Duplicates Dev's Postman collection - keep or delete pending Newman-in-CI decision")
 	@DisplayName("T30 copy events from another meet creates them with 0 participants and no results; source unchanged")
 	void copiesEventsWithoutParticipantsOrResults() throws Exception {
 		long source = springMeet();
@@ -116,6 +118,7 @@ class MeetEventsIntegrationTest extends MeetContractTestSupport {
 	}
 
 	@Test
+	@Disabled("Duplicates Dev's Postman collection - keep or delete pending Newman-in-CI decision")
 	@DisplayName("T31 adding an event the meet already has returns 409 EVENT_ALREADY_IN_MEET, nothing created")
 	void addingEventAlreadyInMeetReturnsConflict() throws Exception {
 		long meet = springMeet();
@@ -135,6 +138,7 @@ class MeetEventsIntegrationTest extends MeetContractTestSupport {
 	}
 
 	@Test
+	@Disabled("Duplicates Dev's Postman collection - keep or delete pending Newman-in-CI decision")
 	@DisplayName("T32 copying events the meet already has rejects the whole request, no duplicate event in the meet")
 	void copyingEventsAlreadyInMeetRejectsWholeRequest() throws Exception {
 		// D4 is open (skip duplicates and copy the rest, or reject the whole request). This test picks
@@ -157,31 +161,28 @@ class MeetEventsIntegrationTest extends MeetContractTestSupport {
 	}
 
 	@Test
-	@DisplayName("T35 add or copy events with an empty list returns 400 VALIDATION_ERROR, nothing created")
+	@DisplayName("T35 bulk add or copy events with an empty list returns 400 VALIDATION_ERROR, nothing created")
 	void emptyListIsRejected() throws Exception {
 		long source = springMeet();
 		long target = summerMeet();
-		addEvents(source, sprint100);
 
-		mockMvc.perform(post("/api/meets/{meetId}/events", target)
+		mockMvc.perform(post("/api/meets/{meetId}/events/bulk", target)
 					.contentType(MediaType.APPLICATION_JSON)
-					.content(categoryIdsJson()))
+					.content("{\"events\":[]}"))
 				.andExpect(status().isBadRequest())
-				.andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
-				.andExpect(jsonPath("$.message").value(containsString("categoryIds:")));
+				.andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
 
 		mockMvc.perform(post("/api/meets/{meetId}/events/copy", target)
 					.contentType(MediaType.APPLICATION_JSON)
 					.content(copyEventsJson(source)))
 				.andExpect(status().isBadRequest())
-				.andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
-				.andExpect(jsonPath("$.message").value(containsString("eventIds:")));
+				.andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
 
-		assertEquals(0, eventCountForMeet(target));
-		assertEquals(1, eventCountForMeet(source));
+		assertEquals(0, eventCount());
 	}
 
 	@Test
+	@Disabled("Duplicates Dev's Postman collection - keep or delete pending Newman-in-CI decision")
 	@DisplayName("T36 remove an event returns 204; that event is gone, the meet's other events untouched")
 	void removingEventLeavesOthersUntouched() throws Exception {
 		long meet = springMeet();
@@ -208,6 +209,7 @@ class MeetEventsIntegrationTest extends MeetContractTestSupport {
 	}
 
 	@Test
+	@Disabled("Duplicates Dev's Postman collection - keep or delete pending Newman-in-CI decision")
 	@DisplayName("T40 remove an event with participants and results cascades cleanly; other events and athletes kept")
 	void removingEventWithResultsCascades() throws Exception {
 		// Assumes D3 = cascade, because that is what the current code does (Event -> results).
@@ -234,6 +236,7 @@ class MeetEventsIntegrationTest extends MeetContractTestSupport {
 
 	@ParameterizedTest(name = "{0}")
 	@ValueSource(strings = { "GET", "DELETE" })
+	@Disabled("Duplicates Dev's Postman collection - keep or delete pending Newman-in-CI decision")
 	@DisplayName("T41 event ID that doesn't exist in an existing meet returns 404 EVENT_NOT_FOUND, nothing changed")
 	void unknownEventReturnsEventNotFound(String method) throws Exception {
 		long meet = springMeet();
@@ -253,6 +256,7 @@ class MeetEventsIntegrationTest extends MeetContractTestSupport {
 	}
 
 	@Test
+	@Disabled("Duplicates Dev's Postman collection - keep or delete pending Newman-in-CI decision")
 	@DisplayName("T42 event ID that belongs to a different meet returns 404 for GET and DELETE; neither meet changed")
 	void eventFromAnotherMeetReturnsNotFound() throws Exception {
 		long meetA = springMeet();

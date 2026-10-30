@@ -22,8 +22,8 @@ import com.flyingangels.backend.DatabaseIntegrationTest;
 import com.jayway.jsonpath.JsonPath;
 
 /**
- * Shared setup for the UC-03 contract tests, written against the PROPOSED API in
- * testing-drafts/uc-03-test-cases-and-api-contract.md, section 2 (not yet approved by Dev).
+ * Shared setup for the UC-03 integration tests, written against Dev's API on development (MeetController,
+ * MeetEventController, and the requests in docs/postman/flying-angels-backend.postman_collection.json).
  *
  * These tests deliberately use no meet, event or result production class. Meets and events are created through
  * the API as JSON strings; categories, athletes and results are inserted with SQL; and every database check is a
@@ -52,9 +52,31 @@ abstract class MeetContractTestSupport extends DatabaseIntegrationTest {
 		return meetJson(name, startDate.toString(), endDate.toString(), location);
 	}
 
-	/** Body for POST /api/meets/{meetId}/events. */
+	/** Meet body with only a name and a start date. A null startDate is sent as JSON null. */
+	protected static String startDateOnlyMeetJson(String name, String startDate) {
+		return "{\"name\":" + jsonString(name) + ",\"startDate\":" + jsonString(startDate) + "}";
+	}
+
+	/** Body of the old proposed POST /api/meets/{meetId}/events. Only the disabled tests still send it. */
 	protected static String categoryIdsJson(long... categoryIds) {
 		return "{\"categoryIds\":" + jsonArray(categoryIds) + "}";
+	}
+
+	/**
+	 * Body for POST /api/meets/{meetId}/events/bulk: one event per category, named after the category and held on
+	 * eventDate. Category name and ranking order are read from the database.
+	 */
+	protected String eventBatchJson(long meetId, LocalDate eventDate, long... categoryIds) {
+		String events = Arrays.stream(categoryIds).mapToObj(categoryId -> {
+			Map<String, Object> category = jdbcTemplate.queryForMap(
+					"SELECT name, ranking_order FROM event_categories WHERE id = ?", categoryId);
+			return "{\"name\":" + jsonString((String) category.get("name"))
+					+ ",\"eventDate\":" + jsonString(eventDate.toString())
+					+ ",\"rankingOrder\":" + jsonString((String) category.get("ranking_order"))
+					+ ",\"meetId\":" + meetId
+					+ ",\"categoryId\":" + categoryId + "}";
+		}).collect(Collectors.joining(",", "[", "]"));
+		return "{\"events\":" + events + "}";
 	}
 
 	/** Body for POST /api/meets/{meetId}/events/copy. */
@@ -78,20 +100,30 @@ abstract class MeetContractTestSupport extends DatabaseIntegrationTest {
 	/** Creates a meet through POST /api/meets and returns its ID. */
 	protected long createMeet(String name, LocalDate startDate, LocalDate endDate, String location)
 			throws Exception {
+		return createMeet(meetJson(name, startDate, endDate, location));
+	}
+
+	/** Creates a meet through POST /api/meets from a ready-made body and returns its ID. */
+	protected long createMeet(String body) throws Exception {
 		MockHttpServletResponse response = mockMvc.perform(post("/api/meets")
 					.contentType(MediaType.APPLICATION_JSON)
-					.content(meetJson(name, startDate, endDate, location)))
+					.content(body))
 				.andReturn().getResponse();
 		requireSeedStatus(response, 201, "POST /api/meets");
 		return readLong(response, "$.id", "POST /api/meets");
 	}
 
-	/** Adds events through POST /api/meets/{meetId}/events and returns the new event IDs in response order. */
+	/**
+	 * Adds one event per category through POST /api/meets/{meetId}/events/bulk, held on the meet's start date,
+	 * and returns the new event IDs in response order.
+	 */
 	protected List<Long> addEvents(long meetId, long... categoryIds) throws Exception {
-		String request = "POST /api/meets/" + meetId + "/events";
-		MockHttpServletResponse response = mockMvc.perform(post("/api/meets/{meetId}/events", meetId)
+		String request = "POST /api/meets/" + meetId + "/events/bulk";
+		LocalDate startDate = jdbcTemplate.queryForObject("SELECT start_date FROM meets WHERE id = ?",
+				java.sql.Date.class, meetId).toLocalDate();
+		MockHttpServletResponse response = mockMvc.perform(post("/api/meets/{meetId}/events/bulk", meetId)
 					.contentType(MediaType.APPLICATION_JSON)
-					.content(categoryIdsJson(categoryIds)))
+					.content(eventBatchJson(meetId, startDate, categoryIds)))
 				.andReturn().getResponse();
 		requireSeedStatus(response, 201, request);
 		List<?> ids = readList(response, "$[*].id", request);
@@ -110,7 +142,7 @@ abstract class MeetContractTestSupport extends DatabaseIntegrationTest {
 			throws Exception {
 		if (response.getStatus() != expected) {
 			fail("SEED FAILED: " + request + " returned " + response.getStatus()
-					+ " - UC-03 contract not implemented yet. Body: " + response.getContentAsString());
+					+ ". Body: " + response.getContentAsString());
 		}
 	}
 

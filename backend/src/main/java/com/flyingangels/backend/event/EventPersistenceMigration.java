@@ -15,6 +15,29 @@ public class EventPersistenceMigration implements InitializingBean {
     @Override public void afterPropertiesSet() {
         String product = jdbc.execute((org.springframework.jdbc.core.ConnectionCallback<String>) connection -> connection.getMetaData().getDatabaseProductName());
         if (!"MySQL".equalsIgnoreCase(product)) return;
+        jdbc.update("UPDATE meets SET start_date = meet_date WHERE start_date IS NULL");
+        jdbc.update("UPDATE meets SET end_date = COALESCE(start_date, meet_date) WHERE end_date IS NULL");
+        var categories = jdbc.query("SELECT id, name, ranking_order FROM event_categories WHERE unit IS NULL",
+                (row, index) -> new Object[]{row.getLong(1), ResultValues.unitFor(row.getString(2), RankingOrder.valueOf(row.getString(3))).name()});
+        for (var category : categories) jdbc.update("UPDATE event_categories SET unit = ? WHERE id = ? AND unit IS NULL", category[1], category[0]);
+        var legacyResults = jdbc.query("""
+                SELECT r.id, r.result, c.unit, r.event_id FROM event_results r
+                JOIN event_categories c ON c.id = r.category_id
+                WHERE r.unit IS NULL OR r.status IS NULL OR r.source IS NULL
+                """, (row, index) -> new Object[]{row.getLong(1), row.getString(2), ResultUnit.valueOf(row.getString(3)), row.getObject(4)});
+        for (var row : legacyResults) {
+            ResultUnit unit = (ResultUnit) row[2];
+            ResultStatus status = row[1] == null ? ResultStatus.PENDING : ResultStatus.UNPARSED;
+            java.math.BigDecimal score = null;
+            try {
+                var measurement = ResultValues.parse((String) row[1], unit, null);
+                status = measurement.status(); score = measurement.score();
+            } catch (IllegalArgumentException ignored) {}
+            jdbc.update("""
+                    UPDATE event_results SET unit = COALESCE(unit, ?), status = COALESCE(status, ?),
+                    score = COALESCE(score, ?), source = COALESCE(source, ?) WHERE id = ?
+                    """, unit.name(), status.name(), score, row[3] == null ? "LEGACY_IMPORT" : "MANUAL", row[0]);
+        }
         List<String> oldIndexes = jdbc.query("""
                 SELECT INDEX_NAME FROM information_schema.STATISTICS
                 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'event_results' AND NON_UNIQUE = 0 AND INDEX_NAME <> 'PRIMARY'

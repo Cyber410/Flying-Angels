@@ -29,28 +29,28 @@ public class Meet {
 
 	private String name;
 	private LocalDate meetDate;
-	private LocalDate endDate;
+    private LocalDate startDate;
+    private LocalDate endDate;
 	private String location;
-	private String externalUrl;
+	@jakarta.persistence.Column(length=500) private String externalUrl;
 
 	@OneToMany(mappedBy = "meet", cascade = CascadeType.ALL, orphanRemoval = true)
 	private List<Event> events = new ArrayList<>();
 
+    public LocalDate getStartDate() { return startDate==null?meetDate:startDate; }
+    public LocalDate getEndDate() { return endDate==null?getStartDate():endDate; }
 	public Meet(MeetRequest request) {
 		updateFrom(request);
 	}
 
 	public void updateFrom(MeetRequest request) {
-		if (request.meetDate() == null || (request.endDate() != null && request.endDate().isBefore(request.meetDate()))) {
-			throw new IllegalArgumentException("End date must be on or after the start date");
-		}
-		LocalDate lastDate = request.endDate() == null ? request.meetDate() : request.endDate();
-		if (events.stream().anyMatch(event -> event.getEventDate().isBefore(request.meetDate()) || event.getEventDate().isAfter(lastDate))) {
-			throw new IllegalArgumentException("The meet date range must include all existing event dates");
-		}
+        if (!request.isDateRangeValid()) throw new IllegalArgumentException("Invalid meet date range");
+        if (events.stream().anyMatch(e->e.getEventDate().isBefore(request.effectiveStartDate()) || e.getEventDate().isAfter(request.effectiveEndDate())))
+            throw new IllegalArgumentException("The meet date range must include all existing event dates");
 		this.name = request.name().trim();
-		this.meetDate = request.meetDate();
-		this.endDate = lastDate;
+        this.startDate = request.effectiveStartDate();
+        this.endDate = request.effectiveEndDate();
+        this.meetDate = this.startDate;
 		this.location = request.location();
 		this.externalUrl = request.externalUrl();
 	}

@@ -96,6 +96,7 @@ public class EventController {
 		return eventService.participants(id).stream().map(EventParticipationResponse::from).toList();
 	}
 	@PostMapping("/api/events/{id}/participants/bulk")
+	@ResponseStatus(HttpStatus.CREATED)
 	public List<EventParticipationResponse> assignBatch(@PathVariable Long id, @Valid @RequestBody ParticipantBatchRequest request) {
 		return eventService.assignBatch(id, request.athleteIds()).stream().map(EventParticipationResponse::from).toList();
 	}
@@ -117,4 +118,15 @@ public class EventController {
 	public EventParticipationResponse migrateBrowserData(@PathVariable Long id, @PathVariable Long athleteId, @Valid @RequestBody BrowserDataRequest request) {
 		return EventParticipationResponse.from(eventService.migrateBrowserData(id, athleteId, request));
 	}
+    @GetMapping("/api/events/{id}/results")
+    public List<EventResultResponse> results(@PathVariable Long id) { return eventService.get(id).getResults().stream().map(EventResultResponse::from).toList(); }
+    @PostMapping("/api/events/{id}/results/bulk") @ResponseStatus(HttpStatus.CREATED)
+    public List<EventResultResponse> resultsBulk(@PathVariable Long id,@Valid @RequestBody com.flyingangels.backend.event.dto.ResultBatchRequest request) {
+        return eventService.addResults(id,request.results()).stream().map(EventResultResponse::from).toList();
+    }
+    @PutMapping("/api/events/{id}/results/bulk")
+    public List<EventResultResponse> updateResultsBulk(@PathVariable Long id,
+            @Valid @RequestBody com.flyingangels.backend.event.dto.ResultUpdateBatchRequest request) {
+        return eventService.updateResults(id,request.results()).stream().map(EventResultResponse::from).toList();
+    }
 }

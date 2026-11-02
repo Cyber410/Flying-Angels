@@ -32,9 +32,6 @@ An unknown ID rejects the whole batch. Responses contain the updated summaries.
 Imported duplicates stay archived; importing does not silently restore records.
 No live athlete was archived automatically as part of implementation.
 
-The running backend limitations register is [BACKEND_LIMITATIONS.md](BACKEND_LIMITATIONS.md).
-Keep its entries current as workarounds change or backend fixes become available.
-
 ## Import Athletes
 
 The user took ownership of Import on 2026-11-02. `/import` is enabled in the main
@@ -42,35 +39,29 @@ navigation. `ImportAthletesPage` provides Upload, Preview & validate, Confirm,
 and Summary. Its styles are scoped to `.import-*`; API calls live in
 `athleteImportService.ts` and use the existing Vite `/api` proxy.
 
-- `POST /api/athletes/import/preview`: multipart `file`; returns a SHA-256
-  fingerprint and row-level values, seed marks, warnings, errors, and VALID,
-  DUPLICATE, or ERROR status. It reads the database but never saves records.
-- `POST /api/athletes/import/confirm`: multipart `file`, `fingerprint`, repeated
-  `rows` integers; reparses the file and rechecks duplicates, then saves selected
-  valid new athletes and seed marks in one transaction. Returns actual imported,
-  duplicate, invalid, and unselected-valid counts with row outcomes. A changed
-  file requires preview again. Existing athletes/results are not overwritten.
-- The legacy immediate `/api/athletes/import` endpoint remains unchanged for
-  compatibility. The new UI does not use it.
+- `POST /api/athletes/import/preview`: multipart `file`; persists an import job
+  and returns `importId` and row-level NEW, UPDATE, UNCHANGED, DUPLICATE, INVALID,
+  or AMBIGUOUS classifications. No athlete records change during preview.
+- `POST /api/athletes/import/{importId}/commit`: JSON `{ rowNumbers: [...] }`;
+  rechecks selected rows and applies each in its own transaction. The screen
+  shows new records, updates, skipped rows, and failures separately. UPDATE rows
+  are explicitly labeled before confirmation. Blank cells preserve existing values.
+- Both preview/commit and immediate `/api/athletes/import` use the team's
+  shared `importing` module. The duplicate frontend-specific parser and workflow
+  have been removed to avoid conflicting route mappings and matching rules.
 
-Files: XLSX (first worksheet), UTF-8 comma CSV, or TSV, up to 5 MB, 5,000 data
-rows, and 128 columns. Legacy tab-separated `.csv` files are accepted. Headers
-must identify the first seven columns in the original order: First Name,
-Last Name, Note, FLY, FLYA, Date of Birth, Gender. Existing workbook header
-spellings are supported. Additional nonblank columns identify seed disciplines.
-Names are required. Missing DOB/gender produce warnings; nonblank invalid or
-future DOBs produce errors. Dates use YYYY-MM-DD or Excel date cells. Excel
-formulas must be replaced with values. Blank lines are ignored. CSV row numbers
-identify parsed records; XLSX numbers identify worksheet rows.
+Files: XLSX (first worksheet), UTF-8 comma CSV, or TSV, up to 10 MB and 10,000
+data rows. Legacy tab-separated `.csv` files are accepted. The sample uses
+First Name, Last Name, Note, FLY, FLYA, Date of Birth, Gender, followed by seed
+disciplines; the shared parser also recognizes headers in other orders.
+Names and valid past birth dates are required. Dates use YYYY-MM-DD or typed
+Excel date cells. Optional missing gender is allowed with a warning.
 
-Seed marks accept numeric seconds/metres, s/m/cm/min suffixes, or minutes:seconds.
-They normalize to numeric seconds/metres with at most four decimal places and
-the current score bounds. Known field events reject time units; known running
-events reject distance units. DNS/DNF/DQ are not invented numeric marks. Imported
-seeds remain unlinked historical records and do not create meet-event instances.
-Duplicate matching normalizes name/gender plus DOB; without DOB it also compares
-optional details and legacy seed marks. The first valid instance in a file wins.
-The model's note column is widened to 500 characters to match existing API rules.
+Seed marks remain unlinked historical records and never create meet-event
+instances. The shared parser preserves raw historical values and flags formats
+that cannot be normalized for review. Matching uses confirmed identifiers or
+name and DOB, with ambiguous identities blocked. See `docs/sprint2-api-updates.md`
+for the team's full import contract.
 
 Downloadable sample: `public/samples/athlete-import-sample.csv`. On the current
 roster it previews as 7 ready, 1 duplicate in the file, and 2 errors. The sample
@@ -263,13 +254,22 @@ The original meet and its four event definitions were preserved. Verified totals
 
 ## Checks
 
+Merge reconciliation with `origin/development` (2026-11-02): frontend production
+build and ESLint pass; 75 tests pass across 16 files, including three shared-import
+API adapter checks. A clean backend compile with Java 21 passes; no backend tests
+were run. Compilation reports a deprecation warning in `ApiExceptionHandler`.
+The reconciliation retains archive, shared notes, attempt IDs and retry keys,
+the team's bulk/result/import endpoints, and the persistent local MySQL volume.
+Legacy meet dates and missing result metadata are backfilled on MySQL startup.
+No containers or database were started or changed during this merge review.
+
 The user resumed test work on 2026-11-02. Frontend tests cover directory search,
 filters and pagination, bulk archive/restore/cancel/error paths, profiles and
 notes, meet CRUD and weekend ranges, result filtering and unit conversion,
 import preview/confirmation, navigation, and API services. External services are
 mocked; frontend tests do not alter the application database.
 
-Latest results after shared persistence: production build passed, ESLint passed,
+Earlier results after shared persistence: production build passed, ESLint passed,
 and all 72 frontend tests passed across 15 files. Added coverage for shared
 assignments, explicit attempt-ID editing, note load/save failures, participant
 grouping, and preservation/retry of migrated browser notes. Manual API checks used

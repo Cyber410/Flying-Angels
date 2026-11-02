@@ -2,6 +2,8 @@ package com.flyingangels.backend.event;
 
 import com.flyingangels.backend.athlete.Athlete;
 import jakarta.persistence.Column;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.EnumType;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
@@ -50,17 +52,31 @@ public class EventResult {
 
 	public void setClientId(String clientId) { this.clientId = clientId; }
 
+    @Enumerated(EnumType.STRING) private ResultUnit unit;
+    @Enumerated(EnumType.STRING) private ResultStatus status;
+    private java.time.Instant recordedAt;
+    private String source;
+
 	public EventResult(Event event, EventCategory category, Athlete athlete, String result, BigDecimal score) {
 		this.event = event;
 		this.category = category;
 		this.athlete = athlete;
 		this.result = result == null ? null : result.trim();
 		this.score = score;
+        this.unit = category.getUnit();
+        this.status = result == null ? ResultStatus.PENDING : ResultValues.status(result);
+        this.recordedAt = java.time.Instant.now();
+        this.source = event == null ? "LEGACY_IMPORT" : "MANUAL";
 	}
+
+    public void setMeasurement(ResultUnit unit, ResultStatus status) { this.unit=unit; this.status=status; }
 
 	public void update(Athlete athlete, String result, BigDecimal score) {
 		this.athlete = athlete;
 		this.result = result == null ? null : result.trim();
 		this.score = score;
+        this.unit = category.getUnit();
+        this.status = result == null ? ResultStatus.PENDING : ResultValues.status(result);
+
 	}
 }

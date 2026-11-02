@@ -16,6 +16,7 @@ public class MeetService {
 
 	private final MeetRepository repository;
 	private final EventRepository eventRepository;
+    private final com.flyingangels.backend.note.AthleteNoteRepository noteRepository;
 
 	@Transactional(readOnly = true)
 	public List<Meet> list() {
@@ -44,13 +45,15 @@ public class MeetService {
 	@Transactional
 	public Meet update(Long id, MeetRequest request) {
 		Meet meet = get(id);
-		meet.updateFrom(request);
+		if (!request.isDateRangeValid() || meet.getEvents().stream().anyMatch(e->e.getEventDate().isBefore(request.effectiveStartDate()) || e.getEventDate().isAfter(request.effectiveEndDate())))
+            throw new IllegalArgumentException("Meet dates must include all existing events");
+        meet.updateFrom(request);
 		return repository.save(meet);
 	}
 
 	@Transactional
 	public void delete(Long id) {
-		repository.delete(get(id));
+		var meet=get(id); meet.getEvents().forEach(e->noteRepository.detachEvent(e.getId())); repository.delete(meet);
 	}
 
 	public static class MeetNotFoundException extends RuntimeException {

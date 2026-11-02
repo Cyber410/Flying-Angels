@@ -9,7 +9,11 @@ import java.util.List;
 import java.util.Optional;
 import java.time.LocalDate;
 
-public interface AthleteRepository extends JpaRepository<Athlete, Long> {
+public interface AthleteRepository extends JpaRepository<Athlete, Long>, org.springframework.data.jpa.repository.JpaSpecificationExecutor<Athlete> {
+
+    @Override
+    @EntityGraph(attributePaths = "events")
+    List<Athlete> findAll(org.springframework.data.jpa.domain.Specification<Athlete> specification, org.springframework.data.domain.Sort sort);
 
 	@EntityGraph(attributePaths = "events")
 	@Query("""
@@ -25,14 +29,10 @@ public interface AthleteRepository extends JpaRepository<Athlete, Long> {
 	@EntityGraph(attributePaths = "events")
 	Optional<Athlete> findById(Long id);
 
-	boolean existsByImportKey(String importKey);
-
-	Optional<Athlete> findByImportKey(String importKey);
 
 	List<Athlete> findByFirstNameIgnoreCaseAndLastNameIgnoreCaseAndDateOfBirthAndGenderIgnoreCase(
 			String firstName, String lastName, LocalDate dateOfBirth, String gender);
 
-	@EntityGraph(attributePaths = "events")
-	List<Athlete> findByFirstNameIgnoreCaseAndLastNameIgnoreCaseAndDateOfBirthIsNullAndGenderIgnoreCase(
-			String firstName, String lastName, String gender);
+    Optional<Athlete> findByExternalSourceAndExternalId(String externalSource,String externalId);
+    List<Athlete> findByFirstNameIgnoreCaseAndLastNameIgnoreCase(String firstName,String lastName);
 }

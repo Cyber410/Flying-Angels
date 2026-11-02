@@ -7,7 +7,7 @@ import { confirmAthleteImport, previewAthleteImport } from "../services/athleteI
 import type { ImportPreview } from "../types/athleteImport";
 
 vi.mock("../services/athleteImportService");
-const preview: ImportPreview={filename:"sample.csv",fingerprint:"hash",validCount:1,duplicateCount:1,errorCount:1,rows:[
+const preview: ImportPreview={filename:"sample.csv",importId:"job-1",validCount:1,duplicateCount:1,errorCount:1,rows:[
   {rowNumber:2,firstName:"New",lastName:"Runner",dateOfBirth:"2012-01-01",gender:"Female",flyStatus:"Active",flyaStatus:"",note:"",seedMarks:[],status:"VALID",errors:[],warnings:[]},
   {rowNumber:3,firstName:"Existing",lastName:"Runner",dateOfBirth:"2012-01-01",gender:"Male",flyStatus:"",flyaStatus:"",note:"",seedMarks:[],status:"DUPLICATE",errors:[],warnings:["Already exists."]},
   {rowNumber:4,firstName:"",lastName:"Runner",dateOfBirth:"",gender:"",flyStatus:"",flyaStatus:"",note:"",seedMarks:[],status:"ERROR",errors:["First name is required."],warnings:[]},
@@ -29,7 +29,7 @@ describe("Import Athletes",()=>{
     await user.click(screen.getByRole("button",{name:"Review 1 selected"}));expect(confirmAthleteImport).not.toHaveBeenCalled();
     await user.click(screen.getByRole("button",{name:"Import 1 athletes"}));
     expect(await screen.findByText("Import complete")).toBeInTheDocument();
-    expect(confirmAthleteImport).toHaveBeenCalledWith(expect.any(File),"hash",[2]);
+    expect(confirmAthleteImport).toHaveBeenCalledWith("job-1",[2]);
     expect(screen.getByText("1 athletes and 0 unlinked seed marks added.")).toBeInTheDocument();
   });
   it("blocks confirmation when all valid rows are deselected",async()=>{

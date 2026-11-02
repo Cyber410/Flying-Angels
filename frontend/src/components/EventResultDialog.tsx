@@ -1,7 +1,7 @@
-import { useId, useRef, useState } from "react";
+// Converts result units and saves or edits each attempt through the shared API.
+import { useId, useState } from "react";
 import type { FormEvent } from "react";
-import { createParticipantResult, saveParticipantResult } from "../services/eventService";
-import { commitResultAttempts, discardStagedResultAttempts, stageResultAttempts } from "../services/eventAttemptStore";
+import { createParticipantResult, updateEventAttempt } from "../services/eventService";
 import { bestResultAttempt, convertResultEntry, eventResultUnit, parseResultEntry, resultEntryForAttempt, resultEntryUnits } from "../utils/eventResult";
 import type { ResultEntryUnit } from "../utils/eventResult";
 import type { EventParticipant, EventResult, MeetEvent, ResultAttempt } from "../types/event";
@@ -22,7 +22,6 @@ export default function EventResultDialog({ event, participant, attempts, editin
   const units = resultEntryUnits(event);
   const [entry, setEntry] = useState(() => resultEntryForAttempt(event, editingAttempt));
   const [attemptId] = useState(() => editingAttempt?.id ?? crypto.randomUUID());
-  const sharedParticipant = useRef(participant);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState("");
   const preview = parseResultEntry(entry, event);
@@ -33,11 +32,13 @@ export default function EventResultDialog({ event, participant, attempts, editin
     : entry.unit === "cm" ? "Enter centimetres, such as 520 for a 5.20-metre jump."
     : "Enter the distance or height in metres, such as 5.20.";
 
+  // Updates one result-entry field and clears the previous validation error.
   function updateValue(field: "value" | "hours" | "minutes" | "seconds", value: string) {
     setEntry((current) => ({ ...current, [field]: value }));
     setError("");
   }
 
+  // Converts valid input before switching the result unit.
   function changeUnit(unit: ResultEntryUnit) {
     const hasValue = [entry.value, entry.hours, entry.minutes, entry.seconds].some((value) => value.trim());
     if (hasValue && !preview) {
@@ -60,41 +61,20 @@ export default function EventResultDialog({ event, participant, attempts, editin
         : "Enter a non-negative number in the selected unit, such as 12.45. Very large values cannot be saved.");
       return;
     }
-    const attempt: ResultAttempt = { id: attemptId, ...parsed };
-    const nextAttempts = attempts.some((item) => item.id === attemptId)
-      ? attempts.map((item) => item.id === attemptId ? attempt : item)
-      : [...attempts, attempt];
-    const best = bestResultAttempt(nextAttempts, event.rankingOrder)!;
-    setIsSaving(true);
-    setError("");
-    let saved: EventResult | undefined;
+    setIsSaving(true); setError("");
     try {
-      stageResultAttempts(event.id, participant.athleteId, nextAttempts);
-      const current = sharedParticipant.current;
-      if (current.resultId === null) {
-        saved = await createParticipantResult(event.id, current.athleteId, best.result, best.score);
-      } else if (current.result !== best.result || current.score !== best.score) {
-        saved = await saveParticipantResult(event.id, current.athleteId, best.result, best.score);
-      } else {
-        saved = current;
-      }
-      // Keep the server ID if local storage fails after a successful first POST.
-      sharedParticipant.current = saved;
-      commitResultAttempts(event.id, participant.athleteId, nextAttempts);
-      onSaved(saved, nextAttempts);
+      const saved = editingAttempt
+        ? await updateEventAttempt(event.id, Number(editingAttempt.id), participant.athleteId, parsed.result, parsed.score)
+        : await createParticipantResult(event.id, participant.athleteId, parsed.result, parsed.score, attemptId);
+      const attempt: ResultAttempt = { id: String(saved.resultId), result: saved.result!, score: saved.score! };
+      const nextAttempts = editingAttempt
+        ? attempts.map(item => item.id === editingAttempt.id ? attempt : item)
+        : [...attempts.filter(item => item.id !== attempt.id), attempt];
+      const best = bestResultAttempt(nextAttempts, event.rankingOrder)!;
+      onSaved({ ...saved, resultId: Number(best.id), result: best.result, score: best.score }, nextAttempts);
       onClose();
-    } catch (error) {
-      if (saved) {
-        const warning = "The best result is saved to the shared meet, but the full attempt history could not be saved in this browser. Retry before closing this dialog.";
-        onSaved(saved, nextAttempts, warning);
-        setError(warning);
-      } else {
-        discardStagedResultAttempts(event.id, participant.athleteId);
-        setError(error instanceof Error ? error.message : "Unable to save result.");
-      }
-    } finally {
-      setIsSaving(false);
-    }
+    } catch (error) { setError(error instanceof Error ? error.message : "Unable to save result."); }
+    finally { setIsSaving(false); }
   }
 
   return (
@@ -142,8 +122,7 @@ export default function EventResultDialog({ event, participant, attempts, editin
             {(entry.unit === "min" || clockEntry || entry.unit === "cm") && <> · {preview.score.toLocaleString("en-CA", { maximumFractionDigits: 4 })} {baseUnit === "s" ? "seconds" : "metres"}</>}
           </p>
         )}
-        <p className="meet-notes-notice">All attempts are saved in this browser. Only the best result is shared with teammates. {event.rankingOrder === "ASC" ? "The lowest value is best." : "The highest value is best."}</p>
-        {participant.resultId === null && <p className="meet-form-help">Saving this result also saves the athlete's assignment to the shared meet.</p>}
+        <p className="meet-form-help">Every attempt is saved to the academy database. {event.rankingOrder === "ASC" ? "The lowest value is best." : "The highest value is best."}</p>
         {error && <p className="meet-dialog-error" role="alert">{error}</p>}
         <div className="meet-dialog-actions">
           <button className="meets-button" type="button" disabled={isSaving} onClick={onClose}>Cancel</button>

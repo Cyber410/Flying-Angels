@@ -1,3 +1,4 @@
+// Filters meet-linked performances and switches between best results and all saved attempts.
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import Header from "../components/header";
@@ -27,6 +28,7 @@ function ResultsOverviewContent({ sample }: { sample: boolean }) {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
+  // Fetch shared results; abort work when the user leaves this view.
   useEffect(() => {
     if (sample) return;
     const controller = new AbortController();
@@ -41,6 +43,7 @@ function ResultsOverviewContent({ sample }: { sample: boolean }) {
     return () => { ignore = true; controller.abort(); };
   }, [sample, revision]);
 
+  // Apply filters before slicing the visible page.
   const rows = (view === "best" ? data?.sharedResults : data?.allAttempts) ?? [];
   const query = search.trim().toLowerCase();
   const filtered = rows.filter((row) =>
@@ -65,6 +68,7 @@ function ResultsOverviewContent({ sample }: { sample: boolean }) {
   const athleteCount = new Set(filtered.map((row) => row.athleteId)).size;
   const meetCount = new Set(filtered.map((row) => row.meetId)).size;
 
+  // Resets filter fields and returns pagination to its first page.
   function clearFilters() {
     setSearch("");
     setCategoryId("");
@@ -75,6 +79,7 @@ function ResultsOverviewContent({ sample }: { sample: boolean }) {
     setPage(1);
   }
 
+  // Retries loading data without changing saved records.
   function refresh() {
     setError("");
     setIsLoading(true);
@@ -112,7 +117,7 @@ function ResultsOverviewContent({ sample }: { sample: boolean }) {
                 onChange={(change) => { setView(change.target.value as "best" | "attempts"); setPage(1); }}
               >
                 <option value="best">Shared best results</option>
-                <option value="attempts">All attempts in this browser</option>
+                <option value="attempts">All attempts</option>
               </select>
             </label>
             {!sample && <button className="meets-button" type="button" disabled={isLoading} onClick={refresh}>Refresh</button>}
@@ -153,7 +158,7 @@ function ResultsOverviewContent({ sample }: { sample: boolean }) {
           <p className="results-scope-note">
             {view === "best"
               ? "Showing each athlete's shared best result per event."
-              : "Full attempt history is available only in the browser where it was recorded. Browser-only attempts are labeled below."}
+              : "Showing all recorded attempts saved to the academy database."}
             {" Age groups use age on the event date. Only recorded performances linked to a meet are shown."}
           </p>
 
@@ -204,7 +209,7 @@ function ResultsOverviewContent({ sample }: { sample: boolean }) {
                         <td>{row.ageGroup}</td><td>{row.gender}</td>
                         <td className="results-result-cell">
                           <span className="results-value">{row.result}</span>
-                          {view === "attempts" && <small className={row.source === "browser" ? "results-browser-label" : "results-shared-label"}>{sample ? "Sample" : row.source === "browser" ? "Browser only" : "Shared best"}</small>}
+                          {view === "attempts" && <small className="results-shared-label">{sample ? "Sample" : "Saved attempt"}</small>}
                         </td>
                       </tr>
                     ))}

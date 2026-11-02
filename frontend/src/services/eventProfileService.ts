@@ -1,3 +1,4 @@
+// Loads event profiles in bounded batches and retains partial-failure details.
 import { getEventProfile } from "./eventService";
 import type { EventProfile, FailedEventProfile, MeetEvent } from "../types/event";
 

@@ -1,3 +1,4 @@
+// Searches meet date ranges and opens create, edit, and delete dialogs.
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import Header from "../components/header";
@@ -6,21 +7,13 @@ import MeetFormDialog from "../components/MeetFormDialog";
 import { createMeet, deleteMeet, getMeets, updateMeet } from "../services/meetService";
 import type { Meet, MeetRequest } from "../types/meet";
 import "./MeetsListPage.css";
+import { formatMeetDates } from "../utils/meetDate";
 
 type ActiveDialog =
   | { type: "create" }
   | { type: "edit"; meet: Meet }
   | { type: "delete"; meet: Meet }
   | null;
-
-const dateFormatter = new Intl.DateTimeFormat("en-CA", {
-  month: "short", day: "numeric", year: "numeric",
-});
-
-function formatDate(date: string) {
-  // LocalDate values must not shift to the previous day in Toronto.
-  return dateFormatter.format(new Date(`${date}T00:00:00`));
-}
 
 export default function MeetsListPage() {
   const [meets, setMeets] = useState<Meet[]>([]);
@@ -37,6 +30,7 @@ export default function MeetsListPage() {
   const [deleteError, setDeleteError] = useState("");
   const [feedback, setFeedback] = useState("");
 
+  // Load meet summaries and ignore results after navigation.
   useEffect(() => {
     let ignore = false;
     getMeets().then((data) => {
@@ -53,12 +47,13 @@ export default function MeetsListPage() {
     return () => { ignore = true; };
   }, [loadVersion]);
 
+  // Include meets that overlap the requested date window.
   const invalidDateRange = Boolean(fromDate && toDate && fromDate > toDate);
   const query = search.trim().toLowerCase();
   const filteredMeets = meets.filter((meet) =>
     !invalidDateRange &&
     (!query || `${meet.name} ${meet.location ?? ""}`.toLowerCase().includes(query)) &&
-    (!fromDate || meet.meetDate >= fromDate) &&
+    (!fromDate || (meet.endDate || meet.meetDate) >= fromDate) &&
     (!toDate || meet.meetDate <= toDate)
   ).sort((a, b) => b.meetDate.localeCompare(a.meetDate) || a.name.localeCompare(b.name));
   const totalPages = Math.max(1, Math.ceil(filteredMeets.length / pageSize));
@@ -67,6 +62,7 @@ export default function MeetsListPage() {
   const visibleMeets = filteredMeets.slice(startIndex, startIndex + pageSize);
   const hasFilters = Boolean(search || fromDate || toDate);
 
+  // Resets filter fields and returns pagination to its first page.
   function clearFilters() {
     setSearch("");
     setFromDate("");
@@ -204,7 +200,7 @@ export default function MeetsListPage() {
                     {visibleMeets.map((meet) => (
                       <tr key={meet.id}>
                         <th scope="row"><Link className="meets-name-link" to={`/meets/${meet.id}`}>{meet.name}</Link></th>
-                        <td><time dateTime={meet.meetDate}>{formatDate(meet.meetDate)}</time></td>
+                        <td><time dateTime={meet.meetDate}>{formatMeetDates(meet.meetDate, meet.endDate)}</time></td>
                         <td>{meet.location || "—"}</td>
                         <td>{meet.eventCount}</td>
                         <td>

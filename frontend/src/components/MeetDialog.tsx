@@ -1,3 +1,4 @@
+// Reusable native modal with keyboard dismissal and busy-state protection.
 import { useEffect, useId, useRef } from "react";
 import type { ReactNode } from "react";
 import "./MeetDialog.css";

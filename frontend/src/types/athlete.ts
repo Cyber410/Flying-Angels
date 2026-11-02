@@ -1,3 +1,4 @@
+// Athlete API records, archive status, and editable request fields.
 export type AthleteEvent = {
   resultId: number;
   athleteId: number;
@@ -11,6 +12,7 @@ export type AthleteEvent = {
 
 export type Athlete = {
   id: number;
+  archived?: boolean;
   firstName: string;
   lastName: string;
   dateOfBirth: string | null;

@@ -1,3 +1,4 @@
+// Consistent gender labels and age groups derived from the performance date.
 export function displayGender(value: string | null | undefined): string {
   const normalized = value?.trim().toLowerCase();
   if (!normalized) return "Not provided";

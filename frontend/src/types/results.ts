@@ -1,3 +1,4 @@
+// Joined result rows, filtering metadata, and partial-load warnings.
 import type { FailedEventProfile, MeetEvent } from "./event";
 
 export type OverviewResult = {
@@ -16,7 +17,7 @@ export type OverviewResult = {
   eventDate: string;
   result: string;
   score: number | null;
-  source: "shared" | "browser";
+  source: "shared";
 };
 
 export type ResultsOverview = {

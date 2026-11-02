@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+﻿import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -54,6 +54,25 @@ async function loadedPage() {
 }
 
 describe("Meets List", () => {
+  it("includes a weekend meet when the filter matches its second day", async () => {
+    vi.mocked(getMeets).mockResolvedValue([{...fall,endDate:"2026-10-25"}]);
+    await loadedPage();
+    fireEvent.change(screen.getByLabelText("From date"),{target:{value:"2026-10-25"}});
+    fireEvent.change(screen.getByLabelText("To date"),{target:{value:"2026-10-25"}});
+    expect(screen.getByRole("rowheader",{name:fall.name})).toBeInTheDocument();
+    expect(screen.getByText("Oct 24, 2026 – Oct 25, 2026")).toBeInTheDocument();
+  });
+  it("creates a multi-day meet with its selected end date", async () => {
+    const user=userEvent.setup();await loadedPage();
+    vi.mocked(createMeet).mockResolvedValue({...fall,id:4,name:"Weekend Meet",endDate:"2026-10-25"});
+    await user.click(screen.getByRole("button",{name:"+ New Meet"}));
+    await user.type(screen.getByLabelText("Meet name"),"Weekend Meet");
+    fireEvent.change(screen.getByLabelText("Start date"),{target:{value:"2026-10-24"}});
+    fireEvent.change(screen.getByLabelText(/End date/),{target:{value:"2026-10-25"}});
+    await user.click(screen.getByRole("button",{name:"Create Meet"}));
+    await screen.findByRole("rowheader",{name:"Weekend Meet"});
+    expect(createMeet).toHaveBeenCalledWith(expect.objectContaining({meetDate:"2026-10-24",endDate:"2026-10-25"}));
+  });
   it("shows loading then renders real fields in date-descending order", async () => {
     renderPage();
     expect(screen.getByText("Loading meets...")).toBeInTheDocument();
@@ -152,11 +171,11 @@ describe("Meets List", () => {
     await user.click(screen.getByRole("button", { name: "+ New Meet" }));
     const dialog = screen.getByRole("dialog", { name: "New Meet" });
     await user.type(within(dialog).getByLabelText("Meet name"), "  Winter Open  ");
-    fireEvent.change(within(dialog).getByLabelText("Meet date"), { target: { value: "2026-12-01" } });
+    fireEvent.change(within(dialog).getByLabelText("Start date"), { target: { value: "2026-12-01" } });
     await user.click(within(dialog).getByRole("button", { name: "Create Meet" }));
     await screen.findByRole("rowheader", { name: "Winter Open" });
     expect(createMeet).toHaveBeenCalledWith({
-      name: "Winter Open", meetDate: "2026-12-01", location: null, externalUrl: null,
+      name: "Winter Open", meetDate: "2026-12-01", endDate: null, location: null, externalUrl: null,
     });
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
@@ -167,7 +186,7 @@ describe("Meets List", () => {
     await loadedPage();
     await user.click(screen.getByRole("button", { name: "+ New Meet" }));
     await user.type(screen.getByLabelText("Meet name"), "Winter Open");
-    fireEvent.change(screen.getByLabelText("Meet date"), { target: { value: "2026-12-01" } });
+    fireEvent.change(screen.getByLabelText("Start date"), { target: { value: "2026-12-01" } });
     await user.click(screen.getByRole("button", { name: "Create Meet" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("Meet date is required");
     expect(screen.getByLabelText("Meet name")).toHaveValue("Winter Open");
@@ -179,7 +198,7 @@ describe("Meets List", () => {
     await loadedPage();
     await user.click(screen.getByRole("button", { name: "+ New Meet" }));
     await user.type(screen.getByLabelText("Meet name"), "   ");
-    fireEvent.change(screen.getByLabelText("Meet date"), { target: { value: "2026-12-01" } });
+    fireEvent.change(screen.getByLabelText("Start date"), { target: { value: "2026-12-01" } });
     await user.click(screen.getByRole("button", { name: "Create Meet" }));
     expect(screen.getByRole("alert")).toHaveTextContent("Meet name is required.");
     expect(createMeet).not.toHaveBeenCalled();
@@ -190,14 +209,14 @@ describe("Meets List", () => {
     vi.mocked(updateMeet).mockResolvedValue({ ...summer, name: "Summer Open" });
     await loadedPage();
     await user.click(screen.getByRole("button", { name: `Edit ${summer.name}` }));
-    expect(screen.getByLabelText("Meet date")).toHaveValue(summer.meetDate);
+    expect(screen.getByLabelText("Start date")).toHaveValue(summer.meetDate);
     expect(screen.getByLabelText("Website (optional)")).toHaveValue(summer.externalUrl);
     await user.clear(screen.getByLabelText("Meet name"));
     await user.type(screen.getByLabelText("Meet name"), "Summer Open");
     await user.click(screen.getByRole("button", { name: "Save Changes" }));
     await screen.findByRole("rowheader", { name: "Summer Open" });
     expect(updateMeet).toHaveBeenCalledWith(summer.id, {
-      name: "Summer Open", meetDate: summer.meetDate,
+      name: "Summer Open", meetDate: summer.meetDate, endDate: null,
       location: summer.location, externalUrl: summer.externalUrl,
     });
     expect(screen.getByRole("rowheader", { name: fall.name })).toBeInTheDocument();
@@ -241,7 +260,7 @@ describe("Meets List", () => {
     await loadedPage();
     await user.click(screen.getByRole("button", { name: "+ New Meet" }));
     await user.type(screen.getByLabelText("Meet name"), "Winter Open");
-    fireEvent.change(screen.getByLabelText("Meet date"), { target: { value: "2026-12-01" } });
+    fireEvent.change(screen.getByLabelText("Start date"), { target: { value: "2026-12-01" } });
     await user.click(screen.getByRole("button", { name: "Create Meet" }));
     expect(screen.getByRole("button", { name: "Saving..." })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Cancel" })).toBeDisabled();

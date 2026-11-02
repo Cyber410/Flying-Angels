@@ -7,12 +7,12 @@ import java.time.LocalDate;
 
 public record EventResponse(Long id, String name, LocalDate eventDate, String location, String eventType,
 		String externalUrl, Long meetId, String meetName, EventCategoryResponse category,
-		RankingOrder rankingOrder, int participantCount) {
+		RankingOrder rankingOrder, int participantCount, String note) {
 
 	public static EventResponse from(Event event) {
 		return new EventResponse(event.getId(), event.getName(), event.getEventDate(), event.getLocation(),
 				event.getEventType(), event.getExternalUrl(), event.getMeet().getId(), event.getMeet().getName(),
 				EventCategoryResponse.from(event.getCategory()),
-				event.getRankingOrder(), event.getResults().size());
+				event.getRankingOrder(), event.getParticipations().size(), event.getNote() == null ? "" : event.getNote());
 	}
 }

@@ -1,8 +1,9 @@
+// Selects active athletes and persists shared assignments before results are recorded.
 import { useEffect, useState } from "react";
 import { getAthletes } from "../services/athleteService";
-import { saveBrowserAssignment } from "../services/eventAssignmentStore";
+import { assignEventAthletes } from "../services/eventService";
 import type { Athlete } from "../types/athlete";
-import type { BrowserEventAssignment, EventParticipant, MeetEvent } from "../types/event";
+import type { EventParticipant, MeetEvent } from "../types/event";
 import MeetDialog from "./MeetDialog";
 
 type Props = {
@@ -22,6 +23,7 @@ export default function AssignAthletesDialog({ event, assignedIds, onAssigned, o
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
 
+  // Only active athletes are offered for new assignments.
   useEffect(() => {
     let ignore = false;
     getAthletes().then((data) => {
@@ -34,40 +36,30 @@ export default function AssignAthletesDialog({ event, assignedIds, onAssigned, o
     return () => { ignore = true; };
   }, [revision]);
 
-  const available = athletes.filter((athlete) => !assignedIds.includes(athlete.id));
+  const available = athletes.filter((athlete) => !athlete.archived && !assignedIds.includes(athlete.id));
   const visible = available.filter((athlete) =>
     `${athlete.firstName} ${athlete.lastName}`.toLowerCase().includes(search.trim().toLowerCase())
   );
   const selectedAthletes = available.filter((athlete) => selected.includes(athlete.id));
 
-  function saveSelected() {
+  // Persist the entire selection atomically before closing the dialog.
+  async function saveSelected() {
     if (isSaving || selectedAthletes.length === 0) return;
-    setIsSaving(true);
-    setSaveError("");
-    const assigned: BrowserEventAssignment[] = [];
-    const failures: string[] = [];
-    for (const athlete of selectedAthletes) {
-      try {
-        assigned.push(saveBrowserAssignment(event, athlete));
-      } catch (error) {
-        failures.push(`${athlete.firstName} ${athlete.lastName}: ${error instanceof Error ? error.message : "Could not assign athlete."}`);
-      }
-    }
-    if (assigned.length) onAssigned(assigned);
-    setSelected((current) => current.filter((id) => !assigned.some((result) => result.athleteId === id)));
-    setIsSaving(false);
-    if (failures.length) {
-      setSaveError(`${assigned.length} of ${selectedAthletes.length} athletes saved in this browser. ${failures.join(" ")}`);
-    } else {
+    setIsSaving(true); setSaveError("");
+    try {
+      const assigned = await assignEventAthletes(event.id, selectedAthletes.map(athlete => athlete.id));
+      onAssigned(assigned.map(participant => ({ ...participant, resultId: null, result: null, score: null, attempts: [] })));
       onClose();
-    }
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : "Unable to assign athletes.");
+    } finally { setIsSaving(false); }
   }
 
   return (
     <MeetDialog title={`Assign Athletes to ${event.name}`} busy={isSaving} onClose={onClose}>
       <div className="meet-form">
         <p className="meet-dialog-message">Select athletes to add. Athletes already assigned to this event are excluded.</p>
-        <p className="meet-notes-notice">Assignments without results are saved only in this browser. Record an athlete's first result to save them to the shared meet. Teammates cannot see browser-only assignments, and clearing browser data removes them.</p>
+        <p className="meet-form-help">Assignments are saved to the academy database immediately. Results can be added later.</p>
         <label className="meet-form-field">
           Search athletes
           <input type="search" placeholder="Search athletes..." value={search} disabled={isSaving} onChange={(change) => setSearch(change.target.value)} />

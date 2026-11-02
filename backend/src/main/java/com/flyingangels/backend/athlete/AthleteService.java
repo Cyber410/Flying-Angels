@@ -19,7 +19,23 @@ public class AthleteService {
 
 	@Transactional(readOnly = true)
 	public List<Athlete> search(String search, String gender, String team) {
+		return searchIncludingArchived(search, gender, team).stream().filter(athlete -> !athlete.isArchived()).toList();
+	}
+
+	@Transactional(readOnly = true)
+	public List<Athlete> searchIncludingArchived(String search, String gender, String team) {
 		return repository.search(normalize(search), normalize(gender), normalize(team).toUpperCase());
+	}
+
+	@Transactional
+	public List<Athlete> setArchived(List<Long> ids, boolean archived) {
+		java.util.Set<Long> uniqueIds = new java.util.LinkedHashSet<>(ids);
+		List<Athlete> athletes = repository.findAllById(uniqueIds);
+		if (athletes.size() != uniqueIds.size()) {
+			throw new IllegalArgumentException("One or more athletes no longer exist. Refresh the directory and try again.");
+		}
+		athletes.forEach(athlete -> athlete.setArchived(archived));
+		return repository.saveAll(athletes);
 	}
 
 	@Transactional(readOnly = true)

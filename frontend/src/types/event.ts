@@ -1,3 +1,4 @@
+// Event, participant, result, and attempt data shared across meet screens.
 export type RankingOrder = "ASC" | "DESC";
 
 export type EventCategory = {
@@ -18,6 +19,7 @@ export type MeetEvent = {
   category: EventCategory;
   rankingOrder: RankingOrder;
   participantCount: number;
+  note?: string;
 };
 
 export type EventResult = {
@@ -31,14 +33,27 @@ export type EventResult = {
   score: number | null;
 };
 
-// A pending selection has no API result ID and no fabricated performance.
-export type BrowserEventAssignment = Omit<EventResult, "resultId" | "result" | "score"> & {
+// Saved participation can exist without any result attempt.
+export type PendingEventAssignment = Omit<EventResult, "resultId" | "result" | "score"> & {
   resultId: null;
   result: null;
   score: null;
 };
 
-export type EventParticipant = EventResult | BrowserEventAssignment;
+// Retained solely for reading data saved by the retired browser-only version.
+export type BrowserEventAssignment = PendingEventAssignment;
+
+export type EventParticipant = (EventResult | PendingEventAssignment) & {
+  participationId?: number;
+  note?: string;
+  attempts?: ResultAttempt[];
+};
+
+export type EventParticipation = {
+  participationId: number; athleteId: number; firstName: string; lastName: string;
+  eventId: number; eventName: string; meetId: number; meetName: string;
+  categoryId: number; categoryName: string; note: string;
+};
 
 export type ResultAttempt = {
   id: string;
@@ -49,6 +64,7 @@ export type ResultAttempt = {
 export type EventProfile = {
   event: MeetEvent;
   results: EventResult[];
+  participants?: EventParticipation[];
 };
 
 export type FailedEventProfile = {

@@ -1,3 +1,4 @@
+// Read-only legacy attempt reader used solely by explicit migration.
 import type { EventParticipant, ResultAttempt } from "../types/event";
 
 type AttemptHistory = { version: 1; attempts: ResultAttempt[] };
@@ -41,6 +42,7 @@ function readStagedHistory(key: string): StagedHistory | null {
   return { ...history, ready: raw.ready };
 }
 
+// Keeps the shared best result available without duplicating matching scores.
 export function includeSharedResult(attempts: ResultAttempt[], participant: EventParticipant): ResultAttempt[] {
   if (participant.result === null || participant.score === null) return attempts;
   const sharedScore = participant.score;
@@ -51,6 +53,7 @@ export function includeSharedResult(attempts: ResultAttempt[], participant: Even
   }];
 }
 
+// Combines valid local attempt history with the available shared result.
 export function getResultAttempts(eventId: number, participant: EventParticipant): ResultAttempt[] {
   // Sample results remain read-only and never access live attempt storage.
   if (eventId < 1) return includeSharedResult([], participant);
@@ -60,51 +63,6 @@ export function getResultAttempts(eventId: number, participant: EventParticipant
     const history = staged?.ready ? staged : readHistory(key);
     return includeSharedResult(history?.attempts ?? [], participant);
   } catch {
-    throw new Error("Attempt history could not be loaded from this browser. Existing data has not been overwritten.");
+    throw new Error("Saved attempt history could not be loaded. Existing records have not been overwritten.");
   }
-}
-
-// Stage before calling the API so unavailable/full storage cannot silently lose
-// additional attempts. Only committed history is displayed after a reload.
-export function stageResultAttempts(eventId: number, athleteId: number, attempts: ResultAttempt[]) {
-  try {
-    const key = historyKey(eventId, athleteId);
-    readHistory(key);
-    const previous = readStagedHistory(`${key}:staged`);
-    if (previous?.ready) {
-      localStorage.setItem(key, JSON.stringify({ version: 1, attempts: previous.attempts }));
-      localStorage.removeItem(`${key}:staged`);
-    }
-    const staged: StagedHistory = { version: 1, attempts, ready: false };
-    localStorage.setItem(`${key}:staged`, JSON.stringify(staged));
-  } catch {
-    throw new Error("Attempt history could not be saved in this browser. Check browser storage and try again.");
-  }
-}
-
-export function commitResultAttempts(eventId: number, athleteId: number, attempts: ResultAttempt[]) {
-  const key = historyKey(eventId, athleteId);
-  const staged: StagedHistory = { version: 1, attempts, ready: true };
-  localStorage.setItem(`${key}:staged`, JSON.stringify(staged));
-  try {
-    localStorage.setItem(key, JSON.stringify({ version: 1, attempts }));
-    localStorage.removeItem(`${key}:staged`);
-  } catch {
-    // The committed staging entry is a recoverable copy if compaction fails.
-  }
-}
-
-export function discardStagedResultAttempts(eventId: number, athleteId: number) {
-  try {
-    const key = historyKey(eventId, athleteId);
-    if (!readStagedHistory(`${key}:staged`)?.ready) localStorage.removeItem(`${key}:staged`);
-  } catch {
-    // Uncommitted staging entries are ignored; preserve the existing history.
-  }
-}
-
-export function removeResultAttempts(eventId: number, athleteId: number) {
-  const key = historyKey(eventId, athleteId);
-  localStorage.removeItem(`${key}:staged`);
-  localStorage.removeItem(key);
 }

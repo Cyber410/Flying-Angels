@@ -34,10 +34,10 @@ describe("shared navigation", () => {
     expect(screen.getByText("Athlete homepage")).toBeInTheDocument();
   });
 
-  it("shows Import as disabled without linking to an unfinished route", () => {
-    render(<MemoryRouter><Header /></MemoryRouter>);
+  it("links to the active Import page", () => {
+    render(<MemoryRouter initialEntries={["/import"]}><Header /></MemoryRouter>);
     const link = screen.getByRole("link", { name: "Import" });
-    expect(link).toHaveAttribute("aria-disabled", "true");
-    expect(link).not.toHaveAttribute("href");
+    expect(link).toHaveAttribute("href", "/import");
+    expect(link).toHaveAttribute("aria-current", "page");
   });
 });

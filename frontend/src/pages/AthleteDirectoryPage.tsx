@@ -1,11 +1,15 @@
-import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+// Searchable athlete table with creation, pagination, and bulk archive/restore.
+import { useEffect, useRef, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import Header from "../components/header";
+import MeetDialog from "../components/MeetDialog";
 import type { Athlete } from "../types/athlete";
 import {
   createAthlete,
+  deleteAthlete,
   getAthleteById,
   getAthletes,
+  setAthletesArchived,
 } from "../services/athleteService";
 import "./AthleteDirectoryPage.css";
 
@@ -29,7 +33,7 @@ const EVENT_OPTIONS = [
   "SHOT PUT",
 ];
 
-const ATHLETES_PER_PAGE = 10;
+
 
 function calculateAge(dateOfBirth: string) {
   const today = new Date();
@@ -93,6 +97,22 @@ function AthleteDirectoryPage() {
   const [searchTerm, setSearchTerm] =
     useState("");
 
+  const [pageSize, setPageSize] = useState(10);
+  const [genderFilter, setGenderFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState<Athlete | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
+
+  // Selection survives pagination and filtering; switching archive views clears it.
+  const [archiveView, setArchiveView] = useState<"active" | "archived">("active");
+  const [selectedAthleteIds, setSelectedAthleteIds] = useState<number[]>([]);
+  const [archiveDialogOpen, setArchiveDialogOpen] = useState(false);
+  const [isArchiving, setIsArchiving] = useState(false);
+  const [archiveError, setArchiveError] = useState("");
+  const [archiveFeedback, setArchiveFeedback] = useState("");
+  const selectPageRef = useRef<HTMLInputElement>(null);
+
   const [currentPage, setCurrentPage] =
     useState(1);
 
@@ -100,8 +120,7 @@ function AthleteDirectoryPage() {
      FILTERS
      ================================================== */
 
-  const [filtersOpen, setFiltersOpen] =
-    useState(false);
+
 
   const [ageDropdownOpen, setAgeDropdownOpen] =
     useState(false);
@@ -314,7 +333,7 @@ function AthleteDirectoryPage() {
         setLoadError("");
 
         const data =
-          await getAthletes();
+          await getAthletes("all");
 
         setAthletes(data);
       } catch (error) {
@@ -432,15 +451,9 @@ const toggleEventFilter = (
 
   setCurrentPage(1);
 };
-const clearFilters = () => {
-  setSelectedAgeGroups([]);
-  setSelectedEventFilters([]);
-  setAgeDropdownOpen(false);
-  setEventFilterDropdownOpen(false);
-  setCurrentPage(1);
-};
-
 const clearAll = () => {
+  setGenderFilter("");
+  setStatusFilter("");
   setSearchTerm("");
   setSelectedAgeGroups([]);
   setSelectedEventFilters([]);
@@ -612,9 +625,12 @@ const clearAll = () => {
         );
 
       return (
+        Boolean(athlete.archived) === (archiveView === "archived") &&
         matchesSearch &&
         matchesAgeGroup &&
-        matchesEvent
+        matchesEvent &&
+        (!genderFilter || athlete.gender?.trim().toLowerCase() === genderFilter) &&
+        (!statusFilter || [athlete.flyStatus, athlete.flyaStatus].some(status => status?.trim().toLowerCase() === statusFilter))
       );
     });
 
@@ -624,15 +640,15 @@ const clearAll = () => {
 
   const totalPages = Math.ceil(
     filteredAthletes.length /
-      ATHLETES_PER_PAGE
+      pageSize
   );
 
   const startIndex =
     (currentPage - 1) *
-    ATHLETES_PER_PAGE;
+    pageSize;
 
   const endIndex =
-    startIndex + ATHLETES_PER_PAGE;
+    startIndex + pageSize;
 
   const paginatedAthletes =
     filteredAthletes.slice(
@@ -643,11 +659,31 @@ const clearAll = () => {
   const hasActiveFilters =
     searchTerm.trim() !== "" ||
     selectedAgeGroups.length > 0 ||
-    selectedEventFilters.length > 0;
+    selectedEventFilters.length > 0 || genderFilter !== "" || statusFilter !== "";
 
-  const activeFilterCount =
-    selectedAgeGroups.length +
-    selectedEventFilters.length;
+  const pageSelectedCount = paginatedAthletes.filter(athlete => selectedAthleteIds.includes(athlete.id)).length;
+  const selectedAthletes = athletes.filter(athlete => selectedAthleteIds.includes(athlete.id));
+  const activeCount = athletes.filter(athlete => !athlete.archived).length;
+  const archivedCount = athletes.length - activeCount;
+
+  useEffect(() => {
+    if (selectPageRef.current) selectPageRef.current.indeterminate = pageSelectedCount > 0 && pageSelectedCount < paginatedAthletes.length;
+  }, [pageSelectedCount, paginatedAthletes.length]);
+
+  async function applyArchiveSelection() {
+    if (isArchiving || !selectedAthletes.length) return;
+    setIsArchiving(true); setArchiveError("");
+    try {
+      const updated = await setAthletesArchived(selectedAthletes.map(athlete => athlete.id), archiveView === "active");
+      const updatedById = new Map(updated.map(athlete => [athlete.id, athlete]));
+      setAthletes(current => current.map(athlete => updatedById.get(athlete.id) ?? athlete));
+      setArchiveFeedback(`${updated.length} athlete${updated.length === 1 ? "" : "s"} ${archiveView === "active" ? "archived" : "restored to the active directory"}.`);
+      setSelectedAthleteIds([]); setCurrentPage(1); setArchiveDialogOpen(false);
+    } catch (error) { setArchiveError(error instanceof Error ? error.message : "Unable to update the archive."); }
+    finally { setIsArchiving(false); }
+  }
+
+
 
   return (
     <div className="directory-page">
@@ -664,16 +700,25 @@ const clearAll = () => {
         </section>
 
         <section className="directory-panel">
+          {/* Archive view and feedback are separate from membership/search filters. */}
+          <div className="directory-view-switch" role="group" aria-label="Directory view">
+            {(["active", "archived"] as const).map(view => <button type="button" key={view} aria-pressed={archiveView === view} onClick={() => { setArchiveView(view); setSelectedAthleteIds([]); setCurrentPage(1); setArchiveFeedback(""); }}>
+              {view === "active" ? "Active athletes" : "Archived athletes"} <span>{isLoading ? "…" : view === "active" ? activeCount : archivedCount}</span>
+            </button>)}
+          </div>
+          {archiveView === "archived" && <p className="directory-archive-help">Archived athletes keep their profiles, results, and notes. Restore them when they should return to the active directory.</p>}
+          {archiveFeedback && <p className="directory-archive-feedback" role="status">{archiveFeedback}</p>}
           <div className="directory-toolbar">
             <div className="search-wrapper">
-              <span className="search-icon">
-                ⌕
+              <span className="search-icon" aria-hidden="true">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="10.5" cy="10.5" r="6.5" /><path d="m16 16 5 5" /></svg>
               </span>
 
               <input
                 type="text"
                 className="search-input"
                 placeholder="Search by athlete name..."
+                aria-label="Search athletes by name"
                 value={searchTerm}
                onChange={(event) => {
   setSearchTerm(
@@ -683,44 +728,6 @@ const clearAll = () => {
 }}
               />
             </div>
-
-            <button
-              className="filter-button"
-              type="button"
-              onClick={() => {
-                const willOpen =
-                  !filtersOpen;
-
-                setFiltersOpen(
-                  willOpen
-                );
-
-                if (willOpen) {
-                  void loadAthleteEvents();
-                }
-              }}
-            >
-              <span>
-                Filters
-
-                {activeFilterCount >
-                  0 && (
-                  <span className="filter-count">
-                    {
-                      activeFilterCount
-                    }
-                  </span>
-                )}
-              </span>
-
-              <span
-                className={`filter-arrow ${
-                  filtersOpen
-                    ? "open"
-                    : ""
-                }`}
-              ></span>
-            </button>
 
             <button
               className="add-athlete-button"
@@ -733,8 +740,7 @@ const clearAll = () => {
             </button>
           </div>
 
-          {filtersOpen && (
-            <div className="filter-panel">
+          <div className="filter-panel" aria-label="Filter athletes">
               {/* AGE GROUP FILTER */}
 
               <div className="multi-select">
@@ -833,6 +839,7 @@ const clearAll = () => {
                   className="multi-select-button"
                   type="button"
                   onClick={() => {
+                    void loadAthleteEvents();
                     setEventFilterDropdownOpen(
                       !eventFilterDropdownOpen
                     );
@@ -916,102 +923,17 @@ const clearAll = () => {
                   )}
               </div>
 
-              {(selectedAgeGroups.length >
-                0 ||
-                selectedEventFilters.length >
-                  0) && (
-                <button
-                  className="clear-filters-button"
-                  type="button"
-                  onClick={
-                    clearFilters
-                  }
-                >
-                  Clear Filters
-                </button>
-              )}
-            </div>
-          )}
-
-          <div className="results-header">
-            <h2>Athletes</h2>
-
-            <div className="results-summary">
-              <span>
-                {
-                  filteredAthletes.length
-                }{" "}
-                {filteredAthletes.length ===
-                1
-                  ? "athlete"
-                  : "athletes"}{" "}
-                found
-              </span>
-
-              {searchTerm.trim() !==
-                "" && (
-                <>
-                  <span className="summary-divider">
-                    •
-                  </span>
-
-                  <span>
-                    Search: "
-                    {searchTerm}"
-                  </span>
-                </>
-              )}
-
-              {selectedAgeGroups.length >
-                0 && (
-                <>
-                  <span className="summary-divider">
-                    •
-                  </span>
-
-                  <span>
-                    {
-                      selectedAgeGroups.length
-                    }{" "}
-                    {selectedAgeGroups.length ===
-                    1
-                      ? "age group"
-                      : "age groups"}
-                  </span>
-                </>
-              )}
-
-              {selectedEventFilters.length >
-                0 && (
-                <>
-                  <span className="summary-divider">
-                    •
-                  </span>
-
-                  <span>
-                    {
-                      selectedEventFilters.length
-                    }{" "}
-                    {selectedEventFilters.length ===
-                    1
-                      ? "event"
-                      : "events"}
-                  </span>
-                </>
-              )}
-
-              {hasActiveFilters && (
-                <button
-                  className="clear-all-button"
-                  type="button"
-                  onClick={clearAll}
-                >
-                  Clear all
-                </button>
-              )}
-            </div>
+              <label className="directory-select-filter"><span className="filter-label">Gender</span><select aria-label="Filter by gender" value={genderFilter} onChange={event => { setGenderFilter(event.target.value); setCurrentPage(1); }}><option value="">All genders</option><option value="female">Female</option><option value="male">Male</option></select></label>
+              <label className="directory-select-filter"><span className="filter-label">Status</span><select aria-label="Filter by roster status" value={statusFilter} onChange={event => { setStatusFilter(event.target.value); setCurrentPage(1); }}><option value="">All statuses</option>{Array.from(new Set(athletes.flatMap(athlete => [athlete.flyStatus, athlete.flyaStatus]).filter((status): status is string => Boolean(status?.trim())).map(status => status.trim().toLowerCase()))).sort().map(status => <option key={status} value={status}>{status.charAt(0).toUpperCase() + status.slice(1)}</option>)}</select></label>
+              <button className="clear-filters-button" type="button" onClick={clearAll} disabled={!hasActiveFilters}>Clear</button>
           </div>
 
+          {/* Bulk actions use the complete selection, including other pages. */}
+          {!isLoading && !loadError && <div className="directory-bulk-actions">
+            <span>{selectedAthletes.length} selected{selectedAthletes.length > pageSelectedCount ? " across the directory" : ""}</span>
+            {selectedAthletes.length > 0 && <button type="button" className="directory-clear-selection" onClick={() => setSelectedAthleteIds([])}>Clear selection</button>}
+            <button type="button" className="directory-archive-button" disabled={!selectedAthletes.length} onClick={() => { setArchiveError(""); setArchiveDialogOpen(true); }}>{archiveView === "active" ? "Archive selected" : "Restore selected"}</button>
+          </div>}
           <div className="athlete-list">
             {isLoading ? (
               <div className="no-results">
@@ -1039,130 +961,69 @@ const clearAll = () => {
               0 ? (
               <div className="no-results">
                 <p>
-                  No athletes found.
+                  {archiveView === "archived" && !hasActiveFilters ? "No archived athletes." : "No athletes found."}
                 </p>
 
                 <span>
-                  Try changing your
-                  search or filters.
+                  {archiveView === "archived" && !hasActiveFilters ? "Select athletes in the active directory to archive them." : "Try changing your search or filters."}
                 </span>
               </div>
             ) : (
-              paginatedAthletes.map(
-                (athlete) => (
-                  <button
-                    className="athlete-row"
-                    type="button"
-                    key={athlete.id}
-                    onClick={() =>
-                      navigate(
-                        `/athletes/${athlete.id}`
-                      )
-                    }
-                  >
-                    <div className="athlete-identity">
-                      <div className="athlete-initials">
-                        {athlete.firstName.charAt(
-                          0
-                        )}
-                        {athlete.lastName.charAt(
-                          0
-                        )}
-                      </div>
-
-                      <div>
-                        <span className="athlete-name">
-                          {
-                            athlete.firstName
-                          }{" "}
-                          {
-                            athlete.lastName
-                          }
-                        </span>
-
-                        <span className="athlete-id">
-                          Athlete #
-                          {athlete.id}
-                        </span>
-                      </div>
-                    </div>
-
-                    <span className="row-arrow">
-                      ›
-                    </span>
-                  </button>
-                )
-              )
+              <div className="directory-table-scroll" role="region" aria-label="Athlete directory" tabIndex={0}>
+                <table className="directory-table">
+                  <thead><tr><th scope="col" className="directory-selection-cell"><input ref={selectPageRef} type="checkbox" aria-label="Select page" checked={paginatedAthletes.length > 0 && pageSelectedCount === paginatedAthletes.length} onChange={event => {
+                    const pageIds = paginatedAthletes.map(athlete => athlete.id);
+                    setSelectedAthleteIds(current => event.target.checked ? [...new Set([...current, ...pageIds])] : current.filter(id => !pageIds.includes(id)));
+                  }} /></th>{["Name", "Age Group", "Gender", "FLY Status", "FLYA Status", "Actions"].map(label => <th key={label} scope="col">{label}</th>)}</tr></thead>
+                  <tbody>{paginatedAthletes.map(athlete => <tr key={athlete.id}>
+                    <td className="directory-selection-cell"><input type="checkbox" aria-label={`Select ${athlete.firstName} ${athlete.lastName}`} checked={selectedAthleteIds.includes(athlete.id)} onChange={event => setSelectedAthleteIds(current => event.target.checked ? [...current, athlete.id] : current.filter(id => id !== athlete.id))} /></td>
+                    <th scope="row"><Link to={`/athletes/${athlete.id}`}>{athlete.firstName} {athlete.lastName}</Link></th>
+                    <td>{getAgeGroup(athlete.dateOfBirth) || "Not provided"}</td>
+                    <td>{athlete.gender?.trim() || "Not provided"}</td>
+                    <td>{athlete.flyStatus?.trim() || "Not provided"}</td>
+                    <td>{athlete.flyaStatus?.trim() || "Not provided"}</td>
+                    <td><div className="directory-row-actions">
+                      <button type="button" title="Edit athlete" aria-label={`Edit ${athlete.firstName} ${athlete.lastName}`} onClick={() => navigate(`/athletes/${athlete.id}`, {state: {editAthlete: true}})}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="m15 5 4 4M4 20l4-1 12-12a2.8 2.8 0 0 0-4-4L4 15z" /></svg></button>
+                      <button type="button" className="directory-delete-action" title="Delete athlete" aria-label={`Delete ${athlete.firstName} ${athlete.lastName}`} onClick={() => { setDeleteError(""); setDeleteTarget(athlete); }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7m4-7v7" /></svg></button>
+                    </div></td>
+                  </tr>)}</tbody>
+                </table>
+              </div>
             )}
           </div>
 
-          {!isLoading &&
-            !loadError &&
-            filteredAthletes.length > 0 && (
-              <div className="pagination">
-                <span className="pagination-summary">
-                  Showing{" "}
-                  {startIndex + 1}–
-                  {Math.min(
-                    endIndex,
-                    filteredAthletes.length
-                  )}{" "}
-                  of{" "}
-                  {filteredAthletes.length}{" "}
-                  athletes
-                </span>
-
-                {totalPages > 1 && (
-                  <div className="pagination-controls">
-                    <button
-                      className="pagination-button"
-                      type="button"
-                      onClick={() =>
-                        setCurrentPage(
-                          (page) =>
-                            Math.max(
-                              1,
-                              page - 1
-                            )
-                        )
-                      }
-                      disabled={
-                        currentPage === 1
-                      }
-                    >
-                      ← Previous
-                    </button>
-
-                    <span className="pagination-page">
-                      Page {currentPage} of{" "}
-                      {totalPages}
-                    </span>
-
-                    <button
-                      className="pagination-button"
-                      type="button"
-                      onClick={() =>
-                        setCurrentPage(
-                          (page) =>
-                            Math.min(
-                              totalPages,
-                              page + 1
-                            )
-                        )
-                      }
-                      disabled={
-                        currentPage ===
-                        totalPages
-                      }
-                    >
-                      Next →
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
+          {!isLoading && !loadError && <div className="pagination">
+            <label className="directory-page-size">Show <select value={pageSize} onChange={event => {setPageSize(Number(event.target.value)); setCurrentPage(1);}}>{[10,25,50].map(size => <option key={size} value={size}>{size}</option>)}</select></label>
+            <span className="pagination-summary" role="status">{filteredAthletes.length ? startIndex + 1 : 0}–{Math.min(endIndex, filteredAthletes.length)} of {filteredAthletes.length}</span>
+            <nav className="pagination-controls" aria-label="Athlete pages">
+              <button className="pagination-button" type="button" aria-label="Previous page" disabled={currentPage <= 1} onClick={() => setCurrentPage(page => Math.max(1,page-1))}>‹</button>
+              <span className="pagination-page" aria-current="page">{currentPage}</span>
+              <button className="pagination-button" type="button" aria-label="Next page" disabled={currentPage >= totalPages} onClick={() => setCurrentPage(page => Math.min(totalPages,page+1))}>›</button>
+            </nav>
+          </div>}
         </section>
       </main>
+
+      {archiveDialogOpen && <MeetDialog title={archiveView === "active" ? "Archive selected athletes?" : "Restore selected athletes?"} busy={isArchiving} onClose={() => { if (!isArchiving) setArchiveDialogOpen(false); }}>
+        <div className="athlete-form">
+          <p>{archiveView === "active" ? "These athletes will leave the active directory. Their profiles, results, and notes will be preserved, and you can restore them later." : "These athletes will return to the active directory and be available for new event assignments."}</p>
+          <ul className="directory-archive-list">{selectedAthletes.map(athlete => <li key={athlete.id}>{athlete.firstName} {athlete.lastName}</li>)}</ul>
+          {archiveError && <p className="form-error" role="alert">{archiveError}</p>}
+          <div className="modal-actions"><button className="cancel-button" type="button" disabled={isArchiving} onClick={() => setArchiveDialogOpen(false)} autoFocus>Cancel</button><button className="save-button" type="button" disabled={isArchiving} onClick={applyArchiveSelection}>{isArchiving ? "Saving…" : `${archiveView === "active" ? "Archive" : "Restore"} ${selectedAthletes.length} athlete${selectedAthletes.length === 1 ? "" : "s"}`}</button></div>
+        </div>
+      </MeetDialog>}
+
+      {deleteTarget && <MeetDialog title="Delete athlete?" busy={isDeleting} onClose={() => { if (!isDeleting) setDeleteTarget(null); }}>
+        <div className="athlete-form"><p>Delete {deleteTarget.firstName} {deleteTarget.lastName}? This permanently removes their athlete record.</p>
+          {deleteError && <p className="form-error" role="alert">{deleteError}</p>}
+          <div className="modal-actions"><button className="cancel-button" type="button" disabled={isDeleting} onClick={() => setDeleteTarget(null)} autoFocus>Cancel</button><button className="save-button directory-confirm-delete" type="button" disabled={isDeleting} onClick={async () => {
+            setIsDeleting(true); setDeleteError("");
+            try { await deleteAthlete(deleteTarget.id); setAthletes(current => current.filter(athlete => athlete.id !== deleteTarget.id)); setCurrentPage(1); setDeleteTarget(null); }
+            catch { setDeleteError("Unable to delete this athlete. Please try again."); }
+            finally { setIsDeleting(false); }
+          }}>{isDeleting ? "Deleting..." : "Delete athlete"}</button></div>
+        </div>
+      </MeetDialog>}
 
       {/* ==================================================
           ADD ATHLETE MODAL

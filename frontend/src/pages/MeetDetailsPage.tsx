@@ -1,3 +1,5 @@
+// Displays meet information and its event panels, including the read-only demo.
+import { formatMeetDates } from "../utils/meetDate";
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import Header from "../components/header";
@@ -37,6 +39,7 @@ function MeetDetailsContent({ meetId, sample }: { meetId: number; sample: boolea
   const [dialog, setDialog] = useState<"edit" | "add" | "copy" | null>(null);
   const [feedback, setFeedback] = useState("");
 
+  // Fetch live meet details; the sample route stays read-only.
   useEffect(() => {
     if (sample) return;
     let ignore = false;
@@ -82,7 +85,7 @@ function MeetDetailsContent({ meetId, sample }: { meetId: number; sample: boolea
         {sample && (
           <div className="meet-sample-banner" role="note">
             <strong>Sample meet preview</strong>
-            <p>These athletes and results are fictional. Meet, event, and result changes are disabled. You can expand events and try browser-only notes. <Link to="/meets">Create a live meet</Link> to manage real data.</p>
+            <p>These athletes and results are fictional. This preview is read-only. You can expand events to explore the layout. <Link to="/meets">Create a live meet</Link> to manage academy data.</p>
           </div>
         )}
         {isLoading ? <p className="meets-state" role="status">Loading meet details...</p> : error ? (
@@ -99,7 +102,7 @@ function MeetDetailsContent({ meetId, sample }: { meetId: number; sample: boolea
                 <h1>{profile.meet.name}</h1>
                 <p className="meet-details-meta">
                   <time dateTime={profile.meet.meetDate}>
-                    {new Date(`${profile.meet.meetDate}T00:00:00`).toLocaleDateString("en-CA", { month: "short", day: "numeric", year: "numeric" })}
+                    {formatMeetDates(profile.meet.meetDate, profile.meet.endDate)}
                   </time>
                   {profile.meet.location && <> · {profile.meet.location}</>}
                 </p>

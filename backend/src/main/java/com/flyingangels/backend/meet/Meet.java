@@ -29,6 +29,7 @@ public class Meet {
 
 	private String name;
 	private LocalDate meetDate;
+	private LocalDate endDate;
 	private String location;
 	private String externalUrl;
 
@@ -40,8 +41,16 @@ public class Meet {
 	}
 
 	public void updateFrom(MeetRequest request) {
+		if (request.meetDate() == null || (request.endDate() != null && request.endDate().isBefore(request.meetDate()))) {
+			throw new IllegalArgumentException("End date must be on or after the start date");
+		}
+		LocalDate lastDate = request.endDate() == null ? request.meetDate() : request.endDate();
+		if (events.stream().anyMatch(event -> event.getEventDate().isBefore(request.meetDate()) || event.getEventDate().isAfter(lastDate))) {
+			throw new IllegalArgumentException("The meet date range must include all existing event dates");
+		}
 		this.name = request.name().trim();
 		this.meetDate = request.meetDate();
+		this.endDate = lastDate;
 		this.location = request.location();
 		this.externalUrl = request.externalUrl();
 	}

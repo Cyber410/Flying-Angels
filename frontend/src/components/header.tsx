@@ -1,3 +1,4 @@
+// Shared branding and navigation, including the active section.
 import { Link, NavLink, useMatch } from "react-router-dom";
 import "./header.css";
 
@@ -23,15 +24,7 @@ function Header() {
           </Link>
           <NavLink to="/meets" className="site-nav-link">Meets</NavLink>
           <NavLink to="/results" className="site-nav-link">Results</NavLink>
-          {/* Enable /import when the team's Import page is integrated. */}
-          <span
-            className="site-nav-link site-nav-disabled"
-            role="link"
-            aria-disabled="true"
-            title="Import Athletes is coming soon"
-          >
-            Import
-          </span>
+          <NavLink to="/import" className="site-nav-link">Import</NavLink>
         </nav>
 
         <div className="site-admin">

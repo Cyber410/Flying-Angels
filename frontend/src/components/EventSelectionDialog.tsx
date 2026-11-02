@@ -1,3 +1,4 @@
+// Adds or copies event definitions onto a selected day of the meet.
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import type { EventCategory, MeetEvent, RankingOrder } from "../types/event";
@@ -5,6 +6,7 @@ import type { Meet } from "../types/meet";
 import { createEvent, getEventCategories } from "../services/eventService";
 import { getMeetById, getMeets } from "../services/meetService";
 import MeetDialog from "./MeetDialog";
+import { formatMeetDates } from "../utils/meetDate";
 
 type Choice = {
   id: number;
@@ -39,7 +41,9 @@ export default function EventSelectionDialog({ mode, meet, existingEvents, onCre
   const [customChoices, setCustomChoices] = useState<Choice[]>([]);
   const [newName, setNewName] = useState("");
   const [newRanking, setNewRanking] = useState<RankingOrder>("ASC");
+  const [eventDate, setEventDate] = useState(meet.meetDate);
 
+  // Load either discipline choices or source meets for copying.
   useEffect(() => {
     let ignore = false;
     async function load() {
@@ -95,8 +99,13 @@ export default function EventSelectionDialog({ mode, meet, existingEvents, onCre
   const visibleChoices = choices.filter((choice) => choice.name.toLowerCase().includes(search.trim().toLowerCase()));
   const loading = isLoading || isSourceLoading;
 
+  // Saves the chosen items while retaining partial successes for retry.
   async function saveSelected() {
     if (isSaving || selectedChoices.length === 0) return;
+    if (!eventDate || eventDate < meet.meetDate || eventDate > (meet.endDate || meet.meetDate)) {
+      setSaveError("Choose an event date within this meet's date range.");
+      return;
+    }
     setIsSaving(true);
     setSaveError("");
     const created: MeetEvent[] = [];
@@ -107,7 +116,7 @@ export default function EventSelectionDialog({ mode, meet, existingEvents, onCre
       try {
         created.push(await createEvent({
           name: choice.name,
-          eventDate: meet.meetDate,
+          eventDate,
           location: meet.location,
           eventType: choice.eventType,
           externalUrl: null,
@@ -132,6 +141,7 @@ export default function EventSelectionDialog({ mode, meet, existingEvents, onCre
     }
   }
 
+  // Adds a new discipline to the current selection with its ranking rule.
   function addCustomChoice(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const name = newName.trim();
@@ -177,10 +187,15 @@ export default function EventSelectionDialog({ mode, meet, existingEvents, onCre
               }}
             >
               <option value="">Select a meet...</option>
-              {sourceMeets.map((source) => <option key={source.id} value={source.id}>{source.name} ({source.meetDate})</option>)}
+              {sourceMeets.map((source) => <option key={source.id} value={source.id}>{source.name} ({formatMeetDates(source.meetDate, source.endDate)})</option>)}
             </select>
           </label>
         )}
+        {meet.endDate && meet.endDate !== meet.meetDate && <label className="meet-form-field">
+          Event date
+          <input type="date" value={eventDate} min={meet.meetDate} max={meet.endDate} disabled={isSaving} onChange={event => setEventDate(event.target.value)} />
+          <span className="meet-form-help">Selected events will be scheduled on this day. Add another selection for a different day.</span>
+        </label>}
         <label className="meet-form-field">
           Search events
           <input type="search" placeholder="Search events..." value={search} disabled={isSaving} onChange={(event) => setSearch(event.target.value)} />

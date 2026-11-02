@@ -1,3 +1,4 @@
+// Athlete details, meet history, and notes, with existing edit/delete actions.
 import {
   useEffect,
   useState,
@@ -5,6 +6,7 @@ import {
 import type { KeyboardEvent } from "react";
 import {
   useNavigate,
+  useLocation,
   useParams,
 } from "react-router-dom";
 import Header from "../components/header";
@@ -61,6 +63,8 @@ function displayValue(
 function AthleteProfilePage() {
   const { athleteId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
+  const openEditor = location.state?.editAthlete === true;
   const [activeTab, setActiveTab] = useState<ProfileTab>("overview");
   const [athlete, setAthlete] =
     useState<Athlete | null>(null);
@@ -136,6 +140,14 @@ function AthleteProfilePage() {
         setAthlete(
           loadedAthlete
         );
+        if (openEditor) {
+          setEditedGender(loadedAthlete.gender ?? "");
+          setEditedFlyStatus(loadedAthlete.flyStatus ?? "");
+          setEditedFlyaStatus(loadedAthlete.flyaStatus ?? "");
+          setEditedNote(loadedAthlete.note ?? "");
+          setEditedEvents((loadedAthlete.events ?? []).map(event => ({eventName: event.categoryName})));
+          setIsEditing(true);
+        }
       } catch (error) {
         console.error(error);
         setLoadError(
@@ -146,7 +158,7 @@ function AthleteProfilePage() {
       }
     }
     loadAthlete();
-  }, [athleteId]);
+  }, [athleteId, openEditor]);
   /* ==================================================
      EDIT FUNCTIONS
      ================================================== */
@@ -282,7 +294,7 @@ function AthleteProfilePage() {
       }
     };
   function handleTabKey(event: KeyboardEvent<HTMLButtonElement>, index: number) {
-    let nextIndex = index;
+    let nextIndex: number;
     if (event.key === "ArrowRight") nextIndex = (index + 1) % PROFILE_TABS.length;
     else if (event.key === "ArrowLeft") nextIndex = (index + PROFILE_TABS.length - 1) % PROFILE_TABS.length;
     else if (event.key === "Home") nextIndex = 0;
@@ -383,6 +395,7 @@ function AthleteProfilePage() {
           <div className="profile-identity">
             <p className="profile-eyebrow">ATHLETE PROFILE</p>
             <h1>{athlete.firstName} {athlete.lastName}</h1>
+            {athlete.archived && <p className="profile-archive-notice">Archived athlete · History is preserved. Restore from the Directory to include in new events.</p>}
             <p className="profile-identity-meta">
               Athlete #{athlete.id}
               {age !== null && <> · {age} years</>}
@@ -429,12 +442,6 @@ function AthleteProfilePage() {
             ))}
           </div>
 
-          {activeTab !== "overview" && (
-            <details className="profile-storage-note">
-              <summary>Some data is saved only in this browser</summary>
-              <p>The best result and general athlete note are shared. Extra attempts, pending assignments, and performance notes stay in this browser and are removed if its data is cleared.</p>
-            </details>
-          )}
 
           <section
             id="profile-panel-overview"
@@ -499,17 +506,18 @@ function AthleteProfilePage() {
               <section className="profile-general-note" aria-labelledby="profile-general-note-heading">
                 <div className="profile-tab-heading profile-note-heading">
                   <div>
-                    <h2 id="profile-general-note-heading">General athlete note</h2>
-                    <p>Shared with your academy team.</p>
+                    <span className="profile-note-kind">Athlete-wide</span>
+                    <h2 id="profile-general-note-heading">Athlete note</h2>
+                    <p>General coaching context, training preferences, and reminders about this athlete.</p>
                   </div>
-                  {!isEditing && <button className="ath-history-button" type="button" aria-label={athlete.note?.trim() ? "Edit general athlete note" : "Add general athlete note"} onClick={() => startEditing("notes")}>{athlete.note?.trim() ? "Edit Note" : "Add Note"}</button>}
+                  {!isEditing && <button className="ath-history-button" type="button" aria-label={athlete.note?.trim() ? "Edit general athlete note" : "Add general athlete note"} onClick={() => startEditing("notes")}>{athlete.note?.trim() ? "Edit athlete note" : "Add athlete note"}</button>}
                 </div>
                 <div className="profile-note-field">
-                  <label className="detail-label" htmlFor="profile-general-note-input">Note</label>
+                  {isEditing && <label className="detail-label" htmlFor="profile-general-note-input">Athlete note</label>}
                   {isEditing ? (
-                    <textarea id="profile-general-note-input" className="profile-textarea" value={editedNote} disabled={isSaving} maxLength={500} onChange={(event) => setEditedNote(event.target.value)} rows={4} placeholder="Add useful information about this athlete..." />
+                    <textarea id="profile-general-note-input" className="profile-textarea" value={editedNote} disabled={isSaving} maxLength={500} onChange={(event) => setEditedNote(event.target.value)} rows={4} placeholder="For example: Prefers afternoon training. Focus on building confidence at the start." />
                   ) : (
-                    <p className={`profile-note-text${athlete.note?.trim() ? "" : " profile-note-empty"}`}>{athlete.note?.trim() || "No general note yet."}</p>
+                    <p className={`profile-note-text${athlete.note?.trim() ? "" : " profile-note-empty"}`}>{athlete.note?.trim() || "No athlete note yet. Add a reminder that applies across training and competitions."}</p>
                   )}
                 </div>
               </section>

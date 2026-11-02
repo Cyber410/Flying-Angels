@@ -1,11 +1,11 @@
+// Loads shared event participants and coordinates attempts, notes, and removal.
 import { useEffect, useId, useState } from "react";
 import { Link } from "react-router-dom";
-import { getEventProfile, removeParticipant } from "../services/eventService";
-import { getBrowserAssignments, removeBrowserAssignment } from "../services/eventAssignmentStore";
-import { getResultAttempts, includeSharedResult, removeResultAttempts } from "../services/eventAttemptStore";
+import { getEventProfile, removeEventParticipant } from "../services/eventService";
+import { eventParticipants, participantAttempts } from "../utils/eventParticipants";
 import { bestResultAttempt, parseEventResult } from "../utils/eventResult";
 import { sampleEventResults } from "../data/sampleMeet";
-import type { BrowserEventAssignment, EventParticipant, MeetEvent, ResultAttempt } from "../types/event";
+import type { EventParticipant, MeetEvent, ResultAttempt } from "../types/event";
 import AssignAthletesDialog from "./AssignAthletesDialog";
 import EventResultDialog from "./EventResultDialog";
 import EventNotesDialog from "./EventNotesDialog";
@@ -28,18 +28,8 @@ type PanelDialog =
 export default function MeetEventPanel({ event, sample, defaultOpen, onCountChanged }: Props) {
   const contentId = useId();
   const [isOpen, setIsOpen] = useState(defaultOpen);
-  const [initialBrowserState] = useState<{ assignments: BrowserEventAssignment[]; error: string }>(() => {
-    if (sample) return { assignments: [], error: "" };
-    try {
-      return { assignments: getBrowserAssignments(event), error: "" };
-    } catch (error) {
-      return { assignments: [], error: error instanceof Error ? error.message : "Browser-only assignments could not be loaded." };
-    }
-  });
   const [results, setResults] = useState<EventParticipant[] | null>(() => sample ? sampleEventResults[event.id] ?? [] : null);
   const [attemptsByAthlete, setAttemptsByAthlete] = useState<Record<number, ResultAttempt[]>>({});
-  const [attemptStorageError, setAttemptStorageError] = useState("");
-  const [browserError, setBrowserError] = useState(initialBrowserState.error);
   const [isLoading, setIsLoading] = useState(!sample);
   const [loadError, setLoadError] = useState("");
   const [revision, setRevision] = useState(0);
@@ -48,35 +38,15 @@ export default function MeetEventPanel({ event, sample, defaultOpen, onCountChan
   const [removeError, setRemoveError] = useState("");
   const [feedback, setFeedback] = useState("");
 
+  // Load all saved participants, including assignments without results.
   useEffect(() => {
     if (sample || !isOpen) return;
     let ignore = false;
     getEventProfile(event.id).then((data) => {
       if (ignore) return;
-      let pending: BrowserEventAssignment[] = [];
-      let storageError = "";
-      try {
-        pending = getBrowserAssignments(data.event);
-      } catch (error) {
-        storageError = error instanceof Error ? error.message : "Browser-only assignments could not be loaded.";
-      }
-      // A saved result always takes precedence over a stale browser assignment.
-      const sharedIds = new Set(data.results.map((result) => result.athleteId));
-      const participants = [...data.results, ...pending.filter((assignment) => !sharedIds.has(assignment.athleteId))];
-      const histories: Record<number, ResultAttempt[]> = {};
-      let historyError = "";
-      for (const participant of participants) {
-        try {
-          histories[participant.athleteId] = getResultAttempts(event.id, participant);
-        } catch (error) {
-          histories[participant.athleteId] = includeSharedResult([], participant);
-          historyError = error instanceof Error ? error.message : "Attempt history could not be loaded.";
-        }
-      }
+      const participants = eventParticipants(data);
       setResults(participants);
-      setAttemptsByAthlete(histories);
-      setAttemptStorageError(historyError);
-      setBrowserError(storageError);
+      setAttemptsByAthlete(Object.fromEntries(participants.map(participant => [participant.athleteId, participantAttempts(participant)])));
     }).catch((error: unknown) => {
       if (!ignore) setLoadError(error instanceof Error ? error.message : "Unable to load participants.");
     }).finally(() => {
@@ -85,46 +55,27 @@ export default function MeetEventPanel({ event, sample, defaultOpen, onCountChan
     return () => { ignore = true; };
   }, [event.id, isOpen, revision, sample]);
 
+  // Merges newly assigned athletes without duplicating existing participants.
   function addParticipants(assigned: EventParticipant[]) {
     const existingIds = new Set((results ?? []).map((result) => result.athleteId));
     const next = [...(results ?? []), ...assigned.filter((assignment) => !existingIds.has(assignment.athleteId))];
     setResults(next);
-    onCountChanged(event.id, next.filter((result) => result.resultId !== null).length);
-    setFeedback(`${assigned.length} athlete${assigned.length === 1 ? "" : "s"} assigned in this browser. Add a result to save to the shared meet.`);
+    onCountChanged(event.id, next.length);
+    setFeedback(`${assigned.length} athlete${assigned.length === 1 ? "" : "s"} assigned to this event. Results can be recorded later.`);
   }
 
+  // Remove the participation and its attempts through one backend transaction.
   async function confirmRemoval() {
     if (sample || dialog?.type !== "remove" || isRemoving) return;
     const participant = dialog.participant;
     setIsRemoving(true);
     setRemoveError("");
     try {
-      let storageError = "";
-      if (participant.resultId === null) {
-        removeBrowserAssignment(event.id, participant.athleteId);
-      } else {
-        await removeParticipant(event.id, participant.resultId);
-        try {
-          removeBrowserAssignment(event.id, participant.athleteId);
-        } catch {
-          storageError = "The athlete was removed from the shared event, but browser-only assignment data could not be cleared.";
-        }
-      }
-      const next = (results ?? []).filter((result) => result.athleteId !== participant.athleteId);
-      try {
-        removeResultAttempts(event.id, participant.athleteId);
-        setAttemptStorageError("");
-      } catch {
-        setAttemptStorageError("The athlete was removed, but their old attempt history could not be cleared from this browser.");
-      }
+      await removeEventParticipant(event.id, participant.athleteId);
+      const next = (results ?? []).filter(result => result.athleteId !== participant.athleteId);
       setResults(next);
-      setAttemptsByAthlete((current) => {
-        const remaining = { ...current };
-        delete remaining[participant.athleteId];
-        return remaining;
-      });
-      setBrowserError(storageError);
-      onCountChanged(event.id, next.filter((result) => result.resultId !== null).length);
+      setAttemptsByAthlete(current => { const remaining = { ...current }; delete remaining[participant.athleteId]; return remaining; });
+      onCountChanged(event.id, next.length);
       setFeedback(`${participant.firstName} ${participant.lastName} was removed from this event.`);
       setDialog(null);
     } catch (error) {
@@ -141,10 +92,8 @@ export default function MeetEventPanel({ event, sample, defaultOpen, onCountChan
     return (event.rankingOrder === "ASC" ? scoreDifference : -scoreDifference) ||
       a.lastName.localeCompare(b.lastName) || a.firstName.localeCompare(b.firstName);
   });
-  const pendingCount = results
-    ? results.filter((result) => result.resultId === null).length
-    : initialBrowserState.assignments.length;
-  const count = results?.length ?? event.participantCount + pendingCount;
+  const pendingCount = (results ?? []).filter(result => result.score === null).length;
+  const count = results?.length ?? event.participantCount;
 
   return (
     <section className="meet-event-panel" aria-label={event.name}>
@@ -160,7 +109,7 @@ export default function MeetEventPanel({ event, sample, defaultOpen, onCountChan
       >
         <span className="meet-event-chevron" aria-hidden="true">{isOpen ? "⌄" : "›"}</span>
         <span>{event.name}</span>
-        <span className="meet-event-count">{count} athlete{count === 1 ? "" : "s"}{pendingCount > 0 && ` (${pendingCount} browser-only)`}</span>
+        <span className="meet-event-count">{count} athlete{count === 1 ? "" : "s"}{pendingCount > 0 && ` (${pendingCount} awaiting results)`}</span>
       </button>
       <div id={contentId} hidden={!isOpen}>
         {isOpen && (
@@ -170,12 +119,7 @@ export default function MeetEventPanel({ event, sample, defaultOpen, onCountChan
               <button className="meets-button" type="button" onClick={() => setDialog({ type: "notes" })}>Event Notes</button>
               <button className="meets-button meets-button-primary" type="button" disabled={sample || isLoading || Boolean(loadError)} onClick={() => setDialog({ type: "assign" })}>+ Assign Athletes</button>
             </div>
-            {!sample && pendingCount > 0 && (
-              <p className="meet-pending-notice">Browser-only assignments are visible on this device until a result is recorded. They are not shared with teammates. Clearing browser data removes them.</p>
-            )}
-            {browserError && <p className="meet-pending-notice" role="alert">{browserError}</p>}
-            {attemptStorageError && <p className="meet-pending-notice" role="alert">{attemptStorageError}</p>}
-            {!sample && <p className="meet-attempts-notice">Attempt history is saved in this browser. Only each athlete's best result is shared with teammates. Click a result to edit it, or use + Result to add another.</p>}
+            {!sample && <p className="meet-attempts-notice">Assignments, notes, and every result attempt are saved to the academy database. Click a result to edit it, or use + Result to add another.</p>}
             <p className="meet-event-feedback" role="status">{feedback}</p>
             {isLoading ? <p className="meets-state" role="status">Loading participants...</p> : loadError ? (
               <div className="meets-state">
@@ -190,13 +134,13 @@ export default function MeetEventPanel({ event, sample, defaultOpen, onCountChan
                   <tbody>
                     {orderedResults.map((participant) => {
                       const fullName = `${participant.firstName} ${participant.lastName}`;
-                      const attempts = attemptsByAthlete[participant.athleteId] ?? includeSharedResult([], participant);
+                      const attempts = attemptsByAthlete[participant.athleteId] ?? participantAttempts(participant);
                       const bestAttempt = bestResultAttempt(attempts, event.rankingOrder);
                       return (
                         <tr key={participant.athleteId}>
                           <th scope="row">
                             {sample ? fullName : <Link to={`/athletes/${participant.athleteId}`}>{fullName}</Link>}
-                            {participant.resultId === null && <small className="meet-pending-label">Browser only</small>}
+                            {participant.resultId === null && <small className="meet-pending-label">Awaiting result</small>}
                           </th>
                           <td>
                             <div className="meet-result-list">
@@ -246,34 +190,26 @@ export default function MeetEventPanel({ event, sample, defaultOpen, onCountChan
         <EventResultDialog
           event={event}
           participant={dialog.participant}
-          attempts={attemptsByAthlete[dialog.participant.athleteId] ?? includeSharedResult([], dialog.participant)}
+          attempts={attemptsByAthlete[dialog.participant.athleteId] ?? participantAttempts(dialog.participant)}
           editingAttempt={dialog.attempt}
-          onSaved={(saved, attempts, warning) => {
-            const next = (results ?? []).map((result) => result.athleteId === saved.athleteId ? saved : result);
+          onSaved={(saved, attempts) => {
+            const next = (results ?? []).map((result) => result.athleteId === saved.athleteId ? { ...result, ...saved, attempts } : result);
             setResults(next);
             setAttemptsByAthlete((current) => ({ ...current, [saved.athleteId]: attempts }));
-            setAttemptStorageError(warning ?? "");
             onCountChanged(event.id, next.filter((result) => result.resultId !== null).length);
-            try {
-              removeBrowserAssignment(event.id, saved.athleteId);
-              setBrowserError("");
-            } catch {
-              // The API save succeeded: keep its result even if local cleanup fails.
-              setBrowserError("The result is saved to the shared meet, but the old browser-only assignment could not be cleared. The shared result takes priority.");
-            }
-            setFeedback(`Result saved for ${saved.firstName} ${saved.lastName}. Their best result is shared with teammates.`);
+            setFeedback(`Result saved for ${saved.firstName} ${saved.lastName}. All attempts are saved and shared with your team.`);
           }}
           onClose={() => setDialog(null)}
         />
       )}
       {dialog?.type === "notes" && (
-        <EventNotesDialog event={event} participant={dialog.participant} sample={sample} onSaved={() => setFeedback("Note saved in this browser.")} onClose={() => setDialog(null)} />
+        <EventNotesDialog event={event} participant={dialog.participant} sample={sample} onSaved={() => setFeedback("Note saved to the academy database.")} onClose={() => setDialog(null)} />
       )}
       {dialog?.type === "remove" && (
         <MeetDialog title="Remove Athlete from Event" busy={isRemoving} onClose={() => setDialog(null)}>
           <p className="meet-dialog-message">
             Remove <strong>{dialog.participant.firstName} {dialog.participant.lastName}</strong> from {event.name}?
-            {dialog.participant.resultId === null ? " This removes their browser-only assignment." : " Their shared result and this browser's attempt history for this event will also be deleted."}
+            {" Their assignment, attempts, and performance note for this event will be deleted."}
             {" Their athlete profile will remain available."}
           </p>
           {removeError && <p className="meet-dialog-error" role="alert">{removeError}</p>}

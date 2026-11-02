@@ -4,6 +4,7 @@ import com.flyingangels.backend.athlete.dto.AthleteProfileResponse;
 import com.flyingangels.backend.athlete.dto.AthleteRequest;
 import com.flyingangels.backend.athlete.dto.AthleteSummaryResponse;
 import com.flyingangels.backend.athlete.dto.AthleteImportResponse;
+import com.flyingangels.backend.athlete.dto.AthleteArchiveRequest;
 import com.flyingangels.backend.event.EventResultRepository;
 import com.flyingangels.backend.event.EventService;
 import jakarta.validation.Valid;
@@ -38,8 +39,20 @@ public class AthleteController {
 	@GetMapping("/api/athletes")
 	public List<AthleteSummaryResponse> search(@RequestParam(defaultValue = "") String search,
 			@RequestParam(defaultValue = "") String gender,
-			@RequestParam(defaultValue = "") String team) {
-		return athleteService.search(search, gender, team).stream().map(AthleteSummaryResponse::from).toList();
+			@RequestParam(defaultValue = "") String team,
+			@RequestParam(defaultValue = "active") String archive) {
+		List<Athlete> athletes = switch (archive) {
+			case "active" -> athleteService.search(search, gender, team);
+			case "all" -> athleteService.searchIncludingArchived(search, gender, team);
+			case "archived" -> athleteService.searchIncludingArchived(search, gender, team).stream().filter(Athlete::isArchived).toList();
+			default -> throw new IllegalArgumentException("Archive filter must be active, archived, or all");
+		};
+		return athletes.stream().map(AthleteSummaryResponse::from).toList();
+	}
+
+	@PutMapping("/api/athletes/archive")
+	public List<AthleteSummaryResponse> archive(@Valid @RequestBody AthleteArchiveRequest request) {
+		return athleteService.setArchived(request.athleteIds(), request.archived()).stream().map(AthleteSummaryResponse::from).toList();
 	}
 
 	@GetMapping("/api/athletes/{id}")
@@ -83,4 +96,5 @@ public class AthleteController {
 		}
 		return new AthleteImportResponse(importedCount, importedEventCount, summary.athleteCount() - importedCount);
 	}
+
 }

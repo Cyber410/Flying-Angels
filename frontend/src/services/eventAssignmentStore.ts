@@ -1,3 +1,4 @@
+// Read-only legacy assignment reader used solely by explicit migration.
 import type { Athlete } from "../types/athlete";
 import type { BrowserEventAssignment, MeetEvent } from "../types/event";
 
@@ -5,7 +6,7 @@ type StoredAthlete = Pick<Athlete, "id" | "firstName" | "lastName">;
 
 function storageKey(eventId: number) {
   if (!Number.isSafeInteger(eventId) || eventId < 1) {
-    throw new Error("Browser-only assignments require a live event.");
+    throw new Error("Saved assignments require an existing event.");
   }
   return `flying-angels:pending-event-assignments:${eventId}`;
 }
@@ -22,14 +23,14 @@ function readStoredAthletes(eventId: number): StoredAthlete[] {
   try {
     raw = localStorage.getItem(storageKey(eventId));
   } catch {
-    throw new Error("Browser storage is unavailable. Enable it to save assignments without results.");
+    throw new Error("Saved assignments could not be accessed. Download the records for review.");
   }
   if (raw === null) return [];
   let data: unknown;
   try {
     data = JSON.parse(raw);
   } catch {
-    throw new Error("Browser-only assignments could not be read. Stored data has not been overwritten.");
+    throw new Error("Saved assignments could not be read. Existing records have not been overwritten.");
   }
   if (
     typeof data !== "object" || data === null ||
@@ -37,21 +38,9 @@ function readStoredAthletes(eventId: number): StoredAthlete[] {
     !("athletes" in data) || !Array.isArray(data.athletes) ||
     !data.athletes.every(isStoredAthlete)
   ) {
-    throw new Error("Browser-only assignments have an unsupported format. Stored data has not been overwritten.");
+    throw new Error("Saved assignments have an unsupported format. Existing records have not been overwritten.");
   }
   return data.athletes;
-}
-
-function writeStoredAthletes(eventId: number, athletes: StoredAthlete[]) {
-  try {
-    if (athletes.length) {
-      localStorage.setItem(storageKey(eventId), JSON.stringify({ version: 1, athletes }));
-    } else {
-      localStorage.removeItem(storageKey(eventId));
-    }
-  } catch {
-    throw new Error("The assignment could not be saved in this browser. Check browser storage and try again.");
-  }
 }
 
 function toAssignment(event: MeetEvent, athlete: StoredAthlete): BrowserEventAssignment {
@@ -63,18 +52,7 @@ function toAssignment(event: MeetEvent, athlete: StoredAthlete): BrowserEventAss
   };
 }
 
+// Reads pending assignments without inventing result values.
 export function getBrowserAssignments(event: MeetEvent): BrowserEventAssignment[] {
   return readStoredAthletes(event.id).map((athlete) => toAssignment(event, athlete));
-}
-
-export function saveBrowserAssignment(event: MeetEvent, athlete: StoredAthlete): BrowserEventAssignment {
-  const stored = readStoredAthletes(event.id);
-  const snapshot = { id: athlete.id, firstName: athlete.firstName, lastName: athlete.lastName };
-  writeStoredAthletes(event.id, [...stored.filter((item) => item.id !== athlete.id), snapshot]);
-  return toAssignment(event, snapshot);
-}
-
-export function removeBrowserAssignment(eventId: number, athleteId: number): void {
-  const stored = readStoredAthletes(eventId);
-  writeStoredAthletes(eventId, stored.filter((athlete) => athlete.id !== athleteId));
 }

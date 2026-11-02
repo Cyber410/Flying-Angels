@@ -8,6 +8,11 @@ import java.util.Optional;
 
 public interface EventRepository extends JpaRepository<Event, Long> {
 
+	@org.springframework.data.jpa.repository.Modifying
+	@org.springframework.data.jpa.repository.Query("UPDATE Event e SET e.note = :text WHERE e.id = :eventId AND (e.note IS NULL OR e.note = '' OR e.note = :text)")
+	int migrateNote(@org.springframework.data.repository.query.Param("eventId") Long eventId,
+			@org.springframework.data.repository.query.Param("text") String text);
+
 	@EntityGraph(attributePaths = {"meet", "category", "results", "results.athlete"})
 	List<Event> findAllByOrderByEventDateDescNameAsc();
 

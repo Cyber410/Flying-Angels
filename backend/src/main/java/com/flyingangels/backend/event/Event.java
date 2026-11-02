@@ -38,6 +38,10 @@ public class Event {
 	private String location;
 	private String eventType;
 	private String externalUrl;
+	@jakarta.persistence.Column(length = 2000)
+	private String note;
+
+	public void setNote(String note) { this.note = note == null || note.isBlank() ? null : note.trim(); }
 
 	@ManyToOne(optional = false)
 	@JoinColumn(name = "meet_id", nullable = false)
@@ -51,7 +55,11 @@ public class Event {
 	private RankingOrder rankingOrder;
 
 	@OneToMany(mappedBy = "event", cascade = CascadeType.ALL, orphanRemoval = true)
+	@jakarta.persistence.OrderBy("id ASC")
 	private List<EventResult> results = new ArrayList<>();
+
+	@OneToMany(mappedBy = "event", cascade = CascadeType.ALL, orphanRemoval = true)
+	private List<EventParticipation> participations = new ArrayList<>();
 
 	public Event(EventRequest request, EventCategory category, Meet meet) {
 		updateFrom(request, category, meet);

@@ -18,7 +18,7 @@ import lombok.NoArgsConstructor;
 import java.math.BigDecimal;
 
 @Entity
-@Table(name = "event_results", uniqueConstraints = @UniqueConstraint(columnNames = {"event_id", "athlete_id"}))
+@Table(name = "event_results")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class EventResult {
@@ -45,17 +45,22 @@ public class EventResult {
 	@Column(precision = 12, scale = 4)
 	private BigDecimal score;
 
+	@Column(unique = true, length = 100)
+	private String clientId;
+
+	public void setClientId(String clientId) { this.clientId = clientId; }
+
 	public EventResult(Event event, EventCategory category, Athlete athlete, String result, BigDecimal score) {
 		this.event = event;
 		this.category = category;
 		this.athlete = athlete;
-		this.result = result.trim();
+		this.result = result == null ? null : result.trim();
 		this.score = score;
 	}
 
 	public void update(Athlete athlete, String result, BigDecimal score) {
 		this.athlete = athlete;
-		this.result = result.trim();
+		this.result = result == null ? null : result.trim();
 		this.score = score;
 	}
 }

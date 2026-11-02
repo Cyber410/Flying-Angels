@@ -30,11 +30,18 @@ public class Athlete {
 
 	private String firstName;
 	private String lastName;
+	@Column(length = 500)
 	private String note;
 	private String flyStatus;
 	private String flyaStatus;
 	private LocalDate dateOfBirth;
 	private String gender;
+	@Column(nullable = false, columnDefinition = "boolean default false")
+	private boolean archived;
+
+	public void setArchived(boolean archived) {
+		this.archived = archived;
+	}
 
 	@Column(unique = true, length = 64)
 	private String importKey;

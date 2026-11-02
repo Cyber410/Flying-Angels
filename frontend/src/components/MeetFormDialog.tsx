@@ -1,3 +1,4 @@
+// Creates or edits meet details and validates single-day or multi-day dates.
 import { useId, useState } from "react";
 import type { FormEvent } from "react";
 import type { Meet, MeetRequest } from "../types/meet";
@@ -13,6 +14,7 @@ export default function MeetFormDialog({ meet, onSave, onClose }: Props) {
   const id = useId();
   const [name, setName] = useState(meet?.name ?? "");
   const [meetDate, setMeetDate] = useState(meet?.meetDate ?? "");
+  const [endDate, setEndDate] = useState(meet?.endDate && meet.endDate !== meet.meetDate ? meet.endDate : "");
   const [location, setLocation] = useState(meet?.location ?? "");
   const [externalUrl, setExternalUrl] = useState(meet?.externalUrl ?? "");
   const [isSaving, setIsSaving] = useState(false);
@@ -26,12 +28,17 @@ export default function MeetFormDialog({ meet, onSave, onClose }: Props) {
       return;
     }
 
+    if (endDate && endDate < meetDate) {
+      setError("End date must be on or after the start date.");
+      return;
+    }
     setIsSaving(true);
     setError("");
     try {
       await onSave({
         name: name.trim(),
         meetDate,
+        endDate: endDate || null,
         location: location.trim() || null,
         // The backend's URL pattern rejects empty strings; optional values use null.
         externalUrl: externalUrl.trim() || null,
@@ -59,7 +66,7 @@ export default function MeetFormDialog({ meet, onSave, onClose }: Props) {
           />
         </label>
         <label className="meet-form-field" htmlFor={`${id}-date`}>
-          Meet date
+          Start date
           <input
             id={`${id}-date`}
             type="date"
@@ -68,6 +75,11 @@ export default function MeetFormDialog({ meet, onSave, onClose }: Props) {
             required
             disabled={isSaving}
           />
+        </label>
+        <label className="meet-form-field" htmlFor={`${id}-end-date`}>
+          End date (optional)
+          <input id={`${id}-end-date`} type="date" min={meetDate || undefined} value={endDate} onChange={event => setEndDate(event.target.value)} disabled={isSaving} />
+          <span className="meet-form-help">Leave blank for a single-day meet.</span>
         </label>
         <label className="meet-form-field" htmlFor={`${id}-location`}>
           Location (optional)

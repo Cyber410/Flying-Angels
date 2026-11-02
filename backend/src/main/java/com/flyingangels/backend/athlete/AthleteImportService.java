@@ -134,7 +134,7 @@ public class AthleteImportService {
 		return filename != null && filename.toLowerCase().endsWith(".xlsx");
 	}
 
-	private String buildImportKey(List<String> row, LocalDate dateOfBirth) {
+	String buildImportKey(List<String> row, LocalDate dateOfBirth) {
 		String identity;
 		if (dateOfBirth != null) {
 			identity = String.join("|", normalize(value(row, 0)), normalize(value(row, 1)),

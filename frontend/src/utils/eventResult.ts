@@ -1,3 +1,4 @@
+// Result parsing, unit conversion, display defaults, and best-attempt selection.
 import type { MeetEvent, RankingOrder, ResultAttempt } from "../types/event";
 
 export type ResultEntryUnit = "s" | "min" | "min-sec" | "h-min-sec" | "m" | "cm";
@@ -34,6 +35,7 @@ function scalarParts(value: string, defaultUnit: "s" | "min" | "m" | "cm") {
   return { value: match[1], unit };
 }
 
+// Infers time or distance from the discipline and available event metadata.
 export function eventResultUnit(event: MeetEvent): "s" | "m" {
   const name = `${event.category.name} ${event.name}`.toLowerCase();
   if (/jump|shot\s*put|discus|javelin|hammer|throw|vault/.test(name)) return "m";
@@ -41,6 +43,7 @@ export function eventResultUnit(event: MeetEvent): "s" | "m" {
   return /field/i.test(event.eventType ?? "") || event.rankingOrder === "DESC" ? "m" : "s";
 }
 
+// Provides compatible unit choices for this event.
 export function resultEntryUnits(event: MeetEvent): { value: ResultEntryUnit; label: string }[] {
   return eventResultUnit(event) === "m" ? [
     { value: "m", label: "Metres (m)" },
@@ -64,6 +67,7 @@ function suggestedEntryUnit(event: MeetEvent): ResultEntryUnit {
   return "s";
 }
 
+// Restores the recorded unit, or suggests a discipline-appropriate default.
 export function resultEntryForAttempt(event: MeetEvent, attempt?: ResultAttempt): ResultEntry {
   if (!attempt) return emptyEntry(suggestedEntryUnit(event));
   const base = eventResultUnit(event);
@@ -89,6 +93,7 @@ function scoredResult(result: string, score: number): Omit<ResultAttempt, "id"> 
   return result.length <= 50 ? { result, score: normalizedScore } : null;
 }
 
+// Validates entry fields and normalizes scores to seconds or metres.
 export function parseResultEntry(entry: ResultEntry, event: MeetEvent): Omit<ResultAttempt, "id"> | null {
   const timeEvent = eventResultUnit(event) === "s";
   if (entry.unit === "s" && timeEvent && entry.value.includes(":")) return parseEventResult(entry.value, event);
@@ -114,6 +119,7 @@ export function parseResultEntry(entry: ResultEntry, event: MeetEvent): Omit<Res
   return scoredResult(`${numericText(value)}${entry.unit}`, score);
 }
 
+// Accepts supported scalar or clock-time text for the selected event.
 export function parseEventResult(value: string, event: MeetEvent): Omit<ResultAttempt, "id"> | null {
   const base = eventResultUnit(event);
   const raw = value.trim();
@@ -127,6 +133,7 @@ export function parseEventResult(value: string, event: MeetEvent): Omit<ResultAt
   return scalar ? parseResultEntry({ ...emptyEntry(scalar.unit), value: scalar.value }, event) : null;
 }
 
+// Changes the displayed unit while preserving the underlying measurement.
 export function convertResultEntry(entry: ResultEntry, unit: ResultEntryUnit, event: MeetEvent): ResultEntry {
   if (entry.unit === unit) return entry;
   const parsed = parseResultEntry(entry, event);
@@ -148,6 +155,7 @@ export function convertResultEntry(entry: ResultEntry, unit: ResultEntryUnit, ev
   return { ...emptyEntry(unit), value: numericText(value) };
 }
 
+// Selects the lowest timed score or highest field score as configured.
 export function bestResultAttempt(attempts: ResultAttempt[], order: RankingOrder): ResultAttempt | undefined {
   return attempts.reduce<ResultAttempt | undefined>((best, attempt) => {
     if (!best) return attempt;

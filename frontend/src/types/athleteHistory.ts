@@ -1,3 +1,4 @@
+// Grouped athlete history used by the profile tabs.
 import type { EventParticipant, FailedEventProfile, MeetEvent, ResultAttempt } from "./event";
 
 export type AthleteHistoryEvent = {
@@ -11,6 +12,7 @@ export type AthleteHistoryMeet = {
   id: number;
   name: string;
   date: string;
+  endDate?: string | null;
   dateIsFromEvent: boolean;
   location: string | null;
   events: AthleteHistoryEvent[];

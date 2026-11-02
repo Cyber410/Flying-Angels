@@ -1,3 +1,4 @@
+// Extracts useful API error messages, including non-JSON proxy failures.
 // Both meet and event endpoints return ApiErrorResponse on failure.
 export async function checkResponse(response: Response, fallback: string): Promise<void> {
   if (response.ok) return;

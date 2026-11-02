@@ -34,7 +34,9 @@ public class AthleteController {
             @RequestParam(defaultValue="active") String archive,
             @RequestParam(required=false) Integer minAge, @RequestParam(required=false) Integer maxAge,
             @RequestParam(required=false) @org.springframework.format.annotation.DateTimeFormat(iso=org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate ageAsOf) {
-        var athletes = minAge == null && maxAge == null ? athleteService.searchIncludingArchived(search,gender,team)
+        var athletes = minAge == null && maxAge == null
+                ? (archive.equals("active") ? athleteService.search(search,gender,team)
+                    : athleteService.searchIncludingArchived(search,gender,team))
                 : athleteService.search(search,gender,team,minAge,maxAge,ageAsOf);
 		if (!List.of("active","archived","all").contains(archive)) throw new IllegalArgumentException("Archive filter must be active, archived, or all");
         return athletes.stream().filter(a -> archive.equals("all") || a.isArchived() == archive.equals("archived"))

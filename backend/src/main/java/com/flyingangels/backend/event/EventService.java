@@ -133,6 +133,10 @@ public class EventService {
     public List<EventParticipation> assignBatch(Long eventId,List<Long> athleteIds) {
         if (new HashSet<>(athleteIds).size()!=athleteIds.size()) throw new IllegalArgumentException("Repeated athlete IDs");
         Event event=get(eventId);
+        for (Long athleteId : athleteIds) {
+            if (participationRepository.existsByEventIdAndAthleteId(eventId,athleteId))
+                throw new DuplicateResultException(eventId,athleteId);
+        }
         return athleteIds.stream().map(id->ensureParticipant(event,id)).toList();
     }
     @Transactional(readOnly=true)

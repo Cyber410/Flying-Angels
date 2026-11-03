@@ -18,4 +18,3 @@ public class AthleteImportController {
     public AthleteImportResponse importFile(@RequestParam("file") MultipartFile file,
             @RequestParam(defaultValue="UPLOAD") String source) throws IOException {return service.importFile(file,source);}
 }
-

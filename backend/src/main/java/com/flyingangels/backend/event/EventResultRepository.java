@@ -16,6 +16,7 @@ public interface EventResultRepository extends JpaRepository<EventResult, Long>,
 	boolean existsByEventIdAndAthleteId(Long eventId, Long athleteId);
 
 	List<EventResult> findByEventIdAndAthleteId(Long eventId, Long athleteId);
+    Optional<EventResult> findByClientId(String clientId);
     void deleteByEventIdAndAthleteId(Long eventId, Long athleteId);
     void deleteByAthleteId(Long athleteId);
 

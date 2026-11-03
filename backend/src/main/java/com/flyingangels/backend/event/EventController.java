@@ -7,6 +7,7 @@ import com.flyingangels.backend.event.dto.EventResultRequest;
 import com.flyingangels.backend.event.dto.EventResultResponse;
 import com.flyingangels.backend.event.dto.EventParticipantRequest;
 import com.flyingangels.backend.event.dto.ParticipantResultRequest;
+import com.flyingangels.backend.event.dto.*;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -67,9 +68,9 @@ public class EventController {
 
 	@PostMapping("/api/events/{id}/participants")
 	@ResponseStatus(HttpStatus.CREATED)
-	public com.flyingangels.backend.event.dto.EventParticipationResponse assignParticipant(@PathVariable Long id,
+	public EventParticipationResponse assignParticipant(@PathVariable Long id,
 			@Valid @RequestBody EventParticipantRequest request) {
-		return com.flyingangels.backend.event.dto.EventParticipationResponse.from(eventService.assignParticipant(id, request));
+		return EventParticipationResponse.from(eventService.assignParticipant(id, request));
 	}
 
 	@PutMapping("/api/events/{id}/participants/{athleteId}/result")
@@ -89,17 +90,34 @@ public class EventController {
 	public void deleteResult(@PathVariable Long id, @PathVariable Long resultId) {
 		eventService.deleteResult(id, resultId);
 	}
-    @GetMapping("/api/events/{id}/participants")
-    public List<com.flyingangels.backend.event.dto.EventParticipationResponse> participants(@PathVariable Long id) {
-        return eventService.participants(id).stream().map(com.flyingangels.backend.event.dto.EventParticipationResponse::from).toList();
-    }
-    @PostMapping("/api/events/{id}/participants/bulk") @ResponseStatus(HttpStatus.CREATED)
-    public List<com.flyingangels.backend.event.dto.EventParticipationResponse> assignBulk(@PathVariable Long id,
-            @Valid @RequestBody com.flyingangels.backend.event.dto.ParticipantBatchRequest request) {
-        return eventService.assignBatch(id,request.athleteIds()).stream().map(com.flyingangels.backend.event.dto.EventParticipationResponse::from).toList();
-    }
-    @DeleteMapping("/api/events/{id}/participants/{athleteId}") @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void removeParticipant(@PathVariable Long id,@PathVariable Long athleteId) { eventService.removeParticipant(id,athleteId); }
+
+	@GetMapping("/api/events/{id}/participants")
+	public List<EventParticipationResponse> participants(@PathVariable Long id) {
+		return eventService.participants(id).stream().map(EventParticipationResponse::from).toList();
+	}
+	@PostMapping("/api/events/{id}/participants/bulk")
+	@ResponseStatus(HttpStatus.CREATED)
+	public List<EventParticipationResponse> assignBatch(@PathVariable Long id, @Valid @RequestBody ParticipantBatchRequest request) {
+		return eventService.assignBatch(id, request.athleteIds()).stream().map(EventParticipationResponse::from).toList();
+	}
+	@DeleteMapping("/api/events/{id}/participants/{athleteId}")
+	@ResponseStatus(HttpStatus.NO_CONTENT)
+	public void removeParticipant(@PathVariable Long id, @PathVariable Long athleteId) { eventService.removeParticipant(id, athleteId); }
+
+	@GetMapping("/api/events/{id}/note")
+	public java.util.Map<String, String> note(@PathVariable Long id) { return java.util.Map.of("text", eventService.getNote(id, null)); }
+	@PutMapping("/api/events/{id}/note")
+	public java.util.Map<String, String> note(@PathVariable Long id, @Valid @RequestBody EventNoteRequest request) { return java.util.Map.of("text", eventService.saveNote(id, null, request.text())); }
+	@PostMapping("/api/events/{id}/note/migrate-browser-data")
+	public java.util.Map<String, String> migrateEventNote(@PathVariable Long id, @Valid @RequestBody EventNoteRequest request) { return java.util.Map.of("text", eventService.migrateEventNote(id, request.text())); }
+	@GetMapping("/api/events/{id}/participants/{athleteId}/note")
+	public java.util.Map<String, String> performanceNote(@PathVariable Long id, @PathVariable Long athleteId) { return java.util.Map.of("text", eventService.getNote(id, athleteId)); }
+	@PutMapping("/api/events/{id}/participants/{athleteId}/note")
+	public java.util.Map<String, String> performanceNote(@PathVariable Long id, @PathVariable Long athleteId, @Valid @RequestBody EventNoteRequest request) { return java.util.Map.of("text", eventService.saveNote(id, athleteId, request.text())); }
+	@PostMapping("/api/events/{id}/participants/{athleteId}/migrate-browser-data")
+	public EventParticipationResponse migrateBrowserData(@PathVariable Long id, @PathVariable Long athleteId, @Valid @RequestBody BrowserDataRequest request) {
+		return EventParticipationResponse.from(eventService.migrateBrowserData(id, athleteId, request));
+	}
     @GetMapping("/api/events/{id}/results")
     public List<EventResultResponse> results(@PathVariable Long id) { return eventService.get(id).getResults().stream().map(EventResultResponse::from).toList(); }
     @PostMapping("/api/events/{id}/results/bulk") @ResponseStatus(HttpStatus.CREATED)

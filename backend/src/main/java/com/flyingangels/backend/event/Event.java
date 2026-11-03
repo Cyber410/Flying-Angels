@@ -37,6 +37,8 @@ public class Event {
 	private LocalDate eventDate;
 	private String location;
 	private String eventType;
+    @jakarta.persistence.Column(length=2000) private String note;
+    public void setNote(String note) { this.note=note==null || note.isBlank()?null:note.trim(); }
 	@jakarta.persistence.Column(length=500) private String externalUrl;
 
 	@ManyToOne(optional = false)
@@ -51,6 +53,7 @@ public class Event {
 	private RankingOrder rankingOrder;
 
 	@OneToMany(mappedBy = "event", cascade = CascadeType.ALL, orphanRemoval = true)
+	@jakarta.persistence.OrderBy("id ASC")
 	private java.util.Set<EventResult> results = new java.util.LinkedHashSet<>();
 
     @OneToMany(mappedBy="event", cascade=CascadeType.ALL, orphanRemoval=true)

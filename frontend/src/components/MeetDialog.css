@@ -1,0 +1,250 @@
+.meet-dialog {
+  width: min(480px, calc(100% - 32px));
+  max-height: calc(100svh - 48px);
+  padding: 24px;
+  color: var(--text);
+  background: #fdfdfc;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.16);
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+
+.meet-dialog::backdrop {
+  background: rgba(32, 36, 39, 0.4);
+}
+
+.meet-dialog-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.meet-dialog-heading h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.meet-dialog-close {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  color: var(--text-secondary);
+  background: transparent;
+  border: 0;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 24px;
+  line-height: 1;
+}
+
+.meet-dialog-close:hover:not(:disabled) {
+  background: var(--surface-secondary);
+}
+
+.meet-form {
+  display: grid;
+  gap: 16px;
+}
+
+.meet-form-field {
+  display: grid;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.meet-form-field input,
+.meet-form-field select,
+.meet-form-field textarea {
+  width: 100%;
+  min-width: 0;
+  height: 40px;
+  padding: 0 10px;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-weight: 400;
+}
+
+.meet-form-field textarea {
+  height: auto;
+  min-height: 120px;
+  padding: 10px;
+  resize: vertical;
+}
+
+.meet-form-help {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.meet-result-entry-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 180px);
+  align-items: end;
+  gap: 12px;
+}
+
+.meet-clock-entry {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.meet-clock-entry legend {
+  margin-bottom: 6px;
+  padding: 0;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.meet-clock-values {
+  display: flex;
+  gap: 8px;
+}
+
+.meet-clock-values .meet-form-field {
+  min-width: 0;
+  flex: 1;
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+.meet-clock-values input {
+  padding: 0 8px;
+  color: var(--text);
+  font-size: 13px;
+}
+
+.meet-result-preview {
+  padding: 10px 12px;
+  color: var(--text-secondary);
+  background: var(--surface-secondary);
+  border: 1px solid var(--border-light);
+  border-radius: 4px;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.meet-result-preview strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+@media (max-width: 420px) {
+  .meet-result-entry-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.meet-notes-notice {
+  padding: 10px 12px;
+  color: #755126;
+  background: #fff6e8;
+  border: 1px solid #e6d1b1;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.meet-choice-list {
+  max-height: 260px;
+  margin: 0;
+  padding: 4px;
+  border: 1px solid var(--border-light);
+  border-radius: 4px;
+  overflow-y: auto;
+}
+
+.meet-choice {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 9px 10px;
+  border-radius: 3px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.meet-choice:hover {
+  background: var(--surface-hover);
+}
+
+.meet-choice input {
+  margin: 4px 0 0;
+  flex-shrink: 0;
+  accent-color: var(--orange-dark);
+}
+
+.meet-choice small {
+  display: block;
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+.meet-choice:has(input:disabled) {
+  color: var(--text-muted);
+  cursor: default;
+}
+
+.meet-choice-empty {
+  padding: 16px;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.meet-custom-event {
+  padding: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border-light);
+  border-radius: 4px;
+}
+
+.meet-custom-event summary {
+  color: var(--orange-dark);
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.meet-custom-event[open] summary {
+  margin-bottom: 12px;
+}
+
+.meet-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.meet-dialog-message {
+  margin: 0 0 16px;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.meet-dialog-error {
+  padding: 10px 12px;
+  color: #a33325;
+  background: #fff1ed;
+  border: 1px solid #ebc7be;
+  border-radius: 4px;
+  font-size: 13px;
+}
+
+.meet-dialog button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.meet-dialog :is(button, input, select, textarea, summary):focus-visible {
+  outline: 2px solid var(--orange);
+  outline-offset: 2px;
+}

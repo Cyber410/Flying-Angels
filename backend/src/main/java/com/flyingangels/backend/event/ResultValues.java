@@ -39,19 +39,29 @@ public final class ResultValues {
             return new Measurement(null,unit,status);
         }
         String text=raw.trim();
-        if (unit==ResultUnit.METRES) text=text.replaceFirst("(?i)\\s*m$", "").trim();
+        BigDecimal multiplier=BigDecimal.ONE;
+        if (unit==ResultUnit.METRES) {
+            if (text.matches("(?i).*cm$")) { multiplier=new BigDecimal("0.01"); text=text.replaceFirst("(?i)\\s*cm$", "").trim(); }
+            else text=text.replaceFirst("(?i)\\s*m$", "").trim();
+        }
+        if (unit==ResultUnit.SECONDS) {
+            if (text.matches("(?i).*min$")) { multiplier=BigDecimal.valueOf(60); text=text.replaceFirst("(?i)\\s*min$", "").trim(); }
+            else text=text.replaceFirst("(?i)\\s*s$", "").trim();
+        }
         BigDecimal value;
         try {
             if (text.contains(":")) {
-                if (unit!=ResultUnit.SECONDS || !text.matches("\\d+:[0-5]\\d(?:\\.\\d+)?")) throw new NumberFormatException();
+                if (unit!=ResultUnit.SECONDS || !text.matches("\\d+:(?:[0-5]\\d:)?[0-5]\\d(?:\\.\\d+)?")) throw new NumberFormatException();
                 String[] parts=text.split(":");
-                value=new BigDecimal(parts[0]).multiply(BigDecimal.valueOf(60)).add(new BigDecimal(parts[1]));
+                value=BigDecimal.ZERO;
+                for (String part:parts) value=value.multiply(BigDecimal.valueOf(60)).add(new BigDecimal(part));
             } else {
                 if (!text.matches("\\d+(?:\\.\\d+)?")) throw new NumberFormatException();
                 value=new BigDecimal(text);
             }
         } catch (NumberFormatException ex) { throw new IllegalArgumentException("Unrecognized result format: " + raw); }
-        if (value.precision()-value.scale()>8 || value.scale()>4) throw new IllegalArgumentException("Result exceeds supported precision");
+        value=value.multiply(multiplier).setScale(4,java.math.RoundingMode.HALF_UP).stripTrailingZeros();
+        if (value.precision()-value.scale()>8) throw new IllegalArgumentException("Result exceeds supported precision");
         if (supplied!=null && value.compareTo(supplied)!=0) throw new IllegalArgumentException("Score must match normalized result value");
         return new Measurement(value,unit,ResultStatus.VALID);
     }

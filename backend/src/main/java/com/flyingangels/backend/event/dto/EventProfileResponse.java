@@ -8,6 +8,7 @@ public record EventProfileResponse(EventResponse event, List<EventResultResponse
 
 	public static EventProfileResponse from(Event event) {
 		return new EventProfileResponse(EventResponse.from(event),
-				event.getResults().stream().map(EventResultResponse::from).toList(), event.getParticipations().stream().map(EventParticipationResponse::from).toList());
+				event.getResults().stream().map(EventResultResponse::from).toList(),
+				event.getParticipations().stream().map(EventParticipationResponse::from).toList());
 	}
 }

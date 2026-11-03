@@ -16,12 +16,23 @@ import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.multipart.support.MissingServletRequestPartException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 import java.io.IOException;
 import java.time.Instant;
 
 @RestControllerAdvice
 public class ApiExceptionHandler {
+
+	@ExceptionHandler(org.springframework.orm.ObjectOptimisticLockingFailureException.class)
+	ResponseEntity<ApiErrorResponse> changedData(Exception exception, HttpServletRequest request) {
+		return error(HttpStatus.CONFLICT, "DATA_CHANGED", "This record changed while you were saving. Reload it and try again.", request);
+	}
+
+	@ExceptionHandler(MaxUploadSizeExceededException.class)
+	ResponseEntity<ApiErrorResponse> uploadTooLarge(MaxUploadSizeExceededException exception, HttpServletRequest request) {
+		return error(HttpStatus.PAYLOAD_TOO_LARGE, "FILE_TOO_LARGE", "The file must be 10 MB or smaller", request);
+	}
 
 	@ExceptionHandler(AthleteNotFoundException.class)
 	ResponseEntity<ApiErrorResponse> athleteNotFound(AthleteNotFoundException exception, HttpServletRequest request) {

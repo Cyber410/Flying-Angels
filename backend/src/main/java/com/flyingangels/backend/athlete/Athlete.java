@@ -35,6 +35,8 @@ public class Athlete {
 	private String flyaStatus;
 	private LocalDate dateOfBirth;
 	private String gender;
+    @Column(nullable=false, columnDefinition="boolean default false") private boolean archived;
+    public void setArchived(boolean archived) { this.archived=archived; }
 
 	@Column(unique = true, length = 64)
 	private String importKey;

@@ -22,9 +22,7 @@ services:
     ports:
       - "3306:3306"
     volumes:
-      # Local testing: database contents are lost when MySQL stops.
-      - type: tmpfs
-        target: /var/lib/mysql
+      - mysql_data:/var/lib/mysql
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-proot"]
       interval: 10s
@@ -46,3 +44,6 @@ services:
       SPRING_DATASOURCE_PASSWORD: apppassword
     ports:
       - "8080:8080"
+
+volumes:
+  mysql_data:

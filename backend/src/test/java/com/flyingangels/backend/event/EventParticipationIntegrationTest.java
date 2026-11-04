@@ -69,4 +69,20 @@ class EventParticipationIntegrationTest extends DatabaseIntegrationTest {
         assertEquals(1,athletes.profile(ada.getId()).participations().size());
         mockMvc.perform(delete("/api/events/{id}/participants/{athleteId}",race.getId(),ada.getId())).andExpect(status().isNotFound());
     }
+
+    @Test @DisplayName("T59 single assignment of an unknown athlete returns 404 ATHLETE_NOT_FOUND and creates nothing")
+    void singleAssignmentOfUnknownAthleteReturnsNotFound() throws Exception {
+        mockMvc.perform(post("/api/events/{id}/participants",race.getId()).contentType("application/json")
+                .content("{\"athleteId\":9223372036854775807}"))
+                .andExpect(status().isNotFound()).andExpect(jsonPath("$.code").value("ATHLETE_NOT_FOUND"));
+        assertEquals(0,participationRepository.count());
+    }
+
+    @Test @DisplayName("T59 single assignment to an unknown event returns 404 EVENT_NOT_FOUND and creates nothing")
+    void singleAssignmentToUnknownEventReturnsNotFound() throws Exception {
+        mockMvc.perform(post("/api/events/{id}/participants",9223372036854775807L).contentType("application/json")
+                .content("{\"athleteId\":"+ada.getId()+"}"))
+                .andExpect(status().isNotFound()).andExpect(jsonPath("$.code").value("EVENT_NOT_FOUND"));
+        assertEquals(0,participationRepository.count());
+    }
 }

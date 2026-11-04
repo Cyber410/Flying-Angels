@@ -17,6 +17,8 @@ For choosing endpoints by task and testing the real client CSV, read [Backend wo
 
 From the repository root, build/start the development stack:
 
+First configure the Git-ignored `.env` using `.env.example`; see [local Docker setup](../local-docker.md).
+
 ```sh
 docker compose up --build mysql backend
 ```

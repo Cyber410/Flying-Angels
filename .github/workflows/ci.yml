@@ -172,6 +172,7 @@ jobs:
         uses: aws-actions/amazon-ecr-login@v2
 
       - name: Publish verified images and record ECR digests
+        id: publish
         if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.publish_images)
         env:
           ECR_REGISTRY: ${{ steps.ecr.outputs.registry }}
@@ -185,6 +186,14 @@ jobs:
           docker tag "$FRONTEND_IMAGE" "$frontend_uri"
           docker push "$backend_uri"
           docker push "$frontend_uri"
+          # Convenience aliases for the most recently published images. CD still
+          # uses the unique release tag's digests recorded below.
+          export BACKEND_LATEST_URI="$ECR_REGISTRY/$BACKEND_REPOSITORY:latest"
+          export FRONTEND_LATEST_URI="$ECR_REGISTRY/$FRONTEND_REPOSITORY:latest"
+          docker tag "$BACKEND_IMAGE" "$BACKEND_LATEST_URI"
+          docker tag "$FRONTEND_IMAGE" "$FRONTEND_LATEST_URI"
+          docker push "$BACKEND_LATEST_URI"
+          docker push "$FRONTEND_LATEST_URI"
           backend_digest=$(aws ecr describe-images --repository-name "$BACKEND_REPOSITORY" --image-ids "imageTag=$IMAGE_TAG" --query 'imageDetails[0].imageDigest' --output text)
           frontend_digest=$(aws ecr describe-images --repository-name "$FRONTEND_REPOSITORY" --image-ids "imageTag=$IMAGE_TAG" --query 'imageDetails[0].imageDigest' --output text)
           export BACKEND_IMAGE_URI="$ECR_REGISTRY/$BACKEND_REPOSITORY@$backend_digest"
@@ -204,8 +213,21 @@ jobs:
               summary.write(f"Commit: `{images['commit']}`\n\nTag: `{images['tag']}`\n\n")
               for container in ("backend", "frontend"):
                   summary.write(f"**{container}**\n\n```text\n{images[container]}\n```\n\n")
-              summary.write("Use these digest references in the ECS task definition. This workflow does not deploy ECS or start AWS compute.\n")
+              summary.write("Moving latest aliases (updated by publishing from development or main):\n\n")
+              for alias in ("BACKEND_LATEST_URI", "FRONTEND_LATEST_URI"):
+                  summary.write(f"```text\n{os.environ[alias]}\n```\n\n")
+              summary.write("CD deploys the exact image digests above; latest does not identify the currently deployed version.\n\n")
+              summary.write("The separate CD workflow in cd.yaml deploys this release after successful CI on a main push when AWS_DEPLOY_ENABLED is true. Development pushes publish images only.\n")
           PY
+
+      - name: Upload published release metadata for CD
+        if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.publish_images)
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-images-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/published-images.json
+          if-no-files-found: error
+          retention-days: 7
 
       - name: Collect Compose status and logs
         if: always()

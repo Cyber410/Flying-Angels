@@ -834,7 +834,7 @@ CORS controls browser access; it does not replace authentication or restrict a n
 | Application name | backend |
 | HTTP port | 8080 |
 | JDBC URL | `jdbc:mysql://mysql:3306/flying_angels?createDatabaseIfNotExist=true&useSSL=false&serverTimezone=UTC` |
-| Default DB username/password | root / empty password; Compose overrides these |
+| Default DB username/password | root / empty password; local Compose overrides these using `.env` |
 | Hibernate schema action | update; creates missing tables/columns from entity mappings |
 | Open EntityManager in View | false |
 | SQL logging | enabled in default profile |
@@ -870,6 +870,8 @@ Commands in this section use a POSIX shell. On Windows, use `mvnw.cmd` with equi
 
 From the `Flying-Angels` repository root:
 
+On first setup, copy `.env.example` to `.env` and set `MYSQL_PASSWORD` and `MYSQL_ROOT_PASSWORD`. Compose automatically loads this private Git-ignored file and uses the same application username/password for MySQL and the backend.
+
 ```sh
 docker compose up --build mysql backend
 ```
@@ -880,7 +882,7 @@ For the full development stack:
 docker compose up --build
 ```
 
-The MySQL health check gates backend startup. For local import testing, MySQL currently uses a temporary `tmpfs` mount at `/var/lib/mysql`: its database contents are lost whenever the MySQL container stops or restarts. Recreate the containers after changing storage configuration (`docker compose down`, then the startup command above). An existing `mysql_data` volume is not mounted or deleted by this configuration. Frontend listens on 5173, backend on 8080, and MySQL on host port 3306. Compose supplies the backend with its development app database credentials.
+The MySQL health check gates backend startup and reads its root password from the container environment. For local import testing, MySQL currently uses a temporary `tmpfs` mount at `/var/lib/mysql`: its database contents are lost whenever the MySQL container stops or restarts. Recreate the containers after changing storage configuration (`docker compose down`, then the startup command above). An existing `mysql_data` volume is not mounted or deleted by this configuration. Frontend listens on 5173, backend on 8080, and MySQL on host port 3306. Compose reads database credentials from `.env`. Frontend/backend share the `application` bridge; backend/MySQL share the `database` bridge. Published host ports remain separate access paths. See [local Docker setup](../docs/local-docker.md).
 
 To restore persistent storage, replace the MySQL mount with `- mysql_data:/var/lib/mysql`, restore the top-level `volumes: { mysql_data: {} }` declaration, and recreate the containers. Use a persistent configuration for data you intend to retain.
 
@@ -905,12 +907,12 @@ Then, from `backend/`, configure host-accessible database settings:
 
 ```sh
 SPRING_DATASOURCE_URL='jdbc:mysql://localhost:3306/flying_angels?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true' \
-SPRING_DATASOURCE_USERNAME=appuser \
-SPRING_DATASOURCE_PASSWORD=apppassword \
+SPRING_DATASOURCE_USERNAME='YOUR_MYSQL_USER_FROM_ENV' \
+SPRING_DATASOURCE_PASSWORD='YOUR_MYSQL_PASSWORD_FROM_ENV' \
 bash mvnw spring-boot:run
 ```
 
-Those credentials match the checked-in development Compose file. Use your actual credentials for another database. Avoid running both host and container backends on the same port.
+Replace the two placeholders with the values from your private `.env`, or configure equivalent environment variables in your IDE. Compose loads `.env` automatically; a bare Maven process does not. Use your actual credentials for another database. Avoid running both host and container backends on the same HTTP port.
 
 ### Build and package
 

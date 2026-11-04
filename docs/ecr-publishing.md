@@ -37,6 +37,8 @@ The required GitHub status check is **Build, test and verify containers**. If br
 
 Repository values are names, not full ECR URLs. Both private repositories must already exist in the selected region and account. The workflow discovers the registry address after authentication. Learner Lab supports `us-east-1` and `us-west-2` according to its Readme.
 
+Both repositories must allow the `latest` tag to be overwritten. If a repository is already **Mutable** without an exclusion blocking `latest`, no change is needed. If it is **Immutable**, open **ECR → Private repositories → select repository → Actions → Edit → Repository**, keep Immutable selected and add `latest` as an **Immutable tag exclusion**, then save. This keeps version tags protected while allowing the moving alias to change. Repeat for the backend and frontend repositories. See [AWS tag-mutability settings](https://docs.aws.amazon.com/AmazonECR/latest/userguide/image-tag-mutability.html). CI does not change repository policies; an immutable `latest` tag will cause a later publication to fail.
+
 `AWS_DEPLOY_ENABLED=true` enables deployment after successful publishing on a push to `main`. Configure `ECS_CLUSTER` and `ECS_SERVICE` for the infrastructure you create once, as described in [ECS continuous delivery](aws-deployment.md). Database settings and secret references remain in the existing ECS task definition. No database password is needed in GitHub.
 
 The lab's temporary user credentials provide publishing access. The existing `LabRole` is intended for ECS task and execution roles; the lab documents its ECR access as read-only, so the workflow does not assume that role to push images.
@@ -62,6 +64,16 @@ Manual runs remain available for verification or republishing. Select **Actions 
 GitHub requires a `workflow_dispatch` workflow on the repository's default branch for manual runs. If this updated workflow exists only on `development` while the default branch is `main`, manual runs may not be available yet. Automatic publishing after a push to `development` works regardless; changing the default branch is unnecessary for the automatic path.
 
 Tags have the form `sha-<commit>-<run-id>-<attempt>`, so a rerun does not overwrite a previous release. The summary also provides immutable references such as `ACCOUNT.dkr.ecr.REGION.amazonaws.com/flying-angels-backend@sha256:...`. CI uploads a dedicated `release-images-<run-id>-<attempt>` artifact containing `published-images.json`. The separate CD workflow downloads that exact run/attempt artifact and verifies its commit before deploying the image digests; you do not copy image references manually.
+
+Each publishing run also pushes `latest` for both repositories, using the same local images that passed the checks. Both versioned images are pushed before either alias is updated. These are additional tags on the images, not extra application builds. Pull-request runs and manual verification without publishing do not update them.
+
+| Reference | Meaning |
+| --- | --- |
+| `flying-angels-backend:latest` / `flying-angels-frontend:latest` | Most recently published image in each repository, from development or main |
+| `sha-<commit>-<run-id>-<attempt>` | Version from one particular CI run/attempt |
+| `repository@sha256:...` | Immutable image content; CD continues to deploy these exact references |
+
+`latest` means the most recent publication, not necessarily the newest Git commit or the version running in ECS. A development publication or an explicit rerun of an older release can move it. Updates to the two repositories are separate operations, so a failure can leave their aliases referring to different releases; use the successful run's digest pair when setting up ECS. Pushing a new `latest` tag alone does not restart ECS tasks. Main's existing CD workflow registers a task revision using that release's recorded digests and updates the service automatically. See [AWS image-resolution behavior](https://repost.aws/knowledge-center/ecs-latest-image-digest).
 
 The run's `verification-<run-id>-<attempt>` artifact contains `published-images.json`, backend test reports, HTTP test output, and Compose logs. The JSON is generated only after both pushes and digest lookups succeed. ECR pushes are separate operations: if the second push fails, the first image can still exist. A failed run must not be treated as a completed release; fix the error and rerun.
 

@@ -6,6 +6,8 @@ For which endpoint to use and when, including preview/commit behavior with the r
 
 Backend review assets: [Postman tests](docs/postman/README.md) and [Architecture Decision Records](docs/adr/README.md).
 
+For local Docker, copy `.env.example` to `.env` on first setup and fill in the database passwords, then run `docker compose up --build`. The private `.env` is ignored by Git. See [local Docker environment and networks](docs/local-docker.md).
+
 ## Overview
 The Flying Angels Management System is a centralized platform designed to support the operations of Flying Angels, a youth sports development organization serving athletes and families across the GTA and Southwestern Ontario.
 

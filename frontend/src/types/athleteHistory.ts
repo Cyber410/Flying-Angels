@@ -1,0 +1,25 @@
+// Grouped athlete history used by the profile tabs.
+import type { EventParticipant, FailedEventProfile, MeetEvent, ResultAttempt } from "./event";
+
+export type AthleteHistoryEvent = {
+  event: MeetEvent;
+  participant: EventParticipant;
+  attempts: ResultAttempt[];
+  note: string;
+};
+
+export type AthleteHistoryMeet = {
+  id: number;
+  name: string;
+  date: string;
+  endDate?: string | null;
+  dateIsFromEvent: boolean;
+  location: string | null;
+  events: AthleteHistoryEvent[];
+};
+
+export type AthleteMeetHistory = {
+  meets: AthleteHistoryMeet[];
+  warnings: string[];
+  failedEvents: FailedEventProfile[];
+};

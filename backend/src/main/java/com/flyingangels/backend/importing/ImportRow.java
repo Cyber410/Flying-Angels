@@ -10,6 +10,8 @@ public class ImportRow {
     @Column(nullable=false,length=20) private String status;
     @Column(length=2000) private String explanation;
     private Long athleteId;
+    private Integer repeatedOfRowNumber;
     public ImportRow(ImportJob job,int rowNumber,String status,String explanation) { this.job=job;this.rowNumber=rowNumber;this.status=status;this.explanation=explanation==null?null:explanation.substring(0,Math.min(2000,explanation.length())); }
     public void outcome(String status,String explanation,Long athleteId) { this.status=status;this.explanation=explanation==null?null:explanation.substring(0,Math.min(2000,explanation.length()));this.athleteId=athleteId; }
+    public void repeatedOf(int rowNumber) { this.repeatedOfRowNumber=rowNumber; }
 }

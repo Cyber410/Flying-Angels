@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { getAthleteById, getAthletes } from "./athleteService";
+import { getAthleteById, getAthletes, setAthletesArchived } from "./athleteService";
 import { buildAthlete } from "../test/athleteTestData";
 
 /**
@@ -27,6 +27,16 @@ afterEach(() => {
 });
 
 describe("athleteService.getAthletes (UC-01)", () => {
+  it("can include archived athletes for historical demographics", async () => {
+    const fetchMock = stubFetch(fakeResponse([]));
+    await getAthletes("all");
+    expect(fetchMock).toHaveBeenCalledWith("/api/athletes?archive=all");
+  });
+  it("sends bulk archive and restore requests", async () => {
+    const fetchMock = stubFetch(fakeResponse([]));
+    await setAthletesArchived([1, 2], true);
+    expect(fetchMock).toHaveBeenCalledWith("/api/athletes/archive", expect.objectContaining({method:"PUT",body:JSON.stringify({athleteIds:[1,2],archived:true})}));
+  });
   it("requests the directory endpoint and returns the athletes", async () => {
     const athletes = [buildAthlete({ id: 1 }), buildAthlete({ id: 2 })];
     const fetchMock = stubFetch(fakeResponse(athletes));

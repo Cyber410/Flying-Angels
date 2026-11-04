@@ -19,6 +19,66 @@ public class EventService {
     private final EventParticipationRepository participationRepository;
     private final com.flyingangels.backend.note.AthleteNoteRepository noteRepository;
 
+    private EventParticipation ensureParticipant(Event event, Long athleteId) {
+        var existing = participationRepository.findByEventIdAndAthleteId(event.getId(), athleteId);
+        if (existing.isPresent()) return existing.get();
+        Athlete athlete = athleteRepository.findById(athleteId).orElseThrow(() -> new AthleteService.AthleteNotFoundException(athleteId));
+        if (athlete.isArchived()) throw new IllegalArgumentException("Restore this athlete before adding them to an event");
+        EventParticipation participant = participationRepository.save(new EventParticipation(event, athlete));
+        event.getParticipations().add(participant);
+        return participant;
+    }
+
+    @Transactional(readOnly = true)
+    public String getNote(Long eventId, Long athleteId) {
+        Event event = get(eventId);
+        String text = athleteId == null ? event.getNote() : participationRepository.findByEventIdAndAthleteId(eventId, athleteId)
+                .orElseThrow(() -> new IllegalArgumentException("Athlete is not assigned to this event")).getNote();
+        return text == null ? "" : text;
+    }
+
+    @Transactional
+    public String saveNote(Long eventId, Long athleteId, String text) {
+        Event event = get(eventId);
+        if (athleteId == null) event.setNote(text);
+        else participationRepository.findByEventIdAndAthleteId(eventId, athleteId)
+                .orElseThrow(() -> new IllegalArgumentException("Athlete is not assigned to this event")).setNote(text);
+        return text.trim();
+    }
+
+    @Transactional
+    public EventParticipation migrateBrowserData(Long eventId, Long athleteId, BrowserDataRequest request) {
+        Event event = get(eventId);
+        EventParticipation participant = ensureParticipant(event, athleteId);
+        if (request.note() != null && !request.note().isBlank()) {
+            if (participant.getNote() != null && !participant.getNote().isBlank() && !participant.getNote().equals(request.note().trim()))
+                throw new IllegalArgumentException("A different shared performance note already exists. Review the saved note manually; it has been preserved.");
+            participant.setNote(request.note());
+        }
+        for (var attempt : request.attempts()) {
+            var prior = resultRepository.findByClientId(attempt.clientId());
+            if (prior.isPresent()) {
+                if (prior.get().getEvent() == null || !prior.get().getEvent().getId().equals(eventId) || !prior.get().getAthlete().getId().equals(athleteId))
+                    throw new IllegalArgumentException("This saved attempt belongs to another participation");
+                continue;
+            }
+            var matching = resultRepository.findByEventIdAndAthleteId(eventId, athleteId).stream()
+                    .filter(result -> result.getClientId() == null && result.getScore() != null && result.getScore().compareTo(attempt.score()) == 0).findFirst();
+            if (matching.isPresent()) matching.get().setClientId(attempt.clientId());
+            else addResult(eventId, new EventResultRequest(athleteId, attempt.result(), attempt.score(), null, attempt.clientId()));
+        }
+        return participant;
+    }
+
+    @Transactional
+    public String migrateEventNote(Long eventId, String text) {
+        get(eventId);
+        if (text.isBlank()) return "";
+        if (eventRepository.migrateNote(eventId, text.trim()) == 0)
+            throw new IllegalArgumentException("A different shared event note already exists. The saved note is preserved for manual review.");
+        return text.trim();
+    }
+
     @Transactional(readOnly=true)
     public List<Event> list() { return eventRepository.findAllByOrderByEventDateDescNameAsc(); }
     @Transactional(readOnly=true)
@@ -67,13 +127,17 @@ public class EventService {
     public EventParticipation assignParticipant(Long eventId,EventParticipantRequest request) {
         Event event=get(eventId); Athlete athlete=athlete(request.athleteId());
         if (participationRepository.existsByEventIdAndAthleteId(eventId,athlete.getId())) throw new DuplicateResultException(eventId,athlete.getId());
-        EventParticipation p=participationRepository.save(new EventParticipation(event,athlete));
-        event.getParticipations().add(p); return p;
+        return ensureParticipant(event,athlete.getId());
     }
     @Transactional
     public List<EventParticipation> assignBatch(Long eventId,List<Long> athleteIds) {
         if (new HashSet<>(athleteIds).size()!=athleteIds.size()) throw new IllegalArgumentException("Repeated athlete IDs");
-        return athleteIds.stream().map(id->assignParticipant(eventId,new EventParticipantRequest(id))).toList();
+        Event event=get(eventId);
+        for (Long athleteId : athleteIds) {
+            if (participationRepository.existsByEventIdAndAthleteId(eventId,athleteId))
+                throw new DuplicateResultException(eventId,athleteId);
+        }
+        return athleteIds.stream().map(id->ensureParticipant(event,id)).toList();
     }
     @Transactional(readOnly=true)
     public List<EventParticipation> participants(Long eventId) { get(eventId); return participationRepository.findByEventIdOrderByAthleteLastNameAscAthleteFirstNameAsc(eventId); }
@@ -87,10 +151,20 @@ public class EventService {
     }
     @Transactional
     public EventResult addResult(Long eventId,EventResultRequest request) {
-        Event event=get(eventId); Athlete athlete=athlete(request.athleteId());
+        Event event=get(eventId);
+        if (request.clientId() != null && !request.clientId().isBlank()) {
+            var existing = resultRepository.findByClientId(request.clientId());
+            if (existing.isPresent()) {
+                EventResult result = existing.get();
+                if (result.getEvent() == null || !result.getEvent().getId().equals(eventId) || !result.getAthlete().getId().equals(request.athleteId()))
+                    throw new IllegalArgumentException("This request ID belongs to another participation");
+                return result;
+            }
+        }
+        Athlete athlete=ensureParticipant(event,request.athleteId()).getAthlete();
         var measurement=measurement(event,request);
-        if (!participationRepository.existsByEventIdAndAthleteId(eventId,athlete.getId())) assignParticipant(eventId,new EventParticipantRequest(athlete.getId()));
         var result=new EventResult(event,event.getCategory(),athlete,request.result(),measurement.score());
+        result.setClientId(request.clientId()==null || request.clientId().isBlank()?null:request.clientId());
         result.setMeasurement(measurement.unit(),measurement.status()); event.addResult(result);
         return resultRepository.save(result);
     }
@@ -101,6 +175,29 @@ public class EventService {
     }
     @Transactional
     public List<EventResult> addResults(Long eventId,List<EventResultRequest> requests) { return requests.stream().map(r->addResult(eventId,r)).toList(); }
+    /** Edit All Results is atomic and changes existing attempts without changing their identity. */
+    @Transactional
+    public List<EventResult> updateResults(Long eventId,List<ResultUpdateRequest> requests) {
+        Event event = get(eventId);
+        if (requests == null || requests.isEmpty()) throw new IllegalArgumentException("Select at least one result to update");
+        Set<Long> selected = new HashSet<>();
+        List<ResultCorrection> corrections = new ArrayList<>();
+        for (var request : requests) {
+            if (request == null || request.resultId() == null || !selected.add(request.resultId()))
+                throw new IllegalArgumentException("Result IDs must be supplied once each");
+            var result = resultRepository.findByIdAndEventId(request.resultId(),eventId)
+                    .orElseThrow(() -> new EventResultNotFoundException(request.resultId(),eventId));
+            var value = measurement(event,new EventResultRequest(result.getAthlete().getId(),request.result(),request.score(),request.unit()));
+            corrections.add(new ResultCorrection(result,request,value));
+        }
+        for (var correction : corrections) {
+            var result = correction.result();
+            result.update(result.getAthlete(),correction.request().result(),correction.measurement().score());
+            result.setMeasurement(correction.measurement().unit(),correction.measurement().status());
+        }
+        return resultRepository.saveAll(corrections.stream().map(ResultCorrection::result).toList());
+    }
+    private record ResultCorrection(EventResult result,ResultUpdateRequest request,ResultValues.Measurement measurement) {}
     /** Legacy endpoint now appends an attempt; explicit result-ID PUT remains the correction operation. */
     @Transactional
     public EventResult recordParticipantResult(Long eventId,Long athleteId,ParticipantResultRequest request) {

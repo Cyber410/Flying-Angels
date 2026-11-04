@@ -60,6 +60,8 @@ Typical order: create/select a meet -> find/create definitions -> add or copy me
 | Add attempts for several athletes | `POST /api/events/{id}/results/bulk` | Body contains a results array |
 | Add an attempt using the participant URL | `PUT /api/events/{id}/participants/{athleteId}/result` | Compatibility route; this appends a result even though its method is PUT |
 | Read all attempts | `GET /api/events/{id}/results` | Inspect the event's full result history |
+| Edit several existing attempts atomically | `PUT /api/events/{id}/results/bulk` | Body contains results with resultId/result; no new attempts or reassignment |
+| Search competition results across meets | `GET /api/results` | Name, meet/event/category, gender and age filters; paginated and sortable |
 | Correct a particular attempt | `PUT /api/events/{id}/results/{resultId}` | Edit the identified record instead of adding another attempt |
 | Delete a particular attempt | `DELETE /api/events/{id}/results/{resultId}` | Participation remains assigned |
 | Read the event leaderboard | `GET /api/events/{id}/leaderboard` | Best comparable result per athlete in this event |
@@ -98,6 +100,7 @@ Preview does write import-job records. It does not create/update athlete profile
 | NEW | No eligible existing athlete matched | Select to create |
 | UPDATE | A matched athlete has changed supplied information | Review the changed-field explanation, then select to update |
 | UNCHANGED | A confirmed identity has the same supplied information | No athlete write is needed |
+| DUPLICATE | Identical parsed registration already appears in this upload | Excluded; repeatedOfRowNumber identifies the earlier row |
 | INVALID | A required value or another validation rule failed | Correct the file and create a new preview |
 | AMBIGUOUS | An existing name/DOB match lacks an identifier, or identity remains unresolved | Supply the actual registration identifier and create a new preview |
 
@@ -124,7 +127,7 @@ Content-Type: application/json
 }
 ```
 
-1. Check that row numbers belong to this job and are not repeated.
+1. Require at least one selected row; check that row numbers belong to this job and are not repeated.
 2. For selected NEW/UPDATE rows, lock the row and recheck the current database match/differences. Legacy VALID previews are also supported.
 3. Create a new athlete or merge changed information into the matched athlete; append newly supplied historical performances.
 4. Save one row's athlete/performance changes atomically and record IMPORTED or UPDATED with its athleteId. A row that no longer needs changes becomes UNCHANGED.
@@ -216,3 +219,7 @@ An unchanged selection does not exercise the create/update save path. To test cr
 ## 8. Where the implementation lives
 
 All import HTTP routes are in [AthleteImportController](../backend/src/main/java/com/flyingangels/backend/importing/AthleteImportController.java). The [service](../backend/src/main/java/com/flyingangels/backend/importing/AthleteImportService.java) coordinates parsing, stored jobs and selection; the [matcher](../backend/src/main/java/com/flyingangels/backend/importing/AthleteImportMatcher.java) decides NEW/UPDATE/UNCHANGED; the [row writer](../backend/src/main/java/com/flyingangels/backend/importing/ImportRowWriter.java) saves each eligible row in its own transaction. Ordinary profile operations remain in the athlete module. Both upload workflows share the same matching/writing rules.
+
+## Sprint 2 filtering and correction additions
+
+See [Sprint 2 API contracts](sprint2-api-updates.md) for exact birthday-based age filtering, atomic bulk result PUT, Results Overview queries, repeated-registration previews and the confirmed participation-removal policy.

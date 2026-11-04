@@ -47,6 +47,11 @@ public class EventResult {
 	@Column(precision = 12, scale = 4)
 	private BigDecimal score;
 
+	@Column(unique = true, length = 100)
+	private String clientId;
+
+	public void setClientId(String clientId) { this.clientId = clientId; }
+
     @Enumerated(EnumType.STRING) private ResultUnit unit;
     @Enumerated(EnumType.STRING) private ResultStatus status;
     private java.time.Instant recordedAt;

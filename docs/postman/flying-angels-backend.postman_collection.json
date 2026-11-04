@@ -2,7 +2,7 @@
   "info": {
     "name": "Flying Angels - Complete backend verification",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-    "description": "All 39 controller endpoints plus positive/negative workflows. Run folders in order against a disposable database. Fixtures are relative to docs/postman. Development uses No Auth; for prod select collection Basic Auth and set username/password locally. CSRF headers are populated automatically when a token is returned."
+    "description": "All current controller endpoints plus positive/negative workflows. Run folders in order against a disposable database. Fixtures are relative to docs/postman. Development uses No Auth; for prod select collection Basic Auth and set username/password locally. CSRF headers are populated automatically when a token is returned."
   },
   "auth": {
     "type": "noauth"
@@ -2114,6 +2114,256 @@
               }
             }
           ]
+        },
+        {
+          "name": "Capture existing attempts for Edit All Results",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/events/{{event100Id}}/results",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "var responseBody = pm.response.json();",
+                  "pm.test(\"Expected behavior\", () => {",
+                  "const selected=responseBody.filter(r=>r.athleteId===Number(pm.collectionVariables.get(\"athleteAId\"))).slice(0,2); pm.expect(selected).to.have.length(2); pm.collectionVariables.set(\"bulkEditCount\",responseBody.length); pm.collectionVariables.set(\"bulkEditFirst\",selected[0].resultId); pm.collectionVariables.set(\"bulkEditSecond\",selected[1].resultId); pm.collectionVariables.set(\"bulkRestoreBody\",JSON.stringify({results:selected.map(r=>({resultId:r.resultId,result:r.result,unit:r.unit}))}));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Edit All Results updates existing attempt IDs",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/events/{{event100Id}}/results/bulk",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"results\": [{\"resultId\":{{bulkEditFirst}},\"result\":\"12.05\",\"unit\":\"SECONDS\"},{\"resultId\":{{bulkEditSecond}},\"result\":\"12.06\",\"unit\":\"SECONDS\"}] }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "var responseBody = pm.response.json();",
+                  "pm.test(\"Expected behavior\", () => {",
+                  "pm.expect(responseBody.map(r=>r.resultId)).to.eql([Number(pm.collectionVariables.get(\"bulkEditFirst\")),Number(pm.collectionVariables.get(\"bulkEditSecond\"))]); pm.expect(responseBody.map(r=>r.score)).to.eql([12.05,12.06]);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Bulk editing preserves attempt count",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/events/{{event100Id}}/results",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "var responseBody = pm.response.json();",
+                  "pm.test(\"Expected behavior\", () => {",
+                  "pm.expect(responseBody).to.have.length(Number(pm.collectionVariables.get(\"bulkEditCount\"))); pm.expect(responseBody.find(r=>r.resultId===Number(pm.collectionVariables.get(\"bulkEditFirst\"))).score).to.equal(12.05);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Restore corrected attempts for remaining verification",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/events/{{event100Id}}/results/bulk",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{{bulkRestoreBody}}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "var responseBody = pm.response.json();",
+                  "pm.test(\"Expected behavior\", () => {",
+                  "pm.expect(responseBody).to.have.length(2);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject empty Edit All selection",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/events/{{event100Id}}/results/bulk",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"results\":[]}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Results Overview filters a meet event and sorts performances",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/results?eventId={{event100Id}}&sort=performance&size=100",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "var responseBody = pm.response.json();",
+                  "pm.test(\"Expected behavior\", () => {",
+                  "pm.expect(responseBody.totalElements).to.equal(Number(pm.collectionVariables.get(\"bulkEditCount\"))); pm.expect(responseBody.content.every(r=>r.eventId===Number(pm.collectionVariables.get(\"event100Id\")))).to.equal(true); const values=responseBody.content.filter(r=>r.status===\"VALID\").map(r=>r.score); pm.expect(values).to.eql([...values].sort((a,b)=>a-b));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Results Overview returns an empty page for no matching athlete",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/results?search=NoMatchingAthlete-{{runId}}",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "var responseBody = pm.response.json();",
+                  "pm.test(\"Expected behavior\", () => {",
+                  "pm.expect(responseBody.totalElements).to.equal(0); pm.expect(responseBody.content).to.eql([]);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Directory supports age bounds on an explicit reference date",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/athletes?minAge=0&maxAge=150&ageAsOf=2026-05-17",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "var responseBody = pm.response.json();",
+                  "pm.test(\"Expected behavior\", () => {",
+                  "pm.expect(responseBody.length).to.be.greaterThan(0); pm.expect(responseBody.every(r=>r.dateOfBirth!==null)).to.equal(true);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Directory rejects age filtering without a reference date",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/athletes?minAge=12",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
         }
       ]
     },
@@ -3471,6 +3721,277 @@
                   "pm.test(\"Expected behavior\", () => {",
                   "pm.expect(responseBody.dateOfBirth).to.equal(\"2011-01-01\"); pm.expect(responseBody.flyStatus).to.equal(\"\"); pm.expect(responseBody.note).not.to.equal(\"Confirmed registration\");",
                   "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Preview rejects header-only files",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/athletes/import/preview",
+            "description": "",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": "fixtures/athletes-header-only.csv"
+                },
+                {
+                  "key": "source",
+                  "type": "text",
+                  "value": "{{importSource}}"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Preview rejects empty files",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/athletes/import/preview",
+            "description": "",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": "fixtures/athletes-empty.csv"
+                },
+                {
+                  "key": "source",
+                  "type": "text",
+                  "value": "{{importSource}}"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Immediate rejects header-only files",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/athletes/import",
+            "description": "",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": "fixtures/athletes-header-only.csv"
+                },
+                {
+                  "key": "source",
+                  "type": "text",
+                  "value": "{{importSource}}"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Immediate rejects empty files",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/athletes/import",
+            "description": "",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": "fixtures/athletes-empty.csv"
+                },
+                {
+                  "key": "source",
+                  "type": "text",
+                  "value": "{{importSource}}"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Preview identifies repeated registrations before confirmation",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/athletes/import/preview",
+            "description": "",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": "fixtures/athletes-repeated.csv"
+                },
+                {
+                  "key": "source",
+                  "type": "text",
+                  "value": "{{importSource}}"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "var responseBody = pm.response.json();",
+                  "pm.test(\"Expected behavior\", () => {",
+                  "pm.expect(responseBody.rows.map(r=>r.status)).to.eql([\"NEW\",\"DUPLICATE\"]); pm.expect(responseBody.rows[1].repeatedOfRowNumber).to.equal(2); pm.collectionVariables.set(\"repeatedImportId\",responseBody.importId);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject empty import commit selection",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/athletes/import/{{repeatedImportId}}/commit",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"rowNumbers\":[]}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Commit imports one registration and skips its repeated row",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/athletes/import/{{repeatedImportId}}/commit",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"rowNumbers\":[2,3]}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "var responseBody = pm.response.json();",
+                  "pm.test(\"Expected behavior\", () => {",
+                  "pm.expect(responseBody.imported).to.equal(1); pm.expect(responseBody.skipped).to.equal(1); pm.expect(responseBody.failed).to.equal(0); pm.collectionVariables.set(\"repeatedAthleteId\",responseBody.rows[0].athleteId);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Clean up the repeated-registration test athlete",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/api/athletes/{{repeatedAthleteId}}",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 204\", () => pm.response.to.have.status(204));"
                 ]
               }
             }

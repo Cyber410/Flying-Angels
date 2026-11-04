@@ -80,7 +80,7 @@ class ManagementIntegrationTest extends DatabaseIntegrationTest {
         var file=new MockMultipartFile("file","registrations.csv","text/csv",("FIRST NAME,LAST NAME,DATE OF BIRTH,Gender,MEMBER #,100m\n"
             +"New,One,2010-01-01,Female,501,12.3\nNew,One,2010-01-01,Female,501,12.3\n"
             +"Bad,,0000-00-00,Male,502,NT\nExcluded,Person,2012-01-01,Male,503,\n").getBytes(java.nio.charset.StandardCharsets.UTF_8));
-        var preview=imports.preview(file,"TRACKIE");assertEquals(List.of("NEW","NEW","INVALID","NEW"),preview.rows().stream().map(ImportPreviewResponse.Row::status).toList());
+        var preview=imports.preview(file,"TRACKIE");assertEquals(List.of("NEW","DUPLICATE","INVALID","NEW"),preview.rows().stream().map(ImportPreviewResponse.Row::status).toList());
         var summary=imports.commit(preview.importId(),new ImportCommitRequest(List.of(2)));
         assertEquals(1,summary.imported());assertEquals(3,summary.skipped());assertEquals(0,summary.failed());
         var retry=imports.commit(preview.importId(),new ImportCommitRequest(List.of(2)));assertEquals(1,retry.imported());

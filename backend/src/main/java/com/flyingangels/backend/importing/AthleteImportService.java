@@ -26,11 +26,29 @@ public class AthleteImportService {
         String normalized = source == null || source.isBlank() ? "UPLOAD" : source.trim().toUpperCase(Locale.ROOT);
         if (normalized.length() > 80) throw new IllegalArgumentException("Source must be 80 characters or fewer");
         var parsed = parser.parse(file.getBytes(), filename);
+        if (parsed.isEmpty()) throw new IllegalArgumentException("No athlete records found in the uploaded file");
         var job = jobs.save(new ImportJob(filename, normalized, file.getBytes()));
+        Map<RegistrationIdentity, LinkedHashMap<com.flyingangels.backend.athlete.dto.AthleteRequest,Integer>> seen = new HashMap<>();
         for (var candidate : parsed) {
             var plan = matcher.plan(candidate, normalized);
             var row = new ImportRow(job, candidate.rowNumber(), plan.action(), plan.explanation());
             if (plan.athlete() != null) row.outcome(plan.action(), plan.explanation(), plan.athlete().getId());
+            if (!plan.action().equals("INVALID")) {
+                var occurrences = seen.computeIfAbsent(RegistrationIdentity.from(candidate), ignored -> new LinkedHashMap<>());
+                Integer identicalRow = occurrences.get(candidate.athlete());
+                if (!occurrences.isEmpty()) {
+                    int firstRow = occurrences.values().iterator().next();
+                    row.repeatedOf(identicalRow == null ? firstRow : identicalRow);
+                    if (identicalRow != null && (ImportRowWriter.eligible(plan.action()) || plan.action().equals("UNCHANGED"))) {
+                        row.outcome("DUPLICATE", "Identical registration already appears at row " + identicalRow + "; skipped",
+                                row.getAthleteId());
+                    } else {
+                        row.outcome(plan.action(), plan.explanation() + "; Repeated registration from row " + firstRow
+                                + (identicalRow == null ? " with different supplied data; eligible rows are rechecked in file order" : ""), row.getAthleteId());
+                    }
+                }
+                occurrences.putIfAbsent(candidate.athlete(), candidate.rowNumber());
+            }
             rows.save(row);
         }
         return response(job, parsed);
@@ -44,6 +62,8 @@ public class AthleteImportService {
 
     /** No outer transaction: each selected source row is applied independently, in source order. */
     public ImportCommitResponse commit(String id, ImportCommitRequest request) throws IOException {
+        if (request == null || request.rowNumbers() == null || request.rowNumbers().isEmpty())
+            throw new IllegalArgumentException("Select at least one row to commit");
         var job = job(id);
         Set<Integer> selected = new HashSet<>(request.rowNumbers());
         if (selected.size() != request.rowNumbers().size()) throw new IllegalArgumentException("Repeated row selections");
@@ -65,7 +85,7 @@ public class AthleteImportService {
             else if (status.equals("UPDATED")) updated++;
             else if (selected.contains(row.rowNumber()) && Set.of("FAILED", "INVALID", "AMBIGUOUS").contains(status)) failed++;
             else if (!selected.contains(row.rowNumber()) && ImportRowWriter.eligible(status)) { status = "SKIPPED"; explanation = "Excluded from this commit"; }
-            outcomes.add(new ImportPreviewResponse.Row(row.rowNumber(), status, explanation, row.athleteId(), row.athlete(), row.externalId()));
+            outcomes.add(new ImportPreviewResponse.Row(row.rowNumber(), status, explanation, row.athleteId(), row.athlete(), row.externalId(), row.repeatedOfRowNumber()));
         }
         return new ImportCommitResponse(id, imported, updated, outcomes.size() - imported - updated - failed, failed, outcomes);
     }
@@ -91,8 +111,16 @@ public class AthleteImportService {
         Map<Integer,AthleteRegistrationParser.ParsedRow> candidates = new HashMap<>(); parsed.forEach(r -> candidates.put(r.rowNumber(), r));
         return new ImportPreviewResponse(job.getId(), rows.findByJobIdOrderByRowNumberAsc(job.getId()).stream().map(r -> {
             var candidate = candidates.get(r.getRowNumber());
-            return new ImportPreviewResponse.Row(r.getRowNumber(), r.getStatus(), r.getExplanation(), r.getAthleteId(), candidate.athlete(), candidate.externalId());
+            return new ImportPreviewResponse.Row(r.getRowNumber(), r.getStatus(), r.getExplanation(), r.getAthleteId(), candidate.athlete(), candidate.externalId(), r.getRepeatedOfRowNumber());
         }).toList());
+    }
+    /** IDs take precedence. Without one, different DOBs remain different people. */
+    private record RegistrationIdentity(String identifier, String firstName, String lastName, java.time.LocalDate birthDate) {
+        static RegistrationIdentity from(AthleteRegistrationParser.ParsedRow row) {
+            if (row.externalId() != null) return new RegistrationIdentity(row.externalId(), null, null, null);
+            return new RegistrationIdentity(null, row.athlete().firstName().trim().toLowerCase(Locale.ROOT),
+                    row.athlete().lastName().trim().toLowerCase(Locale.ROOT), row.athlete().dateOfBirth());
+        }
     }
     public static class ImportNotFoundException extends RuntimeException { public ImportNotFoundException() { super("Import not found"); } }
 }

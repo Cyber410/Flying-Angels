@@ -28,6 +28,8 @@ public class EventCategory {
 	private RankingOrder rankingOrder;
     @Enumerated(EnumType.STRING) private ResultUnit unit;
 
+    public ResultUnit getUnit() { return unit == null ? ResultValues.unitFor(name, rankingOrder) : unit; }
+
 	public EventCategory(String name, RankingOrder rankingOrder) {
 		this.name = name.trim();
 		this.rankingOrder = rankingOrder;

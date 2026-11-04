@@ -37,13 +37,17 @@ public class Meet {
 	@OneToMany(mappedBy = "meet", cascade = CascadeType.ALL, orphanRemoval = true)
 	private List<Event> events = new ArrayList<>();
 
+    public LocalDate getStartDate() { return startDate==null?meetDate:startDate; }
+    public LocalDate getEndDate() { return endDate==null?getStartDate():endDate; }
 	public Meet(MeetRequest request) {
 		updateFrom(request);
 	}
 
 	public void updateFrom(MeetRequest request) {
+        if (!request.isDateRangeValid()) throw new IllegalArgumentException("Invalid meet date range");
+        if (events.stream().anyMatch(e->e.getEventDate().isBefore(request.effectiveStartDate()) || e.getEventDate().isAfter(request.effectiveEndDate())))
+            throw new IllegalArgumentException("The meet date range must include all existing event dates");
 		this.name = request.name().trim();
-		if (!request.isDateRangeValid()) throw new IllegalArgumentException("Invalid meet date range");
         this.startDate = request.effectiveStartDate();
         this.endDate = request.effectiveEndDate();
         this.meetDate = this.startDate;

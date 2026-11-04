@@ -24,9 +24,7 @@ services:
     ports:
       - "3306:3306"
     volumes:
-      # Local testing: database contents are lost when MySQL stops.
-      - type: tmpfs
-        target: /var/lib/mysql
+      - mysql_data:/var/lib/mysql
     healthcheck:
       test: ["CMD-SHELL", 'mysqladmin ping -h 127.0.0.1 -u root -p"$$MYSQL_ROOT_PASSWORD" --silent']
       interval: 10s

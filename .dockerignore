@@ -7,3 +7,7 @@
 !frontend/
 !frontend/dist/
 !frontend/dist/**
+
+# Local environment files must not enter repository-root image builds.
+**/.env
+**/.env.*

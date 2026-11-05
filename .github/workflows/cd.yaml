@@ -1,0 +1,156 @@
+name: CD - Deploy to ECS
+
+on:
+  workflow_run:
+    workflows: [CI and ECR publishing]
+    branches: [main]
+    types: [completed]
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  deploy:
+    name: Deploy to existing ECS service
+    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' && github.event.workflow_run.head_branch == 'main' && github.event.workflow_run.head_repository.full_name == github.repository && vars.AWS_DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    concurrency:
+      group: ecs-deploy-${{ github.repository }}-${{ vars.ECS_CLUSTER }}-${{ vars.ECS_SERVICE }}
+      cancel-in-progress: false
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      ECS_CLUSTER: ${{ vars.ECS_CLUSTER }}
+      ECS_SERVICE: ${{ vars.ECS_SERVICE }}
+    steps:
+      - name: Download release metadata from the successful CI run
+        uses: actions/download-artifact@v4
+        with:
+          name: release-images-${{ github.event.workflow_run.id }}-${{ github.event.workflow_run.run_attempt }}
+          path: release-metadata
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ github.event.workflow_run.id }}
+
+      - name: Verify published release matches the successful commit
+        id: release
+        env:
+          SOURCE_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+          file=release-metadata/published-images.json
+          if ! jq -e --arg commit "$SOURCE_SHA" '.commit == $commit and (.backend | type == "string") and (.frontend | type == "string") and (.backend | test("@sha256:[a-f0-9]{64}$")) and (.frontend | test("@sha256:[a-f0-9]{64}$"))' "$file" > /dev/null; then
+            echo '::error::Release metadata must match the successful CI commit and contain image digests.'
+            exit 1
+          fi
+          backend_image=$(jq -r '.backend' "$file")
+          frontend_image=$(jq -r '.frontend' "$file")
+          {
+            echo "backend_image=$backend_image"
+            echo "frontend_image=$frontend_image"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Validate deployment settings
+        run: |
+          set -euo pipefail
+          for setting in AWS_REGION ECS_CLUSTER ECS_SERVICE; do
+            if [[ -z "${!setting}" ]]; then
+              echo "::error::Missing repository variable: $setting. See docs/aws-deployment.md."
+              exit 1
+            fi
+          done
+
+      - name: Configure temporary AWS credentials
+        uses: aws-actions/configure-aws-credentials@v6.3.0
+        with:
+          aws-region: ${{ vars.AWS_REGION }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+
+      # Read the task revision attached to this service, preserving its existing
+      # roles, secret references, environment, health checks and logging settings.
+      - name: Download the existing service task definition
+        run: |
+          set -euo pipefail
+          aws ecs describe-services --cluster "$ECS_CLUSTER" --services "$ECS_SERVICE" > service.json
+          if ! jq -e '(.failures | length) == 0 and (.services | length) == 1 and .services[0].status == "ACTIVE" and (.services[0].deploymentController.type // "ECS") == "ECS"' service.json > /dev/null; then
+            echo '::error::Expected an existing active ECS service with the ECS rolling deployment controller.'
+            exit 1
+          fi
+          task_arn=$(jq -r '.services[0].taskDefinition' service.json)
+          aws ecs describe-task-definition --task-definition "$task_arn" --query taskDefinition > task-definition.json
+          if ! jq -e '([.containerDefinitions[] | select(.name == "backend")] | length) == 1 and ([.containerDefinitions[] | select(.name == "frontend")] | length) == 1' task-definition.json > /dev/null; then
+            echo '::error::The existing task definition must contain containers named backend and frontend.'
+            exit 1
+          fi
+
+      - name: Set tested backend image
+        id: backend
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: task-definition.json
+          container-name: backend
+          image: ${{ steps.release.outputs.backend_image }}
+
+      - name: Set tested frontend image
+        id: frontend
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: ${{ steps.backend.outputs.task-definition }}
+          container-name: frontend
+          image: ${{ steps.release.outputs.frontend_image }}
+
+      - name: Deploy task revision and wait for stability
+        id: ecs
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+        with:
+          task-definition: ${{ steps.frontend.outputs.task-definition }}
+          cluster: ${{ vars.ECS_CLUSTER }}
+          service: ${{ vars.ECS_SERVICE }}
+          wait-for-service-stability: true
+          wait-for-minutes: 25
+
+      - name: Verify the service uses the released revision
+        env:
+          EXPECTED_TASK_ARN: ${{ steps.ecs.outputs.task-definition-arn }}
+        run: |
+          set -euo pipefail
+          aws ecs describe-services --cluster "$ECS_CLUSTER" --services "$ECS_SERVICE" > released-service.json
+          if ! jq -e --arg expected "$EXPECTED_TASK_ARN" '(.failures | length) == 0 and (.services | length) == 1 and .services[0].taskDefinition == $expected and any(.services[0].deployments[]; .status == "PRIMARY" and .taskDefinition == $expected and .rolloutState == "COMPLETED")' released-service.json > /dev/null; then
+            echo '::error::ECS did not retain the expected release revision; inspect service events for a failed deployment or rollback.'
+            exit 1
+          fi
+          desired_count=$(jq -r '.services[0].desiredCount' released-service.json)
+          {
+            echo '## ECS deployment completed'
+            echo
+            echo "Cluster: $ECS_CLUSTER"
+            echo
+            echo "Service: $ECS_SERVICE"
+            echo
+            echo "Task revision: $EXPECTED_TASK_ARN"
+            echo
+            echo "Desired task count: $desired_count (preserved)"
+            echo
+            if [[ "$desired_count" == 0 ]]; then
+              echo 'The new version is configured, but the service is stopped. Start RDS and scale ECS to one for a presentation.'
+            else
+              echo 'ECS reached service stability with the released task revision.'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Collect ECS diagnostics
+        if: failure()
+        run: |
+          mkdir -p deployment-diagnostics
+          aws ecs describe-services --cluster "$ECS_CLUSTER" --services "$ECS_SERVICE" > deployment-diagnostics/service.json 2>&1 || true
+
+      - name: Upload deployment diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: deployment-diagnostics-${{ github.run_id }}-${{ github.run_attempt }}
+          path: deployment-diagnostics/
+          retention-days: 7

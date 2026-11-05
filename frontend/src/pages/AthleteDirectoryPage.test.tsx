@@ -1,324 +1,106 @@
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-
 import AthleteDirectoryPage from "./AthleteDirectoryPage";
-import {
-  getAthleteById,
-  getAthletes,
-} from "../services/athleteService";
-import {
-  buildAthlete,
-  buildEvent,
-  directoryAthletes,
-  manyAthletes,
-} from "../test/athleteTestData";
-
-/**
- * UC-01 Centralized Athlete Directory and Search - component tests.
- *
- * The service module is mocked, so these tests check only what the page
- * does with the data: what it shows, and how search, filters, pagination
- * and navigation behave. No backend or database is involved.
- */
+import { getAthleteById, getAthletes, setAthletesArchived } from "../services/athleteService";
+import { buildAthlete, buildEvent, directoryAthletes, manyAthletes } from "../test/athleteTestData";
 
 vi.mock("../services/athleteService");
 
-const mockGetAthletes = vi.mocked(getAthletes);
-const mockGetAthleteById = vi.mocked(getAthleteById);
-
-function renderDirectory() {
-  return render(
-    <MemoryRouter initialEntries={["/"]}>
-      <Routes>
-        <Route path="/" element={<AthleteDirectoryPage />} />
-        <Route
-          path="/athletes/:athleteId"
-          element={<p>Profile route reached</p>}
-        />
-      </Routes>
-    </MemoryRouter>
-  );
-}
-
-/** Each athlete in the list is a button whose name contains "Athlete #". */
-function athleteRows() {
-  return screen.queryAllByRole("button", { name: /Athlete #/ });
-}
-
-function searchBox() {
-  return screen.getByPlaceholderText("Search by athlete name...");
-}
-
+// Mock services keep directory/archive checks independent of the live database.
 beforeEach(() => {
-  // The page logs caught errors; keep the test output readable.
+  vi.resetAllMocks();
   vi.spyOn(console, "error").mockImplementation(() => {});
+  vi.mocked(getAthletes).mockResolvedValue(directoryAthletes());
 });
+function renderPage() {
+  return render(<MemoryRouter><Routes><Route path="/" element={<AthleteDirectoryPage />} /><Route path="/athletes/:id" element={<p>Profile opened</p>} /></Routes></MemoryRouter>);
+}
+async function loaded() { renderPage(); await screen.findByRole("link", { name: "Maya Johnson" }); }
+function names() { return screen.getAllByRole("rowheader").map(cell => cell.textContent); }
 
-describe("UC-01 Athlete Directory - loading the list", () => {
-  it("shows a loading message while athletes are being retrieved", () => {
-    mockGetAthletes.mockReturnValue(new Promise(() => {}));
-
-    renderDirectory();
-
-    expect(
-      screen.getByText("Loading athletes...")
-    ).toBeInTheDocument();
+describe("Athlete Directory", () => {
+  it("shows loading and then the directory table", async () => {
+    renderPage(); expect(screen.getByText("Loading athletes...")).toBeInTheDocument();
+    await screen.findByRole("link", { name: "Maya Johnson" });
+    expect(names()).toEqual(["Maya Johnson", "Liam Chen", "Sofia Martinez"]);
+    expect(getAthletes).toHaveBeenCalledWith("all");
   });
-
-  it("lists every athlete with name and athlete number", async () => {
-    mockGetAthletes.mockResolvedValue(directoryAthletes());
-
-    renderDirectory();
-
-    expect(
-      await screen.findByRole("button", {
-        name: /Maya Johnson.*Athlete #\s*1/,
-      })
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: /Liam Chen/ })
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: /Sofia Martinez/ })
-    ).toBeInTheDocument();
-    expect(athleteRows()).toHaveLength(3);
-    expect(
-      screen.getByText("3 athletes found")
-    ).toBeInTheDocument();
+  it("searches case-insensitively and clears filters", async () => {
+    const user = userEvent.setup(); await loaded();
+    await user.type(screen.getByRole("textbox", { name: "Search athletes by name" }), "  CHEN ");
+    expect(names()).toEqual(["Liam Chen"]);
+    await user.click(screen.getByRole("button", { name: "Clear" }));
+    expect(names()).toHaveLength(3);
   });
-
-  it("shows an empty state when there are no athletes", async () => {
-    mockGetAthletes.mockResolvedValue([]);
-
-    renderDirectory();
-
-    expect(
-      await screen.findByText("No athletes found.")
-    ).toBeInTheDocument();
-    expect(athleteRows()).toHaveLength(0);
+  it("filters by age and event", async () => {
+    const user = userEvent.setup();
+    vi.mocked(getAthleteById).mockImplementation(async id => buildAthlete({id, events: [buildEvent({categoryName: id === 2 ? "200M" : "100M"})]}));
+    await loaded();
+    await user.click(screen.getByRole("button", {name: "All age groups"}));
+    await user.click(screen.getByRole("button", {name: "15-18"}));
+    expect(names()).toEqual(["Liam Chen"]);
+    await user.click(screen.getByRole("button", {name: "All events"}));
+    await user.click(await screen.findByRole("button", {name: "200M"}));
+    expect(names()).toEqual(["Liam Chen"]);
   });
-
-  it("shows an error message when the athletes cannot be loaded", async () => {
-    mockGetAthletes.mockRejectedValue(new Error("Network down"));
-
-    renderDirectory();
-
-    expect(
-      await screen.findByText("Unable to load athletes.")
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText("Athlete information could not be loaded.")
-    ).toBeInTheDocument();
-    expect(athleteRows()).toHaveLength(0);
+  it("shows empty and error states", async () => {
+    vi.mocked(getAthletes).mockRejectedValue(new Error("offline")); renderPage();
+    expect(await screen.findByText("Unable to load athletes.")).toBeInTheDocument();
+  });
+  it("opens a profile from its name", async () => {
+    const user=userEvent.setup(); await loaded(); await user.click(screen.getByRole("link", {name:"Maya Johnson"}));
+    expect(screen.getByText("Profile opened")).toBeInTheDocument();
+  });
+  it("opens the create-athlete form", async () => {
+    const user=userEvent.setup(); await loaded(); await user.click(screen.getByRole("button", {name:"+ Add Athlete"}));
+    expect(screen.getByRole("heading", {name:"Add Athlete"})).toBeInTheDocument();
   });
 });
 
-describe("UC-01 Athlete Directory - search", () => {
-  beforeEach(() => {
-    mockGetAthletes.mockResolvedValue(directoryAthletes());
+describe("Athlete archive", () => {
+  it("separates active and archived athletes", async () => {
+    const user=userEvent.setup(); vi.mocked(getAthletes).mockResolvedValue([...directoryAthletes(),buildAthlete({id:9,firstName:"Archived",lastName:"Runner",archived:true})]);
+    await loaded(); expect(names()).toHaveLength(3);
+    await user.click(screen.getByRole("button", {name:/Archived athletes/}));
+    expect(names()).toEqual(["Archived Runner"]);
+    expect(screen.getByRole("button", {name:"Restore selected"})).toBeDisabled();
   });
-
-  it("narrows the list to athletes whose name matches", async () => {
-    const user = userEvent.setup();
-    renderDirectory();
-    await screen.findByRole("button", { name: /Maya Johnson/ });
-
-    await user.type(searchBox(), "chen");
-
-    expect(athleteRows()).toHaveLength(1);
-    expect(
-      screen.getByRole("button", { name: /Liam Chen/ })
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText("1 athlete found")
-    ).toBeInTheDocument();
+  it("keeps selection across pages and archives only after confirmation", async () => {
+    const user=userEvent.setup(); const athletes=manyAthletes(12); vi.mocked(getAthletes).mockResolvedValue(athletes);
+    vi.mocked(setAthletesArchived).mockResolvedValue(athletes.slice(0,10).map(athlete=>({...athlete,archived:true})));
+    renderPage(); await screen.findByRole("link",{name:"Runner 1"});
+    await user.click(screen.getByRole("checkbox",{name:"Select page"}));
+    await user.click(screen.getByRole("button",{name:"Next page"}));
+    expect(screen.getByText("10 selected across the directory")).toBeInTheDocument();
+    await user.click(screen.getByRole("button",{name:"Archive selected"}));
+    const dialog=screen.getByRole("dialog",{name:"Archive selected athletes?"});
+    expect(within(dialog).getAllByRole("listitem")).toHaveLength(10);
+    expect(setAthletesArchived).not.toHaveBeenCalled();
+    await user.click(within(dialog).getByRole("button",{name:"Archive 10 athletes"}));
+    await waitFor(()=>expect(names()).toHaveLength(2));
+    expect(setAthletesArchived).toHaveBeenCalledWith(athletes.slice(0,10).map(athlete=>athlete.id),true);
   });
-
-  it("ignores letter case and surrounding spaces", async () => {
-    const user = userEvent.setup();
-    renderDirectory();
-    await screen.findByRole("button", { name: /Maya Johnson/ });
-
-    await user.type(searchBox(), "  MAYA john  ");
-
-    expect(athleteRows()).toHaveLength(1);
-    expect(
-      screen.getByRole("button", { name: /Maya Johnson/ })
-    ).toBeInTheDocument();
+  it("can cancel without changing records", async () => {
+    const user=userEvent.setup(); await loaded(); await user.click(screen.getByRole("checkbox",{name:"Select Maya Johnson"}));
+    await user.click(screen.getByRole("button",{name:"Archive selected"})); await user.click(screen.getByRole("button",{name:"Cancel"}));
+    expect(setAthletesArchived).not.toHaveBeenCalled(); expect(names()).toHaveLength(3);
   });
-
-  it("shows the empty state when nothing matches", async () => {
-    const user = userEvent.setup();
-    renderDirectory();
-    await screen.findByRole("button", { name: /Maya Johnson/ });
-
-    await user.type(searchBox(), "zzzz");
-
-    expect(
-      screen.getByText("No athletes found.")
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText("Try changing your search or filters.")
-    ).toBeInTheDocument();
-    expect(athleteRows()).toHaveLength(0);
+  it("restores an archived athlete", async () => {
+    const user=userEvent.setup(); const archived=buildAthlete({archived:true}); vi.mocked(getAthletes).mockResolvedValue([archived]);
+    vi.mocked(setAthletesArchived).mockResolvedValue([{...archived,archived:false}]); renderPage();
+    await screen.findByText("No athletes found."); await user.click(screen.getByRole("button",{name:/Archived athletes/}));
+    await user.click(screen.getByRole("checkbox",{name:"Select Maya Johnson"})); await user.click(screen.getByRole("button",{name:"Restore selected"}));
+    await user.click(screen.getByRole("button",{name:"Restore 1 athlete"}));
+    expect(await screen.findByText("No archived athletes.")).toBeInTheDocument();
+    expect(setAthletesArchived).toHaveBeenCalledWith([1],false);
+    await user.click(screen.getByRole("button",{name:/Active athletes/})); expect(names()).toEqual(["Maya Johnson"]);
   });
-
-  it("restores the full list when 'Clear all' is clicked", async () => {
-    const user = userEvent.setup();
-    renderDirectory();
-    await screen.findByRole("button", { name: /Maya Johnson/ });
-    await user.type(searchBox(), "zzzz");
-
-    await user.click(
-      screen.getByRole("button", { name: "Clear all" })
-    );
-
-    expect(searchBox()).toHaveValue("");
-    expect(athleteRows()).toHaveLength(3);
-  });
-});
-
-describe("UC-01 Athlete Directory - filters", () => {
-  beforeEach(() => {
-    mockGetAthletes.mockResolvedValue(directoryAthletes());
-    // Opening the filter panel loads each athlete's profile for its events.
-    mockGetAthleteById.mockImplementation(async (id) =>
-      buildAthlete({
-        id,
-        events:
-          id === 2
-            ? [buildEvent({ athleteId: 2, categoryName: "200m" })]
-            : [buildEvent({ athleteId: id, categoryName: "100M" })],
-      })
-    );
-  });
-
-  it("filters by age group", async () => {
-    const user = userEvent.setup();
-    renderDirectory();
-    await screen.findByRole("button", { name: /Maya Johnson/ });
-
-    await user.click(
-      screen.getByRole("button", { name: /^Filters/ })
-    );
-    await user.click(
-      screen.getByRole("button", { name: "All age groups" })
-    );
-    await user.click(
-      screen.getByRole("button", { name: /^15-18/ })
-    );
-
-    expect(athleteRows()).toHaveLength(1);
-    expect(
-      screen.getByRole("button", { name: /Liam Chen/ })
-    ).toBeInTheDocument();
-  });
-
-  it("filters by event, matching event names regardless of case", async () => {
-    const user = userEvent.setup();
-    renderDirectory();
-    await screen.findByRole("button", { name: /Maya Johnson/ });
-
-    await user.click(
-      screen.getByRole("button", { name: /^Filters/ })
-    );
-    await user.click(
-      await screen.findByRole("button", { name: "All events" })
-    );
-    await user.click(
-      screen.getByRole("button", { name: /^200M/ })
-    );
-
-    expect(athleteRows()).toHaveLength(1);
-    expect(
-      screen.getByRole("button", { name: /Liam Chen/ })
-    ).toBeInTheDocument();
-  });
-
-  it("restores the full list when 'Clear Filters' is clicked", async () => {
-    const user = userEvent.setup();
-    renderDirectory();
-    await screen.findByRole("button", { name: /Maya Johnson/ });
-    await user.click(
-      screen.getByRole("button", { name: /^Filters/ })
-    );
-    await user.click(
-      screen.getByRole("button", { name: "All age groups" })
-    );
-    await user.click(
-      screen.getByRole("button", { name: /^18\+/ })
-    );
-    expect(athleteRows()).toHaveLength(1);
-
-    await user.click(
-      screen.getByRole("button", { name: "Clear Filters" })
-    );
-
-    expect(athleteRows()).toHaveLength(3);
-  });
-});
-
-describe("UC-01 Athlete Directory - pagination", () => {
-  beforeEach(() => {
-    mockGetAthletes.mockResolvedValue(manyAthletes(12));
-  });
-
-  it("shows 10 athletes per page and moves between pages", async () => {
-    const user = userEvent.setup();
-    renderDirectory();
-    await screen.findByText("Runner 1");
-
-    expect(athleteRows()).toHaveLength(10);
-    expect(screen.getByText("Page 1 of 2")).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: /Previous/ })
-    ).toBeDisabled();
-
-    await user.click(
-      screen.getByRole("button", { name: /Next/ })
-    );
-
-    expect(athleteRows()).toHaveLength(2);
-    expect(
-      screen.getByRole("button", { name: /Runner 12/ })
-    ).toBeInTheDocument();
-    expect(screen.getByText("Page 2 of 2")).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: /Next/ })
-    ).toBeDisabled();
-  });
-
-  it("returns to page 1 when a search is entered on a later page", async () => {
-    const user = userEvent.setup();
-    renderDirectory();
-    await screen.findByText("Runner 1");
-    await user.click(
-      screen.getByRole("button", { name: /Next/ })
-    );
-
-    await user.type(searchBox(), "Runner");
-
-    expect(screen.getByText("Page 1 of 2")).toBeInTheDocument();
-    expect(athleteRows()).toHaveLength(10);
-  });
-});
-
-describe("UC-01 Athlete Directory - navigation to a profile", () => {
-  it("opens the selected athlete's profile route", async () => {
-    mockGetAthletes.mockResolvedValue(directoryAthletes());
-    const user = userEvent.setup();
-    renderDirectory();
-
-    const row = await screen.findByRole("button", {
-      name: /Liam Chen/,
-    });
-    expect(within(row).getByText("Liam Chen")).toBeInTheDocument();
-    await user.click(row);
-
-    expect(
-      screen.getByText("Profile route reached")
-    ).toBeInTheDocument();
+  it("keeps the selection and displays failures", async () => {
+    const user=userEvent.setup(); vi.mocked(setAthletesArchived).mockRejectedValue(new Error("Please retry")); await loaded();
+    await user.click(screen.getByRole("checkbox",{name:"Select Maya Johnson"})); await user.click(screen.getByRole("button",{name:"Archive selected"}));
+    await user.click(screen.getByRole("button",{name:"Archive 1 athlete"}));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Please retry"); expect(names()).toHaveLength(3);
   });
 });

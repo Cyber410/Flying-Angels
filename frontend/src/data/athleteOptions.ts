@@ -1,3 +1,4 @@
+// Shared athlete filter choices used by the results interface.
 export const EVENT_OPTIONS = [
   "50m",
   "55m",

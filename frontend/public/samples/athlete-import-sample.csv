@@ -1,0 +1,11 @@
+First Name,Last Name,Note,FLY,FLYA,Date of Birth,Gender,100M,200M,LONG JUMP
+Mirelle,Foxhaven,Focus on a relaxed start.,Active,Active,2011-04-18,Female,14.25,29.80,
+Tavian,Reedbrook,Prefers afternoon training.,Active,Pending,2010-09-23,Male,13.64,,4.35m
+Saffron,Aldercrest,,Active,,2013-02-14,Female,,33.10,
+Ewan,Thornfield,New to the training group.,Pending,Active,2012-07-06,Male,,,
+Nerina,Westgrove,,Active,Active,2008-11-21,Female,13.92,,4.70m
+Kellan,Oakridge,Building consistency in practice.,Active,,2014-05-30,Male,16.45,,
+Solene,Brookmere,Optional details can be added later.,Active,,,,,,
+Mirelle,Foxhaven,Repeated row to demonstrate duplicate detection.,Active,Active,2011-04-18,Female,14.25,29.80,
+Toren,Ashwick,Correct the invalid date before importing.,Active,,2012-02-30,Male,15.20,,
+,Meadowcroft,Add a first name before importing.,Pending,,2015-03-19,Female,,,

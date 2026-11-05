@@ -65,9 +65,15 @@ public abstract class DatabaseIntegrationTest {
 	@Autowired
 	protected EventCategoryRepository eventCategoryRepository;
 
+    @Autowired protected com.flyingangels.backend.event.EventParticipationRepository participationRepository;
+    @Autowired protected com.flyingangels.backend.note.AthleteNoteRepository noteRepository;
+    @Autowired protected com.flyingangels.backend.importing.ImportRowRepository importRowRepository;
+    @Autowired protected com.flyingangels.backend.importing.ImportJobRepository importJobRepository;
 	@BeforeEach
 	void clearAthleteAndEventData() {
 		// Children before parents, so no foreign key blocks a delete.
+        importRowRepository.deleteAllInBatch(); importJobRepository.deleteAllInBatch();
+        noteRepository.deleteAllInBatch(); participationRepository.deleteAllInBatch();
 		eventResultRepository.deleteAllInBatch();
 		eventRepository.deleteAllInBatch();
 		meetRepository.deleteAllInBatch();

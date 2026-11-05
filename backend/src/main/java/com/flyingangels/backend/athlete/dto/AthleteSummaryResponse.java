@@ -5,10 +5,10 @@ import com.flyingangels.backend.athlete.Athlete;
 import java.time.LocalDate;
 
 public record AthleteSummaryResponse(Long id, String firstName, String lastName, LocalDate dateOfBirth,
-		String gender, String flyStatus, String flyaStatus) {
+		String gender, String flyStatus, String flyaStatus, boolean archived) {
 
 	public static AthleteSummaryResponse from(Athlete athlete) {
 		return new AthleteSummaryResponse(athlete.getId(), athlete.getFirstName(), athlete.getLastName(),
-				athlete.getDateOfBirth(), athlete.getGender(), athlete.getFlyStatus(), athlete.getFlyaStatus());
+				athlete.getDateOfBirth(), athlete.getGender(), Athlete.normalizeStatus(athlete.getFlyStatus()), Athlete.normalizeStatus(athlete.getFlyaStatus()), athlete.isArchived());
 	}
 }

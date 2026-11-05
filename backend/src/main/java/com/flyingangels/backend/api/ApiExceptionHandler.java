@@ -16,12 +16,23 @@ import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.multipart.support.MissingServletRequestPartException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 import java.io.IOException;
 import java.time.Instant;
 
 @RestControllerAdvice
 public class ApiExceptionHandler {
+
+	@ExceptionHandler(org.springframework.orm.ObjectOptimisticLockingFailureException.class)
+	ResponseEntity<ApiErrorResponse> changedData(Exception exception, HttpServletRequest request) {
+		return error(HttpStatus.CONFLICT, "DATA_CHANGED", "This record changed while you were saving. Reload it and try again.", request);
+	}
+
+	@ExceptionHandler(MaxUploadSizeExceededException.class)
+	ResponseEntity<ApiErrorResponse> uploadTooLarge(MaxUploadSizeExceededException exception, HttpServletRequest request) {
+		return error(HttpStatus.PAYLOAD_TOO_LARGE, "FILE_TOO_LARGE", "The file must be 10 MB or smaller", request);
+	}
 
 	@ExceptionHandler(AthleteNotFoundException.class)
 	ResponseEntity<ApiErrorResponse> athleteNotFound(AthleteNotFoundException exception, HttpServletRequest request) {
@@ -32,10 +43,24 @@ public class ApiExceptionHandler {
 			EventCategoryNotFoundException.class})
 	ResponseEntity<ApiErrorResponse> eventNotFound(Exception exception, HttpServletRequest request) {
 		String code = exception instanceof EventCategoryNotFoundException
-				? "CATEGORY_NOT_FOUND" : "EVENT_NOT_FOUND";
+				? "CATEGORY_NOT_FOUND" : exception instanceof MeetNotFoundException ? "MEET_NOT_FOUND" : "EVENT_NOT_FOUND";
 		return error(HttpStatus.NOT_FOUND, code, exception.getMessage(), request);
 	}
 
+    @ExceptionHandler({com.flyingangels.backend.event.EventService.DuplicateEventException.class,
+            com.flyingangels.backend.event.EventCategoryService.DuplicateEventCategoryException.class,
+            org.springframework.dao.DataIntegrityViolationException.class})
+    ResponseEntity<ApiErrorResponse> conflict(Exception exception,HttpServletRequest request) {
+        return error(HttpStatus.CONFLICT,"DATA_CONFLICT", "The record conflicts with existing data",request);
+    }
+    @ExceptionHandler(com.flyingangels.backend.event.EventService.ParticipantNotFoundException.class)
+    ResponseEntity<ApiErrorResponse> participantNotFound(Exception exception,HttpServletRequest request) {
+        return error(HttpStatus.NOT_FOUND,"PARTICIPANT_NOT_FOUND",exception.getMessage(),request);
+    }
+    @ExceptionHandler(org.springframework.http.converter.HttpMessageNotReadableException.class)
+    ResponseEntity<ApiErrorResponse> unreadable(Exception exception,HttpServletRequest request) {
+        return error(HttpStatus.BAD_REQUEST,"INVALID_REQUEST","Invalid JSON or field value",request);
+    }
 	@ExceptionHandler(DuplicateResultException.class)
 	ResponseEntity<ApiErrorResponse> duplicateResult(DuplicateResultException exception, HttpServletRequest request) {
 		return error(HttpStatus.CONFLICT, "ATHLETE_ALREADY_ASSIGNED", exception.getMessage(), request);
@@ -62,6 +87,8 @@ public class ApiExceptionHandler {
 		return error(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", message, request);
 	}
 
+    @ExceptionHandler(com.flyingangels.backend.importing.AthleteImportService.ImportNotFoundException.class)
+    ResponseEntity<ApiErrorResponse> importNotFound(Exception exception,HttpServletRequest request) { return error(HttpStatus.NOT_FOUND,"IMPORT_NOT_FOUND",exception.getMessage(),request); }
 	@ExceptionHandler(IOException.class)
 	ResponseEntity<ApiErrorResponse> importReadFailure(IOException exception, HttpServletRequest request) {
 		return error(HttpStatus.BAD_REQUEST, "IMPORT_READ_FAILED", "The uploaded file could not be read", request);

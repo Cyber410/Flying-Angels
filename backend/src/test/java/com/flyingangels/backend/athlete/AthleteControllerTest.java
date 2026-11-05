@@ -1,8 +1,6 @@
 package com.flyingangels.backend.athlete;
 
 import com.flyingangels.backend.api.ApiExceptionHandler;
-import com.flyingangels.backend.event.EventResultRepository;
-import com.flyingangels.backend.event.EventService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
@@ -29,21 +27,15 @@ class AthleteControllerTest {
 	@Mock
 	private AthleteService athleteService;
 
-	@Mock
-	private AthleteImportService importService;
 
-	@Mock
-	private EventResultRepository eventResultRepository;
 
-	@Mock
-	private EventService eventService;
 
 	private MockMvc mockMvc;
 
 	@BeforeEach
 	void setUp() {
 		mockMvc = MockMvcBuilders.standaloneSetup(
-				new AthleteController(athleteService, importService, eventResultRepository, eventService))
+				new AthleteController(athleteService))
 				.setControllerAdvice(new ApiExceptionHandler())
 				.build();
 	}
@@ -65,25 +57,13 @@ class AthleteControllerTest {
 
 	@Test
 	void missingProfileReturnsStableNotFoundError() throws Exception {
-		when(athleteService.get(99L)).thenThrow(new AthleteService.AthleteNotFoundException(99L));
+		when(athleteService.profile(99L)).thenThrow(new AthleteService.AthleteNotFoundException(99L));
 
 		mockMvc.perform(get("/api/athletes/99"))
 				.andExpect(status().isNotFound())
 				.andExpect(jsonPath("$.status").value(404))
 				.andExpect(jsonPath("$.code").value("ATHLETE_NOT_FOUND"))
 				.andExpect(jsonPath("$.path").value("/api/athletes/99"));
-	}
-
-	@Test
-	void invalidImportReturnsBadRequestError() throws Exception {
-		doThrow(new IllegalArgumentException("The athlete file is empty"))
-				.when(importService).importFile(org.mockito.ArgumentMatchers.any());
-		MockMultipartFile file = new MockMultipartFile("file", "empty.tsv", "text/tab-separated-values", new byte[0]);
-
-		mockMvc.perform(multipart("/api/athletes/import").file(file))
-				.andExpect(status().isBadRequest())
-				.andExpect(jsonPath("$.status").value(400))
-				.andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
 	}
 
 	@Test

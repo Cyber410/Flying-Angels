@@ -13,6 +13,8 @@ public record EventResultRequest(
 		@Positive(message = "Athlete ID must be positive") Long athleteId,
 		@NotBlank(message = "Result is required")
 		@Size(max = 50, message = "Result must be 50 characters or fewer") String result,
-		@NotNull(message = "Score is required")
-		@DecimalMin(value = "0.0", inclusive = true, message = "Score cannot be negative") BigDecimal score) {
+
+		@DecimalMin(value = "0.0", inclusive = true, message = "Score cannot be negative") @jakarta.validation.constraints.Digits(integer=8,fraction=4) BigDecimal score, com.flyingangels.backend.event.ResultUnit unit, @Size(max=100) String clientId) {
+    public EventResultRequest(Long athleteId, String result, BigDecimal score) { this(athleteId, result, score, null, null); }
+    public EventResultRequest(Long athleteId,String result,BigDecimal score,com.flyingangels.backend.event.ResultUnit unit) { this(athleteId,result,score,unit,null); }
 }

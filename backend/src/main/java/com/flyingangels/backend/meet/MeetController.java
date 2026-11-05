@@ -55,4 +55,6 @@ public class MeetController {
 	public void delete(@PathVariable Long id) {
 		meetService.delete(id);
 	}
+    @GetMapping("/api/meets/{id}/events")
+    public List<EventResponse> events(@PathVariable Long id) { return meetService.get(id).getEvents().stream().map(EventResponse::from).toList(); }
 }

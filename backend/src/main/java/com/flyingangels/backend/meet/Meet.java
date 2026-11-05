@@ -29,19 +29,28 @@ public class Meet {
 
 	private String name;
 	private LocalDate meetDate;
+    private LocalDate startDate;
+    private LocalDate endDate;
 	private String location;
-	private String externalUrl;
+	@jakarta.persistence.Column(length=500) private String externalUrl;
 
 	@OneToMany(mappedBy = "meet", cascade = CascadeType.ALL, orphanRemoval = true)
 	private List<Event> events = new ArrayList<>();
 
+    public LocalDate getStartDate() { return startDate==null?meetDate:startDate; }
+    public LocalDate getEndDate() { return endDate==null?getStartDate():endDate; }
 	public Meet(MeetRequest request) {
 		updateFrom(request);
 	}
 
 	public void updateFrom(MeetRequest request) {
+        if (!request.isDateRangeValid()) throw new IllegalArgumentException("Invalid meet date range");
+        if (events.stream().anyMatch(e->e.getEventDate().isBefore(request.effectiveStartDate()) || e.getEventDate().isAfter(request.effectiveEndDate())))
+            throw new IllegalArgumentException("The meet date range must include all existing event dates");
 		this.name = request.name().trim();
-		this.meetDate = request.meetDate();
+        this.startDate = request.effectiveStartDate();
+        this.endDate = request.effectiveEndDate();
+        this.meetDate = this.startDate;
 		this.location = request.location();
 		this.externalUrl = request.externalUrl();
 	}

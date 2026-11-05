@@ -1,0 +1,2 @@
+This is a plain text file, not an athlete spreadsheet.
+Used by T90: the import must reject it.

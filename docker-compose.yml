@@ -10,28 +10,31 @@ services:
     ports:
       - "5173:5173"
     networks:
-      - application
+      - frontend-net
 
   mysql:
     image: mysql:8.4
     container_name: flying-angels-mysql
     restart: unless-stopped
     environment:
-      MYSQL_DATABASE: ${MYSQL_DATABASE:-flying_angels}
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Set MYSQL_ROOT_PASSWORD in .env}
-      MYSQL_USER: ${MYSQL_USER:?Set MYSQL_USER in .env}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?Set MYSQL_PASSWORD in .env}
-    ports:
-      - "3306:3306"
+      MYSQL_DATABASE: flying_angels
+      MYSQL_USER: appuser
+      MYSQL_ROOT_PASSWORD_FILE: /run/secrets/db_root_password
+      MYSQL_PASSWORD_FILE: /run/secrets/db_password
+    secrets:
+      - db_root_password
+      - db_password
+    # ports:
+    #   - "3306:3306"
     volumes:
       - mysql_data:/var/lib/mysql
     healthcheck:
-      test: ["CMD-SHELL", 'mysqladmin ping -h 127.0.0.1 -u root -p"$$MYSQL_ROOT_PASSWORD" --silent']
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -p$$(cat /run/secrets/db_root_password)"]
       interval: 10s
       timeout: 5s
       retries: 10
     networks:
-      - database
+      - backend-net
 
   backend:
     build:
@@ -43,17 +46,30 @@ services:
       mysql:
         condition: service_healthy
     environment:
-      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/${MYSQL_DATABASE:-flying_angels}?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
-      SPRING_DATASOURCE_USERNAME: ${MYSQL_USER:?Set MYSQL_USER in .env}
-      SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD:?Set MYSQL_PASSWORD in .env}
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/flying_angels?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+      SPRING_DATASOURCE_USERNAME: appuser
+      SPRING_CONFIG_IMPORT: optional:configtree:/run/secrets/
+    secrets:
+      - source: db_password
+        target: spring.datasource.password
     ports:
       - "8080:8080"
     networks:
-      - application
-      - database
+      - frontend-net
+      - backend-net
 
 networks:
-  application:
+  frontend-net:
     driver: bridge
-  database:
+  backend-net:
     driver: bridge
+    internal: true
+
+secrets:
+  db_root_password:
+    file: ./secrets/db_root_password.txt
+  db_password:
+    file: ./secrets/db_password.txt
+
+volumes:
+  mysql_data:

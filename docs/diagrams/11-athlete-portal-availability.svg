@@ -1,0 +1,111 @@
+<?xml version='1.0' encoding='utf-8'?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1900" height="1350" viewBox="0 0 1900 1350" role="img">
+  <title>Athlete Portal &amp; Meet Availability Responses — code design</title>
+  <desc>Actors: Athlete / Parent / Admin / Coach. E means existing; P means proposed. SUNNY: assign athlete -&gt; upsert one meet request -&gt; scoped portal -&gt; review events -&gt; confirm availability -&gt; staff sees current status. RAINY: Unavailable is a valid reply; staff records external response with channel; no reply stays awaiting; invalid links reveal no profile. REPEAT / CHANGE: another event joins the same request; proposed event-set revision makes old replies stale; changed replies remain audited. DESIGN NOTE: versioned re-confirmation and assignment-removal handling are proposed; follow-up is manual link sharing, not automatic email.</desc>
+  <rect width="1900" height="1350" fill="#ffffff" />
+  <rect x="32" y="24" width="1836" height="86" rx="8" fill="#17263f" stroke="#17263f" />
+  <text x="52" y="61" fill="#ffffff" font-family="Arial, Helvetica, sans-serif" font-size="28" font-weight="700">Athlete Portal &amp; Meet Availability Responses</text>
+  <text x="52" y="91" fill="#dae5f7" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">Code design  /  Athlete / Parent / Admin / Coach</text>
+  <rect x="32" y="120" width="1836" height="38" rx="8" fill="#ffffff" stroke="#ffffff" />
+  <text x="44" y="146" fill="#53617b" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400">E = existing source   |   P = proposed component/contract   |   EXTEND = existing layer + planned changes   |   dashed arrow = response mapping</text>
+  <rect x="32" y="176" width="450" height="295" rx="8" fill="#f7f9fc" stroke="#dce2ec" />
+  <text x="48" y="204" fill="#53617b" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700">FRONTEND  /  REACT + TYPESCRIPT</text>
+  <rect x="514" y="176" width="820" height="295" rx="8" fill="#f7f9fc" stroke="#dce2ec" />
+  <text x="530" y="204" fill="#53617b" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700">HTTP API  /  TARGET CONTRACT</text>
+  <rect x="32" y="510" width="1302" height="625" rx="8" fill="#f7f9fc" stroke="#dce2ec" />
+  <text x="48" y="538" fill="#53617b" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700">BACKEND  /  SPRING BOOT + JPA</text>
+  <rect x="1366" y="510" width="502" height="625" rx="8" fill="#f7f9fc" stroke="#dce2ec" />
+  <text x="1382" y="538" fill="#53617b" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700">DATA MODEL  /  MYSQL</text>
+  <rect x="1366" y="176" width="502" height="295" rx="8" fill="#f7f9fc" stroke="#dce2ec" />
+  <text x="1382" y="204" fill="#53617b" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700">STATUS  /  DESIGN SCOPE</text>
+  <rect x="1382" y="222" width="470" height="232" rx="8" fill="#ffffff" stroke="#c7d0df" />
+  <text x="1400" y="252" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="700">Sprint 3 target design</text>
+  <text x="1400" y="278" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">Checked against repository source.</text>
+  <text x="1400" y="304" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">Purple: proposed layer.</text>
+  <text x="1400" y="330" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">Amber: extend existing code.</text>
+  <text x="1400" y="356" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">Green: reusable existing model.</text>
+  <text x="1400" y="382" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">Routes and new class names are proposed.</text>
+  <text x="1400" y="408" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">E: existing code. P: proposed Sprint 3 work.</text>
+  <rect x="48" y="222" width="418" height="232" rx="8" fill="#f3f0ff" stroke="#7050a3" />
+  <text x="66" y="248" fill="#7050a3" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="700">FRONTEND  /  PROPOSED</text>
+  <text x="66" y="277" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700">AthletePortalPage /</text>
+  <text x="66" y="300" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700">AvailabilityResponseForm</text>
+  <text x="66" y="328" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[E] MeetDetailsPage + assignment controls</text>
+  <text x="66" y="349" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[P] One-athlete profile, meet requests and</text>
+  <text x="66" y="370" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">results</text>
+  <text x="66" y="391" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[P] Staff Record Response with method +</text>
+  <text x="66" y="412" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">actor</text>
+  <rect x="530" y="222" width="788" height="232" rx="8" fill="#fff8e8" stroke="#966719" />
+  <text x="548" y="248" fill="#966719" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="700">HTTP API  /  EXTEND</text>
+  <text x="548" y="277" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700">Assignment, portal and staff response routes</text>
+  <text x="548" y="305" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[E] POST /api/events/{id}/participants and /participants/bulk</text>
+  <text x="548" y="326" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[P] GET /api/portal/profile | GET /api/portal/availability</text>
+  <text x="548" y="347" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[P] PUT /api/portal/availability/{requestId}/response</text>
+  <text x="548" y="368" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[P] PUT /api/availability/{requestId}/response -&gt; staff + method</text>
+  <text x="548" y="389" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[P] Scoped token/session checks for every portal request</text>
+  <rect x="48" y="558" width="556" height="250" rx="8" fill="#fff8e8" stroke="#966719" />
+  <text x="66" y="584" fill="#966719" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="700">CONTROLLER / AUTHORIZATION  /  EXTEND</text>
+  <text x="66" y="613" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700">EventController / PortalController</text>
+  <text x="66" y="641" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[E] Assignment endpoints; ADMIN / COACH target policy</text>
+  <text x="66" y="662" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[P] AvailabilityController handles staff responses</text>
+  <text x="66" y="683" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[P] Portal identity supplies athleteId, never request body</text>
+  <text x="66" y="704" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[P] Request ownership checked before reads or writes</text>
+  <rect x="636" y="558" width="682" height="250" rx="8" fill="#fff8e8" stroke="#966719" />
+  <text x="654" y="584" fill="#966719" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="700">SERVICE  /  EXTEND</text>
+  <text x="654" y="613" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700">EventService / AvailabilityService</text>
+  <text x="654" y="641" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[P] Assignment + meet-request upsert in one transaction</text>
+  <text x="654" y="662" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[P] One request per athlete + meet; collect assigned events</text>
+  <text x="654" y="683" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[P] Version-check proposed event set before response</text>
+  <text x="654" y="704" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[P] Append response audit; derive current effective status</text>
+  <text x="654" y="725" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[P] Share service for portal and externally received replies</text>
+  <rect x="636" y="850" width="682" height="267" rx="8" fill="#f3f0ff" stroke="#7050a3" />
+  <text x="654" y="876" fill="#7050a3" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="700">REPOSITORY  /  PROPOSED</text>
+  <text x="654" y="905" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700">AvailabilityRequest / Response repositories</text>
+  <text x="654" y="933" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[P] findByMeetIdAndAthleteId(); lock / version update</text>
+  <text x="654" y="954" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[E] EventParticipationRepository loads assignments</text>
+  <text x="654" y="975" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[P] Restrict portal query by authenticated athlete scope</text>
+  <text x="654" y="996" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[P] Save request revision + response audit atomically</text>
+  <rect x="1382" y="558" width="470" height="559" rx="8" fill="#f3f0ff" stroke="#7050a3" />
+  <text x="1400" y="584" fill="#7050a3" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="700">ENTITY / DATABASE  /  PROPOSED</text>
+  <text x="1400" y="613" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700">AvailabilityRequest / AvailabilityResponse</text>
+  <text x="1400" y="641" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[P] UNIQUE(meet_id, athlete_id)</text>
+  <text x="1400" y="662" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[P] Request: assignmentRevision + optimistic</text>
+  <text x="1400" y="683" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">version</text>
+  <text x="1400" y="704" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[P] Response: AVAILABLE / UNAVAILABLE,</text>
+  <text x="1400" y="725" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">coveredRevision</text>
+  <text x="1400" y="746" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">actor, channel, respondedAt; retain previous</text>
+  <text x="1400" y="767" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">responses</text>
+  <text x="1400" y="788" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[P] No response or stale revision -&gt;</text>
+  <text x="1400" y="809" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">AWAITING_RESPONSE</text>
+  <text x="1400" y="830" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[E] EventParticipation remains event-level</text>
+  <text x="1400" y="851" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">assignment</text>
+  <text x="1400" y="872" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[P] Portal token grants access to one athlete only</text>
+  <rect x="48" y="850" width="556" height="267" rx="8" fill="#f3f0ff" stroke="#7050a3" />
+  <text x="66" y="876" fill="#7050a3" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="700">RESPONSE / UI STATE  /  PROPOSED</text>
+  <text x="66" y="905" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700">PortalProfileResponse /</text>
+  <text x="66" y="928" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700">AvailabilityRequestResponse</text>
+  <text x="66" y="956" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[P] Safe profile fields, meet details, events and results</text>
+  <text x="66" y="977" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[P] effectiveStatus + assignmentRevision + version</text>
+  <text x="66" y="998" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[P] Available / Unavailable -&gt; confirm -&gt; refresh staff view</text>
+  <text x="66" y="1019" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">Stale form -&gt; 409, reload proposed events and reconfirm</text>
+  <text x="66" y="1040" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">Expired / revoked token -&gt; access unavailable</text>
+  <polyline points="466,338 530,338" fill="none" stroke="#53617b" stroke-width="1.8" />
+  <path d="M521.0,334.0 L530,338 L521.0,342.0" fill="none" stroke="#53617b" stroke-width="1.8" />
+  <polyline points="924,454 924,490 326,490 326,558" fill="none" stroke="#53617b" stroke-width="1.8" />
+  <path d="M330.0,549.0 L326,558 L322.0,549.0" fill="none" stroke="#53617b" stroke-width="1.8" />
+  <polyline points="604,683 636,683" fill="none" stroke="#53617b" stroke-width="1.8" />
+  <path d="M627.0,679.0 L636,683 L627.0,687.0" fill="none" stroke="#53617b" stroke-width="1.8" />
+  <polyline points="977,808 977,850" fill="none" stroke="#53617b" stroke-width="1.8" />
+  <path d="M981.0,841.0 L977,850 L973.0,841.0" fill="none" stroke="#53617b" stroke-width="1.8" />
+  <polyline points="1318,983 1350,983 1350,837 1382,837" fill="none" stroke="#53617b" stroke-width="1.8" />
+  <path d="M1373.0,833.0 L1382,837 L1373.0,841.0" fill="none" stroke="#53617b" stroke-width="1.8" />
+  <polyline points="326,808 326,850" fill="none" stroke="#53617b" stroke-width="1.8" stroke-dasharray="7 5" />
+  <path d="M330.0,841.0 L326,850 L322.0,841.0" fill="none" stroke="#53617b" stroke-width="1.8" />
+  <rect x="32" y="1170" width="1836" height="156" rx="8" fill="#f7f9fc" stroke="#dce2ec" />
+  <text x="48" y="1198" fill="#53617b" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700">BEHAVIOR  /  SUNNY-DAY, RAINY-DAY AND DESIGN NOTES</text>
+  <rect x="44" y="1208" width="1810" height="106" rx="8" fill="#f7f9fc" stroke="#f7f9fc" />
+  <text x="50" y="1227" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400">SUNNY: assign athlete -&gt; upsert one meet request -&gt; scoped portal -&gt; review events -&gt; confirm availability -&gt; staff sees current status.</text>
+  <text x="50" y="1247" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400">RAINY: Unavailable is a valid reply; staff records external response with channel; no reply stays awaiting; invalid links reveal no profile.</text>
+  <text x="50" y="1267" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400">REPEAT / CHANGE: another event joins the same request; proposed event-set revision makes old replies stale; changed replies remain audited.</text>
+  <text x="50" y="1287" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400">DESIGN NOTE: versioned re-confirmation and assignment-removal handling are proposed; follow-up is manual link sharing, not automatic email.</text>
+</svg>

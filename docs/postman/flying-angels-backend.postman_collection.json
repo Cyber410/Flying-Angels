@@ -2,7 +2,7 @@
   "info": {
     "name": "Flying Angels - Complete backend verification",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-    "description": "All current controller endpoints plus positive/negative workflows. Run folders in order against a disposable database. Fixtures are relative to docs/postman. Development uses No Auth; for prod select collection Basic Auth and set username/password locally. CSRF headers are populated automatically when a token is returned."
+    "description": "Standalone backend functional verification with Admin sign-in. Select an environment with baseUrl, email and password, keep cookies enabled, and run every folder in order against disposable data. Folder 00 detects authentication mode, fetches CSRF, signs in as Admin and refreshes CSRF. Invalid credentials or a non-Admin login stop the run before CRUD. Only an explicitly authentication-disabled fixture skips login. Uses session cookies, not Basic/Bearer Auth; subsequent writes attach the returned CSRF header. Upload fixtures are relative to docs/postman. Coach and Athlete permissions are covered by the separate account-role collection.\n\nRun every numbered folder in order from 00 - Authentication, one iteration. Generated fixture IDs are validated and saved automatically. Missing fixture values stop the run before an invalid URL is sent; failed fixture creation stops the run at its source. Role/authentication, CORS and CSRF rejection tests retain their expected negative responses."
   },
   "auth": {
     "type": "noauth"
@@ -18,7 +18,7 @@
     },
     {
       "key": "csrfHeader",
-      "value": "X-XSRF-TOKEN"
+      "value": "X-CSRF-TOKEN"
     }
   ],
   "event": [
@@ -27,9 +27,20 @@
       "script": {
         "type": "text/javascript",
         "exec": [
+          "const fixtureRules={\"ambiguousAId\":\"positiveId\",\"ambiguousBId\":\"positiveId\",\"ambiguousImportId\":\"uuid\",\"athleteAId\":\"positiveId\",\"athleteBId\":\"positiveId\",\"athleteCId\":\"positiveId\",\"athleteDId\":\"positiveId\",\"availabilityId\":\"positiveId\",\"bulkEditFirst\":\"positiveId\",\"bulkEditSecond\":\"positiveId\",\"bulkRestoreBody\":\"text\",\"category100Id\":\"positiveId\",\"category200Id\":\"positiveId\",\"category400Id\":\"positiveId\",\"categoryJumpId\":\"positiveId\",\"confirmedIdentityImportId\":\"uuid\",\"copiedEventId\":\"positiveId\",\"differentDobAthleteId\":\"positiveId\",\"differentDobImportId\":\"uuid\",\"event100Id\":\"positiveId\",\"event200Id\":\"positiveId\",\"eventJumpId\":\"positiveId\",\"immediateAthleteId\":\"positiveId\",\"importAthleteId\":\"positiveId\",\"importDatedAthleteId\":\"positiveId\",\"importId\":\"uuid\",\"importSource\":\"text\",\"meetId\":\"positiveId\",\"repeatedAthleteId\":\"positiveId\",\"repeatedImportId\":\"uuid\",\"resultId\":\"positiveId\",\"runId\":\"text\",\"targetMeetId\":\"positiveId\",\"tsvAthleteId\":\"positiveId\",\"unchangedImportId\":\"uuid\",\"updateImportId\":\"uuid\",\"xlsxAthleteId\":\"positiveId\"};",
+          "function fixtureValueIsValid(value, rule) {",
+          "  const text=String(value ?? \"\");",
+          "  if(rule===\"positiveId\") return /^[1-9][0-9]*$/.test(text) && Number.isSafeInteger(Number(value));",
+          "  if(rule===\"nonNegativeInteger\") return /^[0-9]+$/.test(text) && Number.isSafeInteger(Number(value));",
+          "  if(rule===\"uuid\") return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(text);",
+          "  return typeof value===\"string\" && value.trim().length>0 && !value.includes(\"{{\");",
+          "}",
+          "const fixtureRequestTemplate=JSON.stringify(pm.request.toJSON());",
+          "const missingFixtureKeys=Object.keys(fixtureRules).filter(key=>fixtureRequestTemplate.includes(\"{{\"+key+\"}}\") && !fixtureValueIsValid(pm.variables.get(key),fixtureRules[key]));",
+          "if(missingFixtureKeys.length){const message=\"Missing or invalid setup variable(s): \"+missingFixtureKeys.join(\", \")+\". Run this collection from 00 - Authentication. If setup ran, inspect its first failed response. No request was sent.\";pm.test(\"Required fixture setup is complete\",()=>{throw new Error(message);});console.error(message);pm.execution.setNextRequest(null);pm.execution.skipRequest();}",
           "if (![\"GET\",\"HEAD\",\"OPTIONS\"].includes(pm.request.method)) {",
           "  const token=pm.collectionVariables.get(\"csrfToken\");",
-          "  if (token) pm.request.headers.upsert({key:pm.collectionVariables.get(\"csrfHeader\") || \"X-XSRF-TOKEN\",value:token});",
+          "  if (token) pm.request.headers.upsert({key:pm.collectionVariables.get(\"csrfHeader\") || \"X-CSRF-TOKEN\",value:token});",
           "}"
         ]
       }
@@ -37,16 +48,18 @@
   ],
   "item": [
     {
-      "name": "00 - Setup and athletes",
-      "description": "Run the full collection in order against a disposable database. First request creates a fresh run ID; response scripts save all IDs. Set collection Basic Auth manually when running with prod security.",
+      "name": "00 - Authentication",
+      "description": "Standalone setup for the functional run. Checks server mode, obtains CSRF, signs into the selected Admin account, then refreshes CSRF. Only an explicitly authentication-disabled fixture skips the three login steps. Other roles are exercised by the separate role-security collection.",
       "item": [
         {
-          "name": "Initialize run and list athletes",
+          "name": "Initialize run and check authentication mode",
           "request": {
             "method": "GET",
             "header": [],
-            "url": "{{baseUrl}}/api/athletes",
-            "description": ""
+            "url": "{{baseUrl}}/api/auth/me",
+            "auth": {
+              "type": "noauth"
+            }
           },
           "event": [
             {
@@ -54,12 +67,181 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
+                  "[\"ambiguousAId\",\"ambiguousBId\",\"ambiguousImportId\",\"athleteAId\",\"athleteBId\",\"athleteCId\",\"athleteDId\",\"availabilityId\",\"bulkEditFirst\",\"bulkEditSecond\",\"bulkRestoreBody\",\"category100Id\",\"category200Id\",\"category400Id\",\"categoryJumpId\",\"confirmedIdentityImportId\",\"copiedEventId\",\"differentDobAthleteId\",\"differentDobImportId\",\"event100Id\",\"event200Id\",\"eventJumpId\",\"immediateAthleteId\",\"importAthleteId\",\"importDatedAthleteId\",\"importId\",\"importSource\",\"meetId\",\"repeatedAthleteId\",\"repeatedImportId\",\"resultId\",\"runId\",\"targetMeetId\",\"tsvAthleteId\",\"unchangedImportId\",\"updateImportId\",\"xlsxAthleteId\"].forEach(key=>{pm.collectionVariables.unset(key);pm.variables.unset(key);});",
                   "pm.collectionVariables.set(\"runId\", pm.variables.replaceIn(\"{{$guid}}\"));",
                   "pm.collectionVariables.set(\"importSource\", \"POSTMAN_\" + pm.collectionVariables.get(\"runId\"));",
-                  "[\"ambiguousAId\",\"ambiguousBId\",\"ambiguousImportId\",\"differentDobImportId\",\"differentDobAthleteId\",\"confirmedIdentityImportId\",\"csrfToken\",\"csrfHeader\",\"athleteAId\",\"athleteBId\",\"athleteCId\",\"athleteDId\",\"meetId\",\"targetMeetId\",\"category100Id\",\"category200Id\",\"categoryJumpId\",\"category400Id\",\"event100Id\",\"event200Id\",\"eventJumpId\",\"copiedEventId\",\"resultId\",\"importId\",\"updateImportId\",\"unchangedImportId\",\"importAthleteId\",\"importDatedAthleteId\",\"immediateAthleteId\",\"tsvAthleteId\",\"xlsxAthleteId\"].forEach(k => pm.collectionVariables.unset(k));"
+                  "[\"ambiguousAId\",\"ambiguousBId\",\"ambiguousImportId\",\"differentDobImportId\",\"differentDobAthleteId\",\"confirmedIdentityImportId\",\"csrfToken\",\"csrfHeader\",\"athleteAId\",\"athleteBId\",\"athleteCId\",\"athleteDId\",\"meetId\",\"targetMeetId\",\"category100Id\",\"category200Id\",\"categoryJumpId\",\"category400Id\",\"event100Id\",\"event200Id\",\"eventJumpId\",\"copiedEventId\",\"resultId\",\"importId\",\"updateImportId\",\"unchangedImportId\",\"importAthleteId\",\"importDatedAthleteId\",\"immediateAthleteId\",\"tsvAthleteId\",\"xlsxAthleteId\"].forEach(k => pm.collectionVariables.unset(k));",
+                  "pm.collectionVariables.unset(\"availabilityId\");",
+                  "[\"exportRegistrationCount\",\"exportResultsCount\"].forEach(k => pm.collectionVariables.unset(k));",
+                  "pm.collectionVariables.set(\"authenticationRequired\", \"true\");"
                 ]
               }
             },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const session = pm.response.json();",
+                  "pm.test(\"Server declares authentication mode\", () => pm.expect(session.authenticationRequired).to.be.a(\"boolean\"));",
+                  "pm.collectionVariables.set(\"authenticationRequired\", session.authenticationRequired === false ? \"false\" : \"true\");",
+                  "if (pm.response.code !== 200 || typeof session.authenticationRequired !== \"boolean\") pm.execution.setNextRequest(null);",
+                  "(()=>{",
+                  "function fixtureValueIsValid(value, rule) {",
+                  "  const text=String(value ?? \"\");",
+                  "  if(rule===\"positiveId\") return /^[1-9][0-9]*$/.test(text) && Number.isSafeInteger(Number(value));",
+                  "  if(rule===\"nonNegativeInteger\") return /^[0-9]+$/.test(text) && Number.isSafeInteger(Number(value));",
+                  "  if(rule===\"uuid\") return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(text);",
+                  "  return typeof value===\"string\" && value.trim().length>0 && !value.includes(\"{{\");",
+                  "}",
+                  "const producedFixtureRules={\"importSource\":\"text\",\"runId\":\"text\"};",
+                  "const invalidProducedFixtures=Object.keys(producedFixtureRules).filter(key=>!fixtureValueIsValid(pm.collectionVariables.get(key),producedFixtureRules[key]));",
+                  "const fixtureResponseSucceeded=pm.response.code===200;",
+                  "pm.test(\"Setup returned usable fixture values\",()=>{pm.expect(fixtureResponseSucceeded,\"Unexpected setup response status\").to.eql(true);pm.expect(invalidProducedFixtures,\"Missing or invalid captured fixture values\").to.eql([]);});",
+                  "if(!fixtureResponseSucceeded || invalidProducedFixtures.length){Object.keys(producedFixtureRules).forEach(key=>{pm.collectionVariables.unset(key);pm.variables.unset(key);});console.error(\"Setup failed in \"+pm.info.requestName+\". Check this response before continuing.\");pm.execution.setNextRequest(null);}else{Object.keys(producedFixtureRules).forEach(key=>pm.variables.set(key,pm.collectionVariables.get(key)));}",
+                  "})();"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get login CSRF token",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/csrf",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.collectionVariables.get(\"authenticationRequired\") === \"false\") { pm.execution.skipRequest(); }"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const csrf = pm.response.json();",
+                  "pm.test(\"CSRF token and header supplied\", () => { pm.expect(csrf.token).to.be.a(\"string\").and.not.empty; pm.expect(csrf.headerName).to.eql(\"X-CSRF-TOKEN\"); });",
+                  "pm.collectionVariables.set(\"csrfToken\", csrf.token);",
+                  "pm.collectionVariables.set(\"csrfHeader\", csrf.headerName);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Admin signs in",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/auth/login",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.collectionVariables.get(\"authenticationRequired\") === \"false\") { pm.execution.skipRequest(); }",
+                  "if (!pm.variables.get(\"email\") || !pm.variables.get(\"password\")) { pm.execution.setNextRequest(null); throw new Error(\"Set email and password to an active Admin in the selected environment.\"); }",
+                  "if (!pm.collectionVariables.get(\"csrfToken\")) { pm.execution.setNextRequest(null); throw new Error(\"Run Get login CSRF token before signing in.\"); }"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const session = pm.response.json();",
+                  "const isAdmin = pm.response.code === 200 && session.user && session.user.role === \"ADMIN\";",
+                  "pm.test(\"Admin account required for full CRUD verification\", () => pm.expect(Boolean(isAdmin)).to.eql(true));",
+                  "if (!isAdmin) pm.execution.setNextRequest(null);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Refresh CSRF after login",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/csrf",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.collectionVariables.get(\"authenticationRequired\") === \"false\") { pm.execution.skipRequest(); }"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const csrf = pm.response.json();",
+                  "pm.test(\"CSRF token and header supplied\", () => { pm.expect(csrf.token).to.be.a(\"string\").and.not.empty; pm.expect(csrf.headerName).to.eql(\"X-CSRF-TOKEN\"); });",
+                  "pm.collectionVariables.set(\"csrfToken\", csrf.token);",
+                  "pm.collectionVariables.set(\"csrfHeader\", csrf.headerName);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "01 - Setup and athletes",
+      "description": "Run the full collection in order against a disposable database. First request creates a fresh run ID; response scripts save all IDs. Set collection Basic Auth manually when running with prod security.",
+      "item": [
+        {
+          "name": "List athletes before creating test fixtures",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/athletes",
+            "description": ""
+          },
+          "event": [
             {
               "listen": "test",
               "script": {
@@ -70,27 +252,6 @@
                   "pm.test(\"Expected behavior\", () => {",
                   "pm.expect(responseBody).to.be.an(\"array\");",
                   "});"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "Get CSRF token (needed for secured writes)",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": "{{baseUrl}}/api/csrf",
-            "description": ""
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"CSRF endpoint responds\", () => pm.expect([200,204]).to.include(pm.response.code));",
-                  "if (pm.response.text()) { var responseBody=pm.response.json(); if (responseBody && responseBody.token) { pm.collectionVariables.set(\"csrfToken\",responseBody.token); pm.collectionVariables.set(\"csrfHeader\",responseBody.headerName); } }"
                 ]
               }
             }
@@ -129,7 +290,21 @@
                   "pm.collectionVariables.set(\"athleteAId\", responseBody.id);",
                   "pm.test(\"Expected behavior\", () => {",
                   "pm.expect(responseBody.id).to.be.a(\"number\"); pm.expect(responseBody.dateOfBirth).to.equal(null);",
-                  "});"
+                  "});",
+                  "(()=>{",
+                  "function fixtureValueIsValid(value, rule) {",
+                  "  const text=String(value ?? \"\");",
+                  "  if(rule===\"positiveId\") return /^[1-9][0-9]*$/.test(text) && Number.isSafeInteger(Number(value));",
+                  "  if(rule===\"nonNegativeInteger\") return /^[0-9]+$/.test(text) && Number.isSafeInteger(Number(value));",
+                  "  if(rule===\"uuid\") return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(text);",
+                  "  return typeof value===\"string\" && value.trim().length>0 && !value.includes(\"{{\");",
+                  "}",
+                  "const producedFixtureRules={\"athleteAId\":\"positiveId\"};",
+                  "const invalidProducedFixtures=Object.keys(producedFixtureRules).filter(key=>!fixtureValueIsValid(pm.collectionVariables.get(key),producedFixtureRules[key]));",
+                  "const fixtureResponseSucceeded=pm.response.code===201;",
+                  "pm.test(\"Setup returned usable fixture values\",()=>{pm.expect(fixtureResponseSucceeded,\"Unexpected setup response status\").to.eql(true);pm.expect(invalidProducedFixtures,\"Missing or invalid captured fixture values\").to.eql([]);});",
+                  "if(!fixtureResponseSucceeded || invalidProducedFixtures.length){Object.keys(producedFixtureRules).forEach(key=>{pm.collectionVariables.unset(key);pm.variables.unset(key);});console.error(\"Setup failed in \"+pm.info.requestName+\". Check this response before continuing.\");pm.execution.setNextRequest(null);}else{Object.keys(producedFixtureRules).forEach(key=>pm.variables.set(key,pm.collectionVariables.get(key)));}",
+                  "})();"
                 ]
               }
             }
@@ -168,7 +343,21 @@
                   "pm.collectionVariables.set(\"athleteBId\", responseBody.id);",
                   "pm.test(\"Expected behavior\", () => {",
                   "pm.expect(responseBody.id).to.be.a(\"number\");",
-                  "});"
+                  "});",
+                  "(()=>{",
+                  "function fixtureValueIsValid(value, rule) {",
+                  "  const text=String(value ?? \"\");",
+                  "  if(rule===\"positiveId\") return /^[1-9][0-9]*$/.test(text) && Number.isSafeInteger(Number(value));",
+                  "  if(rule===\"nonNegativeInteger\") return /^[0-9]+$/.test(text) && Number.isSafeInteger(Number(value));",
+                  "  if(rule===\"uuid\") return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(text);",
+                  "  return typeof value===\"string\" && value.trim().length>0 && !value.includes(\"{{\");",
+                  "}",
+                  "const producedFixtureRules={\"athleteBId\":\"positiveId\"};",
+                  "const invalidProducedFixtures=Object.keys(producedFixtureRules).filter(key=>!fixtureValueIsValid(pm.collectionVariables.get(key),producedFixtureRules[key]));",
+                  "const fixtureResponseSucceeded=pm.response.code===201;",
+                  "pm.test(\"Setup returned usable fixture values\",()=>{pm.expect(fixtureResponseSucceeded,\"Unexpected setup response status\").to.eql(true);pm.expect(invalidProducedFixtures,\"Missing or invalid captured fixture values\").to.eql([]);});",
+                  "if(!fixtureResponseSucceeded || invalidProducedFixtures.length){Object.keys(producedFixtureRules).forEach(key=>{pm.collectionVariables.unset(key);pm.variables.unset(key);});console.error(\"Setup failed in \"+pm.info.requestName+\". Check this response before continuing.\");pm.execution.setNextRequest(null);}else{Object.keys(producedFixtureRules).forEach(key=>pm.variables.set(key,pm.collectionVariables.get(key)));}",
+                  "})();"
                 ]
               }
             }
@@ -207,7 +396,21 @@
                   "pm.collectionVariables.set(\"athleteCId\", responseBody.id);",
                   "pm.test(\"Expected behavior\", () => {",
                   "pm.expect(responseBody.id).to.be.a(\"number\");",
-                  "});"
+                  "});",
+                  "(()=>{",
+                  "function fixtureValueIsValid(value, rule) {",
+                  "  const text=String(value ?? \"\");",
+                  "  if(rule===\"positiveId\") return /^[1-9][0-9]*$/.test(text) && Number.isSafeInteger(Number(value));",
+                  "  if(rule===\"nonNegativeInteger\") return /^[0-9]+$/.test(text) && Number.isSafeInteger(Number(value));",
+                  "  if(rule===\"uuid\") return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(text);",
+                  "  return typeof value===\"string\" && value.trim().length>0 && !value.includes(\"{{\");",
+                  "}",
+                  "const producedFixtureRules={\"athleteCId\":\"positiveId\"};",
+                  "const invalidProducedFixtures=Object.keys(producedFixtureRules).filter(key=>!fixtureValueIsValid(pm.collectionVariables.get(key),producedFixtureRules[key]));",
+                  "const fixtureResponseSucceeded=pm.response.code===201;",
+                  "pm.test(\"Setup returned usable fixture values\",()=>{pm.expect(fixtureResponseSucceeded,\"Unexpected setup response status\").to.eql(true);pm.expect(invalidProducedFixtures,\"Missing or invalid captured fixture values\").to.eql([]);});",
+                  "if(!fixtureResponseSucceeded || invalidProducedFixtures.length){Object.keys(producedFixtureRules).forEach(key=>{pm.collectionVariables.unset(key);pm.variables.unset(key);});console.error(\"Setup failed in \"+pm.info.requestName+\". Check this response before continuing.\");pm.execution.setNextRequest(null);}else{Object.keys(producedFixtureRules).forEach(key=>pm.variables.set(key,pm.collectionVariables.get(key)));}",
+                  "})();"
                 ]
               }
             }
@@ -246,7 +449,21 @@
                   "pm.collectionVariables.set(\"athleteDId\", responseBody.id);",
                   "pm.test(\"Expected behavior\", () => {",
                   "pm.expect(responseBody.id).to.be.a(\"number\");",
-                  "});"
+                  "});",
+                  "(()=>{",
+                  "function fixtureValueIsValid(value, rule) {",
+                  "  const text=String(value ?? \"\");",
+                  "  if(rule===\"positiveId\") return /^[1-9][0-9]*$/.test(text) && Number.isSafeInteger(Number(value));",
+                  "  if(rule===\"nonNegativeInteger\") return /^[0-9]+$/.test(text) && Number.isSafeInteger(Number(value));",
+                  "  if(rule===\"uuid\") return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(text);",
+                  "  return typeof value===\"string\" && value.trim().length>0 && !value.includes(\"{{\");",
+                  "}",
+                  "const producedFixtureRules={\"athleteDId\":\"positiveId\"};",
+                  "const invalidProducedFixtures=Object.keys(producedFixtureRules).filter(key=>!fixtureValueIsValid(pm.collectionVariables.get(key),producedFixtureRules[key]));",
+                  "const fixtureResponseSucceeded=pm.response.code===201;",
+                  "pm.test(\"Setup returned usable fixture values\",()=>{pm.expect(fixtureResponseSucceeded,\"Unexpected setup response status\").to.eql(true);pm.expect(invalidProducedFixtures,\"Missing or invalid captured fixture values\").to.eql([]);});",
+                  "if(!fixtureResponseSucceeded || invalidProducedFixtures.length){Object.keys(producedFixtureRules).forEach(key=>{pm.collectionVariables.unset(key);pm.variables.unset(key);});console.error(\"Setup failed in \"+pm.info.requestName+\". Check this response before continuing.\");pm.execution.setNextRequest(null);}else{Object.keys(producedFixtureRules).forEach(key=>pm.variables.set(key,pm.collectionVariables.get(key)));}",
+                  "})();"
                 ]
               }
             }
@@ -437,11 +654,32 @@
               }
             }
           ]
+        },
+        {
+          "name": "History reports no competition records before assignment",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/athletes/{{athleteAId}}/history"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const responsePayload = pm.response.json();",
+                  "pm.test(\"Explicit no-history state\", () => { pm.expect(responsePayload.status).to.eql(\"NO_COMPETITION_HISTORY\"); pm.expect(responsePayload.meets).to.eql([]); pm.expect(responsePayload.performances).to.eql([]); });"
+                ]
+              }
+            }
+          ]
         }
       ]
     },
     {
-      "name": "01 - Meets and event definitions",
+      "name": "02 - Meets and event definitions",
       "description": "Create reusable definitions, single/bulk events, and verify date and duplicate constraints.",
       "item": [
         {
@@ -477,7 +715,21 @@
                   "pm.collectionVariables.set(\"meetId\", responseBody.id);",
                   "pm.test(\"Expected behavior\", () => {",
                   "pm.expect(responseBody.startDate).to.equal(\"2026-05-16\"); pm.expect(responseBody.endDate).to.equal(\"2026-05-18\");",
-                  "});"
+                  "});",
+                  "(()=>{",
+                  "function fixtureValueIsValid(value, rule) {",
+                  "  const text=String(value ?? \"\");",
+                  "  if(rule===\"positiveId\") return /^[1-9][0-9]*$/.test(text) && Number.isSafeInteger(Number(value));",
+                  "  if(rule===\"nonNegativeInteger\") return /^[0-9]+$/.test(text) && Number.isSafeInteger(Number(value));",
+                  "  if(rule===\"uuid\") return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(text);",
+                  "  return typeof value===\"string\" && value.trim().length>0 && !value.includes(\"{{\");",
+                  "}",
+                  "const producedFixtureRules={\"meetId\":\"positiveId\"};",
+                  "const invalidProducedFixtures=Object.keys(producedFixtureRules).filter(key=>!fixtureValueIsValid(pm.collectionVariables.get(key),producedFixtureRules[key]));",
+                  "const fixtureResponseSucceeded=pm.response.code===201;",
+                  "pm.test(\"Setup returned usable fixture values\",()=>{pm.expect(fixtureResponseSucceeded,\"Unexpected setup response status\").to.eql(true);pm.expect(invalidProducedFixtures,\"Missing or invalid captured fixture values\").to.eql([]);});",
+                  "if(!fixtureResponseSucceeded || invalidProducedFixtures.length){Object.keys(producedFixtureRules).forEach(key=>{pm.collectionVariables.unset(key);pm.variables.unset(key);});console.error(\"Setup failed in \"+pm.info.requestName+\". Check this response before continuing.\");pm.execution.setNextRequest(null);}else{Object.keys(producedFixtureRules).forEach(key=>pm.variables.set(key,pm.collectionVariables.get(key)));}",
+                  "})();"
                 ]
               }
             }
@@ -513,7 +765,21 @@
                 "exec": [
                   "pm.test(\"HTTP 201\", () => pm.response.to.have.status(201));",
                   "var responseBody = pm.response.json();",
-                  "pm.collectionVariables.set(\"targetMeetId\", responseBody.id);"
+                  "pm.collectionVariables.set(\"targetMeetId\", responseBody.id);",
+                  "(()=>{",
+                  "function fixtureValueIsValid(value, rule) {",
+                  "  const text=String(value ?? \"\");",
+                  "  if(rule===\"positiveId\") return /^[1-9][0-9]*$/.test(text) && Number.isSafeInteger(Number(value));",
+                  "  if(rule===\"nonNegativeInteger\") return /^[0-9]+$/.test(text) && Number.isSafeInteger(Number(value));",
+                  "  if(rule===\"uuid\") return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(text);",
+                  "  return typeof value===\"string\" && value.trim().length>0 && !value.includes(\"{{\");",
+                  "}",
+                  "const producedFixtureRules={\"targetMeetId\":\"positiveId\"};",
+                  "const invalidProducedFixtures=Object.keys(producedFixtureRules).filter(key=>!fixtureValueIsValid(pm.collectionVariables.get(key),producedFixtureRules[key]));",
+                  "const fixtureResponseSucceeded=pm.response.code===201;",
+                  "pm.test(\"Setup returned usable fixture values\",()=>{pm.expect(fixtureResponseSucceeded,\"Unexpected setup response status\").to.eql(true);pm.expect(invalidProducedFixtures,\"Missing or invalid captured fixture values\").to.eql([]);});",
+                  "if(!fixtureResponseSucceeded || invalidProducedFixtures.length){Object.keys(producedFixtureRules).forEach(key=>{pm.collectionVariables.unset(key);pm.variables.unset(key);});console.error(\"Setup failed in \"+pm.info.requestName+\". Check this response before continuing.\");pm.execution.setNextRequest(null);}else{Object.keys(producedFixtureRules).forEach(key=>pm.variables.set(key,pm.collectionVariables.get(key)));}",
+                  "})();"
                 ]
               }
             }
@@ -672,7 +938,21 @@
                   "pm.collectionVariables.set(\"category100Id\", responseBody.id);",
                   "pm.test(\"Expected behavior\", () => {",
                   "pm.expect(responseBody.unit).to.equal(\"SECONDS\");",
-                  "});"
+                  "});",
+                  "(()=>{",
+                  "function fixtureValueIsValid(value, rule) {",
+                  "  const text=String(value ?? \"\");",
+                  "  if(rule===\"positiveId\") return /^[1-9][0-9]*$/.test(text) && Number.isSafeInteger(Number(value));",
+                  "  if(rule===\"nonNegativeInteger\") return /^[0-9]+$/.test(text) && Number.isSafeInteger(Number(value));",
+                  "  if(rule===\"uuid\") return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(text);",
+                  "  return typeof value===\"string\" && value.trim().length>0 && !value.includes(\"{{\");",
+                  "}",
+                  "const producedFixtureRules={\"category100Id\":\"positiveId\"};",
+                  "const invalidProducedFixtures=Object.keys(producedFixtureRules).filter(key=>!fixtureValueIsValid(pm.collectionVariables.get(key),producedFixtureRules[key]));",
+                  "const fixtureResponseSucceeded=pm.response.code===201;",
+                  "pm.test(\"Setup returned usable fixture values\",()=>{pm.expect(fixtureResponseSucceeded,\"Unexpected setup response status\").to.eql(true);pm.expect(invalidProducedFixtures,\"Missing or invalid captured fixture values\").to.eql([]);});",
+                  "if(!fixtureResponseSucceeded || invalidProducedFixtures.length){Object.keys(producedFixtureRules).forEach(key=>{pm.collectionVariables.unset(key);pm.variables.unset(key);});console.error(\"Setup failed in \"+pm.info.requestName+\". Check this response before continuing.\");pm.execution.setNextRequest(null);}else{Object.keys(producedFixtureRules).forEach(key=>pm.variables.set(key,pm.collectionVariables.get(key)));}",
+                  "})();"
                 ]
               }
             }
@@ -711,7 +991,21 @@
                   "pm.collectionVariables.set(\"category200Id\", responseBody.id);",
                   "pm.test(\"Expected behavior\", () => {",
                   "pm.expect(responseBody.unit).to.equal(\"SECONDS\");",
-                  "});"
+                  "});",
+                  "(()=>{",
+                  "function fixtureValueIsValid(value, rule) {",
+                  "  const text=String(value ?? \"\");",
+                  "  if(rule===\"positiveId\") return /^[1-9][0-9]*$/.test(text) && Number.isSafeInteger(Number(value));",
+                  "  if(rule===\"nonNegativeInteger\") return /^[0-9]+$/.test(text) && Number.isSafeInteger(Number(value));",
+                  "  if(rule===\"uuid\") return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(text);",
+                  "  return typeof value===\"string\" && value.trim().length>0 && !value.includes(\"{{\");",
+                  "}",
+                  "const producedFixtureRules={\"category200Id\":\"positiveId\"};",
+                  "const invalidProducedFixtures=Object.keys(producedFixtureRules).filter(key=>!fixtureValueIsValid(pm.collectionVariables.get(key),producedFixtureRules[key]));",
+                  "const fixtureResponseSucceeded=pm.response.code===201;",
+                  "pm.test(\"Setup returned usable fixture values\",()=>{pm.expect(fixtureResponseSucceeded,\"Unexpected setup response status\").to.eql(true);pm.expect(invalidProducedFixtures,\"Missing or invalid captured fixture values\").to.eql([]);});",
+                  "if(!fixtureResponseSucceeded || invalidProducedFixtures.length){Object.keys(producedFixtureRules).forEach(key=>{pm.collectionVariables.unset(key);pm.variables.unset(key);});console.error(\"Setup failed in \"+pm.info.requestName+\". Check this response before continuing.\");pm.execution.setNextRequest(null);}else{Object.keys(producedFixtureRules).forEach(key=>pm.variables.set(key,pm.collectionVariables.get(key)));}",
+                  "})();"
                 ]
               }
             }
@@ -750,7 +1044,21 @@
                   "pm.collectionVariables.set(\"categoryJumpId\", responseBody.id);",
                   "pm.test(\"Expected behavior\", () => {",
                   "pm.expect(responseBody.unit).to.equal(\"METRES\");",
-                  "});"
+                  "});",
+                  "(()=>{",
+                  "function fixtureValueIsValid(value, rule) {",
+                  "  const text=String(value ?? \"\");",
+                  "  if(rule===\"positiveId\") return /^[1-9][0-9]*$/.test(text) && Number.isSafeInteger(Number(value));",
+                  "  if(rule===\"nonNegativeInteger\") return /^[0-9]+$/.test(text) && Number.isSafeInteger(Number(value));",
+                  "  if(rule===\"uuid\") return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(text);",
+                  "  return typeof value===\"string\" && value.trim().length>0 && !value.includes(\"{{\");",
+                  "}",
+                  "const producedFixtureRules={\"categoryJumpId\":\"positiveId\"};",
+                  "const invalidProducedFixtures=Object.keys(producedFixtureRules).filter(key=>!fixtureValueIsValid(pm.collectionVariables.get(key),producedFixtureRules[key]));",
+                  "const fixtureResponseSucceeded=pm.response.code===201;",
+                  "pm.test(\"Setup returned usable fixture values\",()=>{pm.expect(fixtureResponseSucceeded,\"Unexpected setup response status\").to.eql(true);pm.expect(invalidProducedFixtures,\"Missing or invalid captured fixture values\").to.eql([]);});",
+                  "if(!fixtureResponseSucceeded || invalidProducedFixtures.length){Object.keys(producedFixtureRules).forEach(key=>{pm.collectionVariables.unset(key);pm.variables.unset(key);});console.error(\"Setup failed in \"+pm.info.requestName+\". Check this response before continuing.\");pm.execution.setNextRequest(null);}else{Object.keys(producedFixtureRules).forEach(key=>pm.variables.set(key,pm.collectionVariables.get(key)));}",
+                  "})();"
                 ]
               }
             }
@@ -789,7 +1097,21 @@
                   "pm.collectionVariables.set(\"category400Id\", responseBody.id);",
                   "pm.test(\"Expected behavior\", () => {",
                   "pm.expect(responseBody.unit).to.equal(\"SECONDS\");",
-                  "});"
+                  "});",
+                  "(()=>{",
+                  "function fixtureValueIsValid(value, rule) {",
+                  "  const text=String(value ?? \"\");",
+                  "  if(rule===\"positiveId\") return /^[1-9][0-9]*$/.test(text) && Number.isSafeInteger(Number(value));",
+                  "  if(rule===\"nonNegativeInteger\") return /^[0-9]+$/.test(text) && Number.isSafeInteger(Number(value));",
+                  "  if(rule===\"uuid\") return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(text);",
+                  "  return typeof value===\"string\" && value.trim().length>0 && !value.includes(\"{{\");",
+                  "}",
+                  "const producedFixtureRules={\"category400Id\":\"positiveId\"};",
+                  "const invalidProducedFixtures=Object.keys(producedFixtureRules).filter(key=>!fixtureValueIsValid(pm.collectionVariables.get(key),producedFixtureRules[key]));",
+                  "const fixtureResponseSucceeded=pm.response.code===201;",
+                  "pm.test(\"Setup returned usable fixture values\",()=>{pm.expect(fixtureResponseSucceeded,\"Unexpected setup response status\").to.eql(true);pm.expect(invalidProducedFixtures,\"Missing or invalid captured fixture values\").to.eql([]);});",
+                  "if(!fixtureResponseSucceeded || invalidProducedFixtures.length){Object.keys(producedFixtureRules).forEach(key=>{pm.collectionVariables.unset(key);pm.variables.unset(key);});console.error(\"Setup failed in \"+pm.info.requestName+\". Check this response before continuing.\");pm.execution.setNextRequest(null);}else{Object.keys(producedFixtureRules).forEach(key=>pm.variables.set(key,pm.collectionVariables.get(key)));}",
+                  "})();"
                 ]
               }
             }
@@ -887,7 +1209,21 @@
                 "exec": [
                   "pm.test(\"HTTP 201\", () => pm.response.to.have.status(201));",
                   "var responseBody = pm.response.json();",
-                  "pm.collectionVariables.set(\"event100Id\", responseBody.id);"
+                  "pm.collectionVariables.set(\"event100Id\", responseBody.id);",
+                  "(()=>{",
+                  "function fixtureValueIsValid(value, rule) {",
+                  "  const text=String(value ?? \"\");",
+                  "  if(rule===\"positiveId\") return /^[1-9][0-9]*$/.test(text) && Number.isSafeInteger(Number(value));",
+                  "  if(rule===\"nonNegativeInteger\") return /^[0-9]+$/.test(text) && Number.isSafeInteger(Number(value));",
+                  "  if(rule===\"uuid\") return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(text);",
+                  "  return typeof value===\"string\" && value.trim().length>0 && !value.includes(\"{{\");",
+                  "}",
+                  "const producedFixtureRules={\"event100Id\":\"positiveId\"};",
+                  "const invalidProducedFixtures=Object.keys(producedFixtureRules).filter(key=>!fixtureValueIsValid(pm.collectionVariables.get(key),producedFixtureRules[key]));",
+                  "const fixtureResponseSucceeded=pm.response.code===201;",
+                  "pm.test(\"Setup returned usable fixture values\",()=>{pm.expect(fixtureResponseSucceeded,\"Unexpected setup response status\").to.eql(true);pm.expect(invalidProducedFixtures,\"Missing or invalid captured fixture values\").to.eql([]);});",
+                  "if(!fixtureResponseSucceeded || invalidProducedFixtures.length){Object.keys(producedFixtureRules).forEach(key=>{pm.collectionVariables.unset(key);pm.variables.unset(key);});console.error(\"Setup failed in \"+pm.info.requestName+\". Check this response before continuing.\");pm.execution.setNextRequest(null);}else{Object.keys(producedFixtureRules).forEach(key=>pm.variables.set(key,pm.collectionVariables.get(key)));}",
+                  "})();"
                 ]
               }
             }
@@ -925,7 +1261,21 @@
                   "var responseBody = pm.response.json();",
                   "pm.test(\"Expected behavior\", () => {",
                   "pm.expect(responseBody).to.have.lengthOf(2); pm.collectionVariables.set(\"event200Id\",responseBody[0].id); pm.collectionVariables.set(\"eventJumpId\",responseBody[1].id);",
-                  "});"
+                  "});",
+                  "(()=>{",
+                  "function fixtureValueIsValid(value, rule) {",
+                  "  const text=String(value ?? \"\");",
+                  "  if(rule===\"positiveId\") return /^[1-9][0-9]*$/.test(text) && Number.isSafeInteger(Number(value));",
+                  "  if(rule===\"nonNegativeInteger\") return /^[0-9]+$/.test(text) && Number.isSafeInteger(Number(value));",
+                  "  if(rule===\"uuid\") return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(text);",
+                  "  return typeof value===\"string\" && value.trim().length>0 && !value.includes(\"{{\");",
+                  "}",
+                  "const producedFixtureRules={\"event200Id\":\"positiveId\",\"eventJumpId\":\"positiveId\"};",
+                  "const invalidProducedFixtures=Object.keys(producedFixtureRules).filter(key=>!fixtureValueIsValid(pm.collectionVariables.get(key),producedFixtureRules[key]));",
+                  "const fixtureResponseSucceeded=pm.response.code===201;",
+                  "pm.test(\"Setup returned usable fixture values\",()=>{pm.expect(fixtureResponseSucceeded,\"Unexpected setup response status\").to.eql(true);pm.expect(invalidProducedFixtures,\"Missing or invalid captured fixture values\").to.eql([]);});",
+                  "if(!fixtureResponseSucceeded || invalidProducedFixtures.length){Object.keys(producedFixtureRules).forEach(key=>{pm.collectionVariables.unset(key);pm.variables.unset(key);});console.error(\"Setup failed in \"+pm.info.requestName+\". Check this response before continuing.\");pm.execution.setNextRequest(null);}else{Object.keys(producedFixtureRules).forEach(key=>pm.variables.set(key,pm.collectionVariables.get(key)));}",
+                  "})();"
                 ]
               }
             }
@@ -1196,11 +1546,226 @@
               }
             }
           ]
+        },
+        {
+          "name": "Upcoming meet view is ordered by scheduled start",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/meets?view=UPCOMING&search={{runId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Upcoming order\", () => { const rows = pm.response.json(); const dates = rows.map(r=>r.startDate); pm.expect(dates).to.eql([...dates].sort()); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Past meet view is ordered most recent first",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/meets?view=PAST&search={{runId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Past order\", () => { const rows = pm.response.json(); const dates = rows.map(r=>r.startDate); pm.expect(dates).to.eql([...dates].sort().reverse()); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "All meet search preserves both synthetic meets and zero summaries",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/meets?view=ALL&search={{runId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Both meet records with empty summaries\", () => { const rows = pm.response.json(); pm.expect(rows).to.have.lengthOf(2); pm.expect(rows.every(r=>r.availabilitySummary.total===0)).to.eql(true); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Meet search without a match returns an empty array",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/meets?search=missing-meet-{{runId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"No matches\", () => pm.expect(pm.response.json()).to.eql([]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Export options are disabled before any assignments or results",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/meets/{{meetId}}/exports"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Empty export choices\", () => { const options=pm.response.json().options; pm.expect(options.map(o=>o.type)).to.eql([\"REGISTRATION\",\"RESULTS\"]); pm.expect(options.every(o=>o.recordCount===0 && !o.available)).to.eql(true); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Registration export without assignments returns a message",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "text/csv"
+              }
+            ],
+            "url": "{{baseUrl}}/api/meets/{{meetId}}/export?type=REGISTRATION&ageAsOf={{ageAsOf}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 409\", () => pm.response.to.have.status(409));",
+                  "pm.test(\"No registration records\", () => pm.expect(pm.response.json().code).to.eql(\"NO_REGISTRATION_RECORDS\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Results export without performances returns a message",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "text/csv"
+              }
+            ],
+            "url": "{{baseUrl}}/api/meets/{{meetId}}/export?type=RESULTS&ageAsOf={{ageAsOf}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 409\", () => pm.response.to.have.status(409));",
+                  "pm.test(\"No result records\", () => pm.expect(pm.response.json().code).to.eql(\"NO_RESULT_RECORDS\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Unknown meet cannot be exported",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "text/csv"
+              }
+            ],
+            "url": "{{baseUrl}}/api/meets/999999999/export?type=REGISTRATION&ageAsOf={{ageAsOf}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 404\", () => pm.response.to.have.status(404));",
+                  "pm.test(\"Unknown meet\", () => pm.expect(pm.response.json().code).to.eql(\"MEET_NOT_FOUND\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Ranking meet choices include synthetic meets",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/rankings/meets"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\",()=>pm.response.to.have.status(200));",
+                  "pm.test(\"All meet choices\",()=>{const ids=pm.response.json().map(m=>m.id);pm.expect(ids).to.include(Number(pm.collectionVariables.get(\"meetId\")));pm.expect(ids).to.include(Number(pm.collectionVariables.get(\"targetMeetId\")));});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Ranking event choices filter by the selected meet",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/rankings/events?meetId={{meetId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\",()=>pm.response.to.have.status(200));",
+                  "pm.test(\"Three event instances\",()=>{const events=pm.response.json();pm.expect(events).to.have.lengthOf(3);pm.expect(events.every(e=>e.meetId===Number(pm.collectionVariables.get(\"meetId\")))).to.eql(true);});"
+                ]
+              }
+            }
+          ]
         }
       ]
     },
     {
-      "name": "02 - Participation",
+      "name": "03 - Participation",
       "description": "Unique assignments, bulk rollback, and the same athlete in multiple events.",
       "item": [
         {
@@ -1442,11 +2007,370 @@
               }
             }
           ]
+        },
+        {
+          "name": "History retains assigned events without results",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/athletes/{{athleteAId}}/history"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const responsePayload = pm.response.json(); const events = responsePayload.meets.flatMap(meet => meet.events);",
+                  "pm.test(\"Assignments stay visible\", () => { pm.expect(events.length).to.be.above(0); pm.expect(events.every(event => event.status === \"NO_RESULTS\" && event.attempts.length === 0)).to.eql(true); pm.expect(responsePayload.performances.every(series => series.personalBest === null && series.progression.length === 0)).to.eql(true); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Meet availability counts athletes once across events",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/meets/{{meetId}}/availability"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const rows = pm.response.json();",
+                  "pm.test(\"One request per athlete, both proposed events\", () => { pm.expect(rows).to.have.lengthOf(3); const own = rows.find(r => r.athleteId === Number(pm.collectionVariables.get(\"athleteAId\"))); pm.expect(own.events).to.have.lengthOf(2); pm.expect(own.status).to.eql(\"PENDING\"); pm.collectionVariables.set(\"availabilityId\", own.id); });",
+                  "(()=>{",
+                  "function fixtureValueIsValid(value, rule) {",
+                  "  const text=String(value ?? \"\");",
+                  "  if(rule===\"positiveId\") return /^[1-9][0-9]*$/.test(text) && Number.isSafeInteger(Number(value));",
+                  "  if(rule===\"nonNegativeInteger\") return /^[0-9]+$/.test(text) && Number.isSafeInteger(Number(value));",
+                  "  if(rule===\"uuid\") return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(text);",
+                  "  return typeof value===\"string\" && value.trim().length>0 && !value.includes(\"{{\");",
+                  "}",
+                  "const producedFixtureRules={\"availabilityId\":\"positiveId\"};",
+                  "const invalidProducedFixtures=Object.keys(producedFixtureRules).filter(key=>!fixtureValueIsValid(pm.collectionVariables.get(key),producedFixtureRules[key]));",
+                  "const fixtureResponseSucceeded=pm.response.code===200;",
+                  "pm.test(\"Setup returned usable fixture values\",()=>{pm.expect(fixtureResponseSucceeded,\"Unexpected setup response status\").to.eql(true);pm.expect(invalidProducedFixtures,\"Missing or invalid captured fixture values\").to.eql([]);});",
+                  "if(!fixtureResponseSucceeded || invalidProducedFixtures.length){Object.keys(producedFixtureRules).forEach(key=>{pm.collectionVariables.unset(key);pm.variables.unset(key);});console.error(\"Setup failed in \"+pm.info.requestName+\". Check this response before continuing.\");pm.execution.setNextRequest(null);}else{Object.keys(producedFixtureRules).forEach(key=>pm.variables.set(key,pm.collectionVariables.get(key)));}",
+                  "})();"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Read one meet-level request",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/availability/{{availabilityId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Current assignment revision\", () => { const row = pm.response.json(); pm.expect(row.assignmentRevision).to.eql(2); pm.expect(row.events).to.have.lengthOf(2); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Unanswered request has no fabricated audit entries",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/availability/{{availabilityId}}/responses"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"No confirmations yet\", () => pm.expect(pm.response.json()).to.eql([]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject awaiting response as a submitted answer",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/availability/{{availabilityId}}/response",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"status\":\"PENDING\",\"version\":0,\"assignmentRevision\":2,\"communicationMethod\":\"PHONE\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Meet without assignments has no availability requests",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/meets/{{targetMeetId}}/availability"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Empty availability\", () => pm.expect(pm.response.json()).to.eql([]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Meet Details includes the same availability requests",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/meets/{{meetId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Meet Details status integration\", () => { const rows = pm.response.json().availabilityRequests; pm.expect(rows).to.have.lengthOf(3); pm.expect(rows.every(r => r.status === \"PENDING\")).to.eql(true); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Centralized availability filters outstanding responses by meet",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/availability?meetId={{meetId}}&status=PENDING"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Three athlete requests, no duplicate event rows\", () => { const responsePayload=pm.response.json(); pm.expect(responsePayload.totalElements).to.eql(3); pm.expect(responsePayload.content).to.have.lengthOf(3); pm.expect(new Set(responsePayload.content.map(r=>r.athleteId)).size).to.eql(3); pm.expect(responsePayload.content.every(r=>r.meetId===Number(pm.collectionVariables.get(\"meetId\")) && r.status===\"PENDING\")).to.eql(true); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Availability pagination retains filtered totals",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/availability?meetId={{meetId}}&status=PENDING&page=1&size=1"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Paged filtered rows\", () => { const responsePayload=pm.response.json(); pm.expect(responsePayload.content).to.have.lengthOf(1); pm.expect(responsePayload.totalElements).to.eql(3); pm.expect(responsePayload.totalPages).to.eql(3); pm.expect(responsePayload.page).to.eql(1); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Availability with no matching answers returns an empty page",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/availability?meetId={{meetId}}&status=AVAILABLE"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"No available responses yet\", () => { const responsePayload=pm.response.json(); pm.expect(responsePayload.content).to.eql([]); pm.expect(responsePayload.totalElements).to.eql(0); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Availability search with no matching athlete or meet returns empty",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/availability?meetId={{meetId}}&search=missing-request-{{runId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"No search matches\", () => pm.expect(pm.response.json().totalElements).to.eql(0));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Availability rejects invalid page size",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/availability?size=101"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Meet views reject unknown filter values",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/meets?view=INVALID"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Assignments enable registration export without results",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/meets/{{meetId}}/exports"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Independent choices\", () => { const options=pm.response.json().options; pm.expect(options[0].recordCount).to.eql(4); pm.expect(options[0].available).to.eql(true); pm.expect(options[1].recordCount).to.eql(0); pm.expect(options[1].available).to.eql(false); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Download one registration row per athlete-event assignment",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "text/csv"
+              }
+            ],
+            "url": "{{baseUrl}}/api/meets/{{meetId}}/export?type=REGISTRATION&ageAsOf={{ageAsOf}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const csv = pm.response.text().replace(/^\\uFEFF/, \"\"); const lines = csv.replace(/\\r\\n$/, \"\").split(/\\r\\n/); const headers = lines[0].split(\",\"); const rows = lines.slice(1).map(line => line.split(\",\"));",
+                  "pm.test(\"CSV attachment and meet scope\", () => { pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"text/csv\"); pm.expect(pm.response.headers.get(\"Content-Disposition\")).to.include(\"attachment\"); pm.expect(pm.response.headers.get(\"Cache-Control\")).to.include(\"no-store\"); pm.expect(rows).to.have.lengthOf(4); pm.expect(rows.every(row => row[headers.indexOf(\"meet_id\")] === String(pm.collectionVariables.get(\"meetId\")))).to.eql(true); });",
+                  "pm.test(\"Registration columns\", () => { pm.expect(headers).to.include(\"participation_id\"); pm.expect(headers).to.include(\"availability_status\"); pm.expect(headers).not.to.include(\"result_id\"); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Assigned athletes without results still cannot produce a results export",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "text/csv"
+              }
+            ],
+            "url": "{{baseUrl}}/api/meets/{{meetId}}/export?type=RESULTS&ageAsOf={{ageAsOf}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 409\", () => pm.response.to.have.status(409));",
+                  "pm.test(\"No fabricated performances\", () => pm.expect(pm.response.json().code).to.eql(\"NO_RESULT_RECORDS\"));"
+                ]
+              }
+            }
+          ]
         }
       ]
     },
     {
-      "name": "03 - Results and leaderboard",
+      "name": "04 - Results and leaderboard",
       "description": "Append attempts, correct one record, normalize track/field measurements, reject invalid input, and verify bulk rollback.",
       "item": [
         {
@@ -1463,7 +2387,7 @@
             "description": "",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"athleteId\": {{athleteAId}},\n  \"result\": \"12.40\",\n  \"unit\": \"SECONDS\"\n}",
+              "raw": "{\n  \"athleteId\": {{athleteAId}},\n  \"result\": \"12.40\",\n  \"unit\": \"SECONDS\",\n  \"resultLabel\": \"Heat 1\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -1481,7 +2405,22 @@
                   "var responseBody = pm.response.json();",
                   "pm.test(\"Expected behavior\", () => {",
                   "pm.expect(responseBody.score).to.equal(12.4); pm.expect(responseBody.unit).to.equal(\"SECONDS\"); pm.collectionVariables.set(\"resultId\",responseBody.resultId);",
-                  "});"
+                  "});",
+                  "pm.test(\"Result label retained\", () => pm.expect(pm.response.json().resultLabel).to.eql(\"Heat 1\"));",
+                  "(()=>{",
+                  "function fixtureValueIsValid(value, rule) {",
+                  "  const text=String(value ?? \"\");",
+                  "  if(rule===\"positiveId\") return /^[1-9][0-9]*$/.test(text) && Number.isSafeInteger(Number(value));",
+                  "  if(rule===\"nonNegativeInteger\") return /^[0-9]+$/.test(text) && Number.isSafeInteger(Number(value));",
+                  "  if(rule===\"uuid\") return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(text);",
+                  "  return typeof value===\"string\" && value.trim().length>0 && !value.includes(\"{{\");",
+                  "}",
+                  "const producedFixtureRules={\"resultId\":\"positiveId\"};",
+                  "const invalidProducedFixtures=Object.keys(producedFixtureRules).filter(key=>!fixtureValueIsValid(pm.collectionVariables.get(key),producedFixtureRules[key]));",
+                  "const fixtureResponseSucceeded=pm.response.code===201;",
+                  "pm.test(\"Setup returned usable fixture values\",()=>{pm.expect(fixtureResponseSucceeded,\"Unexpected setup response status\").to.eql(true);pm.expect(invalidProducedFixtures,\"Missing or invalid captured fixture values\").to.eql([]);});",
+                  "if(!fixtureResponseSucceeded || invalidProducedFixtures.length){Object.keys(producedFixtureRules).forEach(key=>{pm.collectionVariables.unset(key);pm.variables.unset(key);});console.error(\"Setup failed in \"+pm.info.requestName+\". Check this response before continuing.\");pm.execution.setNextRequest(null);}else{Object.keys(producedFixtureRules).forEach(key=>pm.variables.set(key,pm.collectionVariables.get(key)));}",
+                  "})();"
                 ]
               }
             }
@@ -1501,7 +2440,7 @@
             "description": "",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"athleteId\": {{athleteAId}},\n  \"result\": \"12.10\",\n  \"unit\": \"SECONDS\"\n}",
+              "raw": "{\n  \"athleteId\": {{athleteAId}},\n  \"result\": \"12.10\",\n  \"unit\": \"SECONDS\",\n  \"resultLabel\": \"Final\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -1515,7 +2454,8 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test(\"HTTP 201\", () => pm.response.to.have.status(201));"
+                  "pm.test(\"HTTP 201\", () => pm.response.to.have.status(201));",
+                  "pm.test(\"Result label retained\", () => pm.expect(pm.response.json().resultLabel).to.eql(\"Final\"));"
                 ]
               }
             }
@@ -1649,7 +2589,7 @@
             "description": "",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"athleteId\": {{athleteAId}},\n  \"result\": \"5.18m\",\n  \"unit\": \"METRES\"\n}",
+              "raw": "{\n  \"athleteId\": {{athleteAId}},\n  \"result\": \"5.18m\",\n  \"unit\": \"METRES\",\n  \"resultLabel\": \"Attempt 1\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -1667,7 +2607,8 @@
                   "var responseBody = pm.response.json();",
                   "pm.test(\"Expected behavior\", () => {",
                   "pm.expect(responseBody.score).to.equal(5.18); pm.expect(responseBody.unit).to.equal(\"METRES\");",
-                  "});"
+                  "});",
+                  "pm.test(\"Result label retained\", () => pm.expect(pm.response.json().resultLabel).to.eql(\"Attempt 1\"));"
                 ]
               }
             }
@@ -2133,7 +3074,21 @@
                   "var responseBody = pm.response.json();",
                   "pm.test(\"Expected behavior\", () => {",
                   "const selected=responseBody.filter(r=>r.athleteId===Number(pm.collectionVariables.get(\"athleteAId\"))).slice(0,2); pm.expect(selected).to.have.length(2); pm.collectionVariables.set(\"bulkEditCount\",responseBody.length); pm.collectionVariables.set(\"bulkEditFirst\",selected[0].resultId); pm.collectionVariables.set(\"bulkEditSecond\",selected[1].resultId); pm.collectionVariables.set(\"bulkRestoreBody\",JSON.stringify({results:selected.map(r=>({resultId:r.resultId,result:r.result,unit:r.unit}))}));",
-                  "});"
+                  "});",
+                  "(()=>{",
+                  "function fixtureValueIsValid(value, rule) {",
+                  "  const text=String(value ?? \"\");",
+                  "  if(rule===\"positiveId\") return /^[1-9][0-9]*$/.test(text) && Number.isSafeInteger(Number(value));",
+                  "  if(rule===\"nonNegativeInteger\") return /^[0-9]+$/.test(text) && Number.isSafeInteger(Number(value));",
+                  "  if(rule===\"uuid\") return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(text);",
+                  "  return typeof value===\"string\" && value.trim().length>0 && !value.includes(\"{{\");",
+                  "}",
+                  "const producedFixtureRules={\"bulkEditFirst\":\"positiveId\",\"bulkEditSecond\":\"positiveId\",\"bulkRestoreBody\":\"text\"};",
+                  "const invalidProducedFixtures=Object.keys(producedFixtureRules).filter(key=>!fixtureValueIsValid(pm.collectionVariables.get(key),producedFixtureRules[key]));",
+                  "const fixtureResponseSucceeded=pm.response.code===200;",
+                  "pm.test(\"Setup returned usable fixture values\",()=>{pm.expect(fixtureResponseSucceeded,\"Unexpected setup response status\").to.eql(true);pm.expect(invalidProducedFixtures,\"Missing or invalid captured fixture values\").to.eql([]);});",
+                  "if(!fixtureResponseSucceeded || invalidProducedFixtures.length){Object.keys(producedFixtureRules).forEach(key=>{pm.collectionVariables.unset(key);pm.variables.unset(key);});console.error(\"Setup failed in \"+pm.info.requestName+\". Check this response before continuing.\");pm.execution.setNextRequest(null);}else{Object.keys(producedFixtureRules).forEach(key=>pm.variables.set(key,pm.collectionVariables.get(key)));}",
+                  "})();"
                 ]
               }
             }
@@ -2364,11 +3319,392 @@
               }
             }
           ]
+        },
+        {
+          "name": "Competition history shares labels and result IDs with event results",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/athletes/{{athleteAId}}/history"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const responsePayload = pm.response.json(); const attempts = responsePayload.meets.flatMap(meet => meet.events).flatMap(event => event.attempts);",
+                  "pm.test(\"Canonical labels and IDs\", () => { pm.expect(responsePayload.athlete.id).to.eql(Number(pm.collectionVariables.get(\"athleteAId\"))); pm.expect(attempts.some(attempt => attempt.resultId === Number(pm.collectionVariables.get(\"resultId\")) && attempt.resultLabel === \"Heat 1\")).to.eql(true); pm.expect(attempts.some(attempt => attempt.resultLabel === \"Final\")).to.eql(true); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Filtered history computes a personal best without inventing a multi-point trend",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/athletes/{{athleteAId}}/history?categoryId={{category100Id}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const responsePayload = pm.response.json(); const category = Number(pm.collectionVariables.get(\"category100Id\")); const events = responsePayload.meets.flatMap(meet => meet.events); const attempts = events.flatMap(event => event.attempts).filter(attempt => attempt.eligibleForPersonalBest);",
+                  "pm.test(\"Filtered best and single-competition progression\", () => { pm.expect(events.every(event => event.categoryId === category)).to.eql(true); pm.expect(responsePayload.performances.length).to.eql(1); const series = responsePayload.performances[0]; pm.expect(series.personalBest.score).to.eql(Math.min(...attempts.map(attempt => attempt.score))); pm.expect(series.progressionStatus).to.eql(\"SINGLE_COMPETITION\"); pm.expect(series.progression.length).to.eql(1); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Known category without athlete events has an explicit empty state",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/athletes/{{athleteAId}}/history?categoryId={{category400Id}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const responsePayload = pm.response.json();",
+                  "pm.test(\"No matching events\", () => { pm.expect(responsePayload.status).to.eql(\"NO_MATCHING_EVENTS\"); pm.expect(responsePayload.meets).to.eql([]); pm.expect(responsePayload.performances).to.eql([]); pm.expect(responsePayload.availableCategories.length).to.be.above(0); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "FOUL remains visible without a personal best",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/athletes/{{athleteDId}}/history?categoryId={{categoryJumpId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const responsePayload = pm.response.json(); const series = responsePayload.performances[0];",
+                  "pm.test(\"No numeric performance invented\", () => { pm.expect(series.personalBest).to.eql(null); pm.expect(series.progressionStatus).to.eql(\"NO_VALID_PERFORMANCE\"); pm.expect(responsePayload.meets.flatMap(meet => meet.events).flatMap(event => event.attempts).some(attempt => attempt.status === \"FOUL\")).to.eql(true); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Oversized result labels do not create attempts",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/events/{{event100Id}}/results",
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"athleteId\": {{athleteAId}}, \"result\": \"12.40\", \"resultLabel\": \"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\" }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Ranking categories expose event definition metadata",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/rankings/categories"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Event options\", () => pm.expect(pm.response.json().some(category => category.id === Number(pm.collectionVariables.get(\"category100Id\")) && category.unit === \"SECONDS\")).to.eql(true));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Centralized rankings return one best athlete row and shared score positions",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/rankings?categoryId={{category100Id}}&ageAsOf={{ageAsOf}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const responsePayload = pm.response.json(); const rows = responsePayload.content;",
+                  "pm.test(\"Best athletes, not raw attempts\", () => { pm.expect(responsePayload.status).to.eql(\"AVAILABLE\"); pm.expect(new Set(rows.map(row => row.athleteId)).size).to.eql(rows.length); pm.expect(rows.length).to.be.at.least(3); rows.forEach((row, index) => { pm.expect(row.profileAccessible).to.eql(true); if (index === 0) pm.expect(row.position).to.eql(1); else { pm.expect(row.score).to.be.at.least(rows[index-1].score); pm.expect(row.position).to.eql(row.score === rows[index-1].score ? rows[index-1].position : index + 1); } }); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Ranking age and gender filters share one explicit reference date",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/rankings?categoryId={{category100Id}}&gender=Male&minAge=0&maxAge=150&ageAsOf=2026-05-17"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const responsePayload = pm.response.json();",
+                  "pm.test(\"Filtered ranking context\", () => { pm.expect(responsePayload.status).to.eql(\"AVAILABLE\"); pm.expect(responsePayload.filters.ageAsOf).to.eql(\"2026-05-17\"); pm.expect(responsePayload.content.every(row => row.gender === \"Male\" && row.ageAtReference !== null && row.ageAtReference >= 0 && row.ageAtReference <= 150)).to.eql(true); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Ranking pagination follows best-per-athlete aggregation",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/rankings?categoryId={{category100Id}}&page=0&size=1&ageAsOf={{ageAsOf}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const responsePayload = pm.response.json();",
+                  "pm.test(\"One athlete on the page, all athletes counted\", () => { pm.expect(responsePayload.content.length).to.eql(1); pm.expect(responsePayload.totalElements).to.be.at.least(3); pm.expect(responsePayload.totalPages).to.eql(responsePayload.totalElements); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Unrecorded event definition has no rankable results",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/rankings?categoryId={{category400Id}}&ageAsOf={{ageAsOf}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"No event results\", () => { const responsePayload = pm.response.json(); pm.expect(responsePayload.status).to.eql(\"NO_EVENT_RESULTS\"); pm.expect(responsePayload.content).to.eql([]); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Ranking filter without matches has a distinct empty state",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/rankings?categoryId={{category100Id}}&gender=NoMatchingGender&ageAsOf={{ageAsOf}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"No matching athletes\", () => pm.expect(pm.response.json().status).to.eql(\"NO_MATCHING_ATHLETES\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Age-filtered rankings require an explicit reference date",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/rankings?categoryId={{category100Id}}&minAge=12"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Review current export choices and capture actual row counts",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/meets/{{meetId}}/exports"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const options=pm.response.json().options;",
+                  "pm.test(\"Both exports available\", () => { pm.expect(options.every(o=>o.available)).to.eql(true); pm.expect(options[1].recordCount).to.be.above(2); });",
+                  "pm.collectionVariables.set(\"exportRegistrationCount\", options[0].recordCount); pm.collectionVariables.set(\"exportResultsCount\", options[1].recordCount);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Registration export is unaffected by repeated result attempts",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "text/csv"
+              }
+            ],
+            "url": "{{baseUrl}}/api/meets/{{meetId}}/export?type=REGISTRATION&ageAsOf={{ageAsOf}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const csv = pm.response.text().replace(/^\\uFEFF/, \"\"); const lines = csv.replace(/\\r\\n$/, \"\").split(/\\r\\n/); const headers = lines[0].split(\",\"); const rows = lines.slice(1).map(line => line.split(\",\"));",
+                  "pm.test(\"CSV attachment and meet scope\", () => { pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"text/csv\"); pm.expect(pm.response.headers.get(\"Content-Disposition\")).to.include(\"attachment\"); pm.expect(pm.response.headers.get(\"Cache-Control\")).to.include(\"no-store\"); pm.expect(rows).to.have.lengthOf(Number(pm.collectionVariables.get(\"exportRegistrationCount\"))); pm.expect(rows.every(row => row[headers.indexOf(\"meet_id\")] === String(pm.collectionVariables.get(\"meetId\")))).to.eql(true); });",
+                  "pm.test(\"Registration columns\", () => { pm.expect(headers).to.include(\"participation_id\"); pm.expect(headers).to.include(\"availability_status\"); pm.expect(headers).not.to.include(\"result_id\"); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Results export retains every attempt and its label",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "text/csv"
+              }
+            ],
+            "url": "{{baseUrl}}/api/meets/{{meetId}}/export?type=RESULTS&ageAsOf={{ageAsOf}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const csv = pm.response.text().replace(/^\\uFEFF/, \"\"); const lines = csv.replace(/\\r\\n$/, \"\").split(/\\r\\n/); const headers = lines[0].split(\",\"); const rows = lines.slice(1).map(line => line.split(\",\"));",
+                  "pm.test(\"CSV attachment and meet scope\", () => { pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"text/csv\"); pm.expect(pm.response.headers.get(\"Content-Disposition\")).to.include(\"attachment\"); pm.expect(pm.response.headers.get(\"Cache-Control\")).to.include(\"no-store\"); pm.expect(rows).to.have.lengthOf(Number(pm.collectionVariables.get(\"exportResultsCount\"))); pm.expect(rows.every(row => row[headers.indexOf(\"meet_id\")] === String(pm.collectionVariables.get(\"meetId\")))).to.eql(true); });",
+                  "pm.test(\"Result columns preserve attempt identity\", () => { pm.expect(headers).to.include(\"result_id\"); pm.expect(headers).to.include(\"result_label\"); pm.expect(headers).to.include(\"score\"); });",
+                  "pm.test(\"Repeated athlete-event performances remain rows\", () => { const keys=rows.map(row=>row[headers.indexOf(\"athlete_id\")]+\":\"+row[headers.indexOf(\"event_id\")]); pm.expect(new Set(keys).size).to.be.below(rows.length); pm.expect(csv).to.include(\"Final\"); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Export requires a recognized explicit type",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "text/csv"
+              }
+            ],
+            "url": "{{baseUrl}}/api/meets/{{meetId}}/export?type=INVALID&ageAsOf={{ageAsOf}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"Invalid export selection\", () => pm.expect(pm.response.json().code).to.eql(\"INVALID_REQUEST\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Rankings can be limited to a selected meet event",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/rankings?categoryId={{category100Id}}&meetId={{meetId}}&eventId={{event100Id}}&ageAsOf={{ageAsOf}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\",()=>pm.response.to.have.status(200));",
+                  "pm.test(\"Selected meet and event scope\",()=>{const responsePayload=pm.response.json();pm.expect(responsePayload.filters.meetId).to.eql(Number(pm.collectionVariables.get(\"meetId\")));pm.expect(responsePayload.filters.eventId).to.eql(Number(pm.collectionVariables.get(\"event100Id\")));pm.expect(responsePayload.content.every(r=>r.meetId===Number(pm.collectionVariables.get(\"meetId\"))&&r.eventId===Number(pm.collectionVariables.get(\"event100Id\")))).to.eql(true);});"
+                ]
+              }
+            }
+          ]
         }
       ]
     },
     {
-      "name": "04 - Notes and definition-only copying",
+      "name": "05 - Notes and definition-only copying",
       "description": "Create ordered notes and copy a populated event into an empty meet without carrying athletes/results.",
       "item": [
         {
@@ -2529,7 +3865,21 @@
                   "var responseBody = pm.response.json();",
                   "pm.test(\"Expected behavior\", () => {",
                   "pm.expect(responseBody).to.have.lengthOf(1); pm.expect(responseBody[0].participantCount).to.equal(0); pm.expect(responseBody[0].meetId).to.equal(Number(pm.collectionVariables.get(\"targetMeetId\"))); pm.collectionVariables.set(\"copiedEventId\",responseBody[0].id);",
-                  "});"
+                  "});",
+                  "(()=>{",
+                  "function fixtureValueIsValid(value, rule) {",
+                  "  const text=String(value ?? \"\");",
+                  "  if(rule===\"positiveId\") return /^[1-9][0-9]*$/.test(text) && Number.isSafeInteger(Number(value));",
+                  "  if(rule===\"nonNegativeInteger\") return /^[0-9]+$/.test(text) && Number.isSafeInteger(Number(value));",
+                  "  if(rule===\"uuid\") return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(text);",
+                  "  return typeof value===\"string\" && value.trim().length>0 && !value.includes(\"{{\");",
+                  "}",
+                  "const producedFixtureRules={\"copiedEventId\":\"positiveId\"};",
+                  "const invalidProducedFixtures=Object.keys(producedFixtureRules).filter(key=>!fixtureValueIsValid(pm.collectionVariables.get(key),producedFixtureRules[key]));",
+                  "const fixtureResponseSucceeded=pm.response.code===201;",
+                  "pm.test(\"Setup returned usable fixture values\",()=>{pm.expect(fixtureResponseSucceeded,\"Unexpected setup response status\").to.eql(true);pm.expect(invalidProducedFixtures,\"Missing or invalid captured fixture values\").to.eql([]);});",
+                  "if(!fixtureResponseSucceeded || invalidProducedFixtures.length){Object.keys(producedFixtureRules).forEach(key=>{pm.collectionVariables.unset(key);pm.variables.unset(key);});console.error(\"Setup failed in \"+pm.info.requestName+\". Check this response before continuing.\");pm.execution.setNextRequest(null);}else{Object.keys(producedFixtureRules).forEach(key=>pm.variables.set(key,pm.collectionVariables.get(key)));}",
+                  "})();"
                 ]
               }
             }
@@ -2596,7 +3946,7 @@
       ]
     },
     {
-      "name": "05 - Imports create update unchanged",
+      "name": "06 - Imports create update unchanged",
       "description": "Choose the fixture files if your Postman installation cannot resolve the relative paths. Keep the same source variable for the whole run.",
       "item": [
         {
@@ -2632,7 +3982,21 @@
                   "var responseBody = pm.response.json();",
                   "pm.test(\"Expected behavior\", () => {",
                   "pm.expect(responseBody.rows.map(r=>r.status)).to.eql([\"NEW\",\"INVALID\",\"NEW\",\"NEW\",\"INVALID\",\"INVALID\",\"INVALID\"]); pm.expect(responseBody.rows[0].athlete.dateOfBirth).to.equal(\"2010-03-20\"); pm.expect(responseBody.rows.slice(4).every(r=>r.status===\"INVALID\" && r.explanation.includes(\"Birth date\"))).to.equal(true); pm.collectionVariables.set(\"importId\",responseBody.importId);",
-                  "});"
+                  "});",
+                  "(()=>{",
+                  "function fixtureValueIsValid(value, rule) {",
+                  "  const text=String(value ?? \"\");",
+                  "  if(rule===\"positiveId\") return /^[1-9][0-9]*$/.test(text) && Number.isSafeInteger(Number(value));",
+                  "  if(rule===\"nonNegativeInteger\") return /^[0-9]+$/.test(text) && Number.isSafeInteger(Number(value));",
+                  "  if(rule===\"uuid\") return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(text);",
+                  "  return typeof value===\"string\" && value.trim().length>0 && !value.includes(\"{{\");",
+                  "}",
+                  "const producedFixtureRules={\"importId\":\"uuid\"};",
+                  "const invalidProducedFixtures=Object.keys(producedFixtureRules).filter(key=>!fixtureValueIsValid(pm.collectionVariables.get(key),producedFixtureRules[key]));",
+                  "const fixtureResponseSucceeded=pm.response.code===200;",
+                  "pm.test(\"Setup returned usable fixture values\",()=>{pm.expect(fixtureResponseSucceeded,\"Unexpected setup response status\").to.eql(true);pm.expect(invalidProducedFixtures,\"Missing or invalid captured fixture values\").to.eql([]);});",
+                  "if(!fixtureResponseSucceeded || invalidProducedFixtures.length){Object.keys(producedFixtureRules).forEach(key=>{pm.collectionVariables.unset(key);pm.variables.unset(key);});console.error(\"Setup failed in \"+pm.info.requestName+\". Check this response before continuing.\");pm.execution.setNextRequest(null);}else{Object.keys(producedFixtureRules).forEach(key=>pm.variables.set(key,pm.collectionVariables.get(key)));}",
+                  "})();"
                 ]
               }
             }
@@ -2728,7 +4092,21 @@
                   "var responseBody = pm.response.json();",
                   "pm.test(\"Expected behavior\", () => {",
                   "pm.expect(responseBody.imported).to.equal(2); pm.expect(responseBody.updated).to.equal(0); pm.expect(responseBody.skipped).to.equal(5); pm.expect(responseBody.failed).to.equal(0); pm.collectionVariables.set(\"importAthleteId\",responseBody.rows.find(r=>r.rowNumber===2).athleteId); pm.collectionVariables.set(\"importDatedAthleteId\",responseBody.rows.find(r=>r.rowNumber===4).athleteId);",
-                  "});"
+                  "});",
+                  "(()=>{",
+                  "function fixtureValueIsValid(value, rule) {",
+                  "  const text=String(value ?? \"\");",
+                  "  if(rule===\"positiveId\") return /^[1-9][0-9]*$/.test(text) && Number.isSafeInteger(Number(value));",
+                  "  if(rule===\"nonNegativeInteger\") return /^[0-9]+$/.test(text) && Number.isSafeInteger(Number(value));",
+                  "  if(rule===\"uuid\") return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(text);",
+                  "  return typeof value===\"string\" && value.trim().length>0 && !value.includes(\"{{\");",
+                  "}",
+                  "const producedFixtureRules={\"importAthleteId\":\"positiveId\",\"importDatedAthleteId\":\"positiveId\"};",
+                  "const invalidProducedFixtures=Object.keys(producedFixtureRules).filter(key=>!fixtureValueIsValid(pm.collectionVariables.get(key),producedFixtureRules[key]));",
+                  "const fixtureResponseSucceeded=pm.response.code===200;",
+                  "pm.test(\"Setup returned usable fixture values\",()=>{pm.expect(fixtureResponseSucceeded,\"Unexpected setup response status\").to.eql(true);pm.expect(invalidProducedFixtures,\"Missing or invalid captured fixture values\").to.eql([]);});",
+                  "if(!fixtureResponseSucceeded || invalidProducedFixtures.length){Object.keys(producedFixtureRules).forEach(key=>{pm.collectionVariables.unset(key);pm.variables.unset(key);});console.error(\"Setup failed in \"+pm.info.requestName+\". Check this response before continuing.\");pm.execution.setNextRequest(null);}else{Object.keys(producedFixtureRules).forEach(key=>pm.variables.set(key,pm.collectionVariables.get(key)));}",
+                  "})();"
                 ]
               }
             }
@@ -2843,7 +4221,21 @@
                   "var responseBody = pm.response.json();",
                   "pm.test(\"Expected behavior\", () => {",
                   "pm.expect(responseBody.rows.map(r=>r.status)).to.eql([\"UPDATE\",\"UPDATE\"]); pm.collectionVariables.set(\"updateImportId\",responseBody.importId);",
-                  "});"
+                  "});",
+                  "(()=>{",
+                  "function fixtureValueIsValid(value, rule) {",
+                  "  const text=String(value ?? \"\");",
+                  "  if(rule===\"positiveId\") return /^[1-9][0-9]*$/.test(text) && Number.isSafeInteger(Number(value));",
+                  "  if(rule===\"nonNegativeInteger\") return /^[0-9]+$/.test(text) && Number.isSafeInteger(Number(value));",
+                  "  if(rule===\"uuid\") return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(text);",
+                  "  return typeof value===\"string\" && value.trim().length>0 && !value.includes(\"{{\");",
+                  "}",
+                  "const producedFixtureRules={\"updateImportId\":\"uuid\"};",
+                  "const invalidProducedFixtures=Object.keys(producedFixtureRules).filter(key=>!fixtureValueIsValid(pm.collectionVariables.get(key),producedFixtureRules[key]));",
+                  "const fixtureResponseSucceeded=pm.response.code===200;",
+                  "pm.test(\"Setup returned usable fixture values\",()=>{pm.expect(fixtureResponseSucceeded,\"Unexpected setup response status\").to.eql(true);pm.expect(invalidProducedFixtures,\"Missing or invalid captured fixture values\").to.eql([]);});",
+                  "if(!fixtureResponseSucceeded || invalidProducedFixtures.length){Object.keys(producedFixtureRules).forEach(key=>{pm.collectionVariables.unset(key);pm.variables.unset(key);});console.error(\"Setup failed in \"+pm.info.requestName+\". Check this response before continuing.\");pm.execution.setNextRequest(null);}else{Object.keys(producedFixtureRules).forEach(key=>pm.variables.set(key,pm.collectionVariables.get(key)));}",
+                  "})();"
                 ]
               }
             }
@@ -2945,7 +4337,21 @@
                   "var responseBody = pm.response.json();",
                   "pm.test(\"Expected behavior\", () => {",
                   "pm.expect(responseBody.rows.map(r=>r.status)).to.eql([\"UNCHANGED\",\"UNCHANGED\"]); pm.collectionVariables.set(\"unchangedImportId\",responseBody.importId);",
-                  "});"
+                  "});",
+                  "(()=>{",
+                  "function fixtureValueIsValid(value, rule) {",
+                  "  const text=String(value ?? \"\");",
+                  "  if(rule===\"positiveId\") return /^[1-9][0-9]*$/.test(text) && Number.isSafeInteger(Number(value));",
+                  "  if(rule===\"nonNegativeInteger\") return /^[0-9]+$/.test(text) && Number.isSafeInteger(Number(value));",
+                  "  if(rule===\"uuid\") return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(text);",
+                  "  return typeof value===\"string\" && value.trim().length>0 && !value.includes(\"{{\");",
+                  "}",
+                  "const producedFixtureRules={\"unchangedImportId\":\"uuid\"};",
+                  "const invalidProducedFixtures=Object.keys(producedFixtureRules).filter(key=>!fixtureValueIsValid(pm.collectionVariables.get(key),producedFixtureRules[key]));",
+                  "const fixtureResponseSucceeded=pm.response.code===200;",
+                  "pm.test(\"Setup returned usable fixture values\",()=>{pm.expect(fixtureResponseSucceeded,\"Unexpected setup response status\").to.eql(true);pm.expect(invalidProducedFixtures,\"Missing or invalid captured fixture values\").to.eql([]);});",
+                  "if(!fixtureResponseSucceeded || invalidProducedFixtures.length){Object.keys(producedFixtureRules).forEach(key=>{pm.collectionVariables.unset(key);pm.variables.unset(key);});console.error(\"Setup failed in \"+pm.info.requestName+\". Check this response before continuing.\");pm.execution.setNextRequest(null);}else{Object.keys(producedFixtureRules).forEach(key=>pm.variables.set(key,pm.collectionVariables.get(key)));}",
+                  "})();"
                 ]
               }
             }
@@ -3135,7 +4541,21 @@
                   "var responseBody = pm.response.json();",
                   "pm.test(\"Expected behavior\", () => {",
                   "pm.expect(responseBody.rows[0].status).to.equal(\"UNCHANGED\"); pm.collectionVariables.set(\"immediateAthleteId\",responseBody.rows[0].athleteId);",
-                  "});"
+                  "});",
+                  "(()=>{",
+                  "function fixtureValueIsValid(value, rule) {",
+                  "  const text=String(value ?? \"\");",
+                  "  if(rule===\"positiveId\") return /^[1-9][0-9]*$/.test(text) && Number.isSafeInteger(Number(value));",
+                  "  if(rule===\"nonNegativeInteger\") return /^[0-9]+$/.test(text) && Number.isSafeInteger(Number(value));",
+                  "  if(rule===\"uuid\") return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(text);",
+                  "  return typeof value===\"string\" && value.trim().length>0 && !value.includes(\"{{\");",
+                  "}",
+                  "const producedFixtureRules={\"immediateAthleteId\":\"positiveId\"};",
+                  "const invalidProducedFixtures=Object.keys(producedFixtureRules).filter(key=>!fixtureValueIsValid(pm.collectionVariables.get(key),producedFixtureRules[key]));",
+                  "const fixtureResponseSucceeded=pm.response.code===200;",
+                  "pm.test(\"Setup returned usable fixture values\",()=>{pm.expect(fixtureResponseSucceeded,\"Unexpected setup response status\").to.eql(true);pm.expect(invalidProducedFixtures,\"Missing or invalid captured fixture values\").to.eql([]);});",
+                  "if(!fixtureResponseSucceeded || invalidProducedFixtures.length){Object.keys(producedFixtureRules).forEach(key=>{pm.collectionVariables.unset(key);pm.variables.unset(key);});console.error(\"Setup failed in \"+pm.info.requestName+\". Check this response before continuing.\");pm.execution.setNextRequest(null);}else{Object.keys(producedFixtureRules).forEach(key=>pm.variables.set(key,pm.collectionVariables.get(key)));}",
+                  "})();"
                 ]
               }
             }
@@ -3291,7 +4711,21 @@
                   "var responseBody = pm.response.json();",
                   "pm.test(\"Expected behavior\", () => {",
                   "pm.expect(responseBody.rows[0].status).to.equal(\"UNCHANGED\"); pm.collectionVariables.set(\"tsvAthleteId\",responseBody.rows[0].athleteId);",
-                  "});"
+                  "});",
+                  "(()=>{",
+                  "function fixtureValueIsValid(value, rule) {",
+                  "  const text=String(value ?? \"\");",
+                  "  if(rule===\"positiveId\") return /^[1-9][0-9]*$/.test(text) && Number.isSafeInteger(Number(value));",
+                  "  if(rule===\"nonNegativeInteger\") return /^[0-9]+$/.test(text) && Number.isSafeInteger(Number(value));",
+                  "  if(rule===\"uuid\") return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(text);",
+                  "  return typeof value===\"string\" && value.trim().length>0 && !value.includes(\"{{\");",
+                  "}",
+                  "const producedFixtureRules={\"tsvAthleteId\":\"positiveId\"};",
+                  "const invalidProducedFixtures=Object.keys(producedFixtureRules).filter(key=>!fixtureValueIsValid(pm.collectionVariables.get(key),producedFixtureRules[key]));",
+                  "const fixtureResponseSucceeded=pm.response.code===200;",
+                  "pm.test(\"Setup returned usable fixture values\",()=>{pm.expect(fixtureResponseSucceeded,\"Unexpected setup response status\").to.eql(true);pm.expect(invalidProducedFixtures,\"Missing or invalid captured fixture values\").to.eql([]);});",
+                  "if(!fixtureResponseSucceeded || invalidProducedFixtures.length){Object.keys(producedFixtureRules).forEach(key=>{pm.collectionVariables.unset(key);pm.variables.unset(key);});console.error(\"Setup failed in \"+pm.info.requestName+\". Check this response before continuing.\");pm.execution.setNextRequest(null);}else{Object.keys(producedFixtureRules).forEach(key=>pm.variables.set(key,pm.collectionVariables.get(key)));}",
+                  "})();"
                 ]
               }
             }
@@ -3369,7 +4803,21 @@
                   "var responseBody = pm.response.json();",
                   "pm.test(\"Expected behavior\", () => {",
                   "pm.expect(responseBody.rows[0].status).to.equal(\"UNCHANGED\"); pm.collectionVariables.set(\"xlsxAthleteId\",responseBody.rows[0].athleteId);",
-                  "});"
+                  "});",
+                  "(()=>{",
+                  "function fixtureValueIsValid(value, rule) {",
+                  "  const text=String(value ?? \"\");",
+                  "  if(rule===\"positiveId\") return /^[1-9][0-9]*$/.test(text) && Number.isSafeInteger(Number(value));",
+                  "  if(rule===\"nonNegativeInteger\") return /^[0-9]+$/.test(text) && Number.isSafeInteger(Number(value));",
+                  "  if(rule===\"uuid\") return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(text);",
+                  "  return typeof value===\"string\" && value.trim().length>0 && !value.includes(\"{{\");",
+                  "}",
+                  "const producedFixtureRules={\"xlsxAthleteId\":\"positiveId\"};",
+                  "const invalidProducedFixtures=Object.keys(producedFixtureRules).filter(key=>!fixtureValueIsValid(pm.collectionVariables.get(key),producedFixtureRules[key]));",
+                  "const fixtureResponseSucceeded=pm.response.code===200;",
+                  "pm.test(\"Setup returned usable fixture values\",()=>{pm.expect(fixtureResponseSucceeded,\"Unexpected setup response status\").to.eql(true);pm.expect(invalidProducedFixtures,\"Missing or invalid captured fixture values\").to.eql([]);});",
+                  "if(!fixtureResponseSucceeded || invalidProducedFixtures.length){Object.keys(producedFixtureRules).forEach(key=>{pm.collectionVariables.unset(key);pm.variables.unset(key);});console.error(\"Setup failed in \"+pm.info.requestName+\". Check this response before continuing.\");pm.execution.setNextRequest(null);}else{Object.keys(producedFixtureRules).forEach(key=>pm.variables.set(key,pm.collectionVariables.get(key)));}",
+                  "})();"
                 ]
               }
             }
@@ -3405,7 +4853,21 @@
                 "exec": [
                   "pm.test(\"HTTP 201\", () => pm.response.to.have.status(201));",
                   "var responseBody = pm.response.json();",
-                  "pm.collectionVariables.set(\"ambiguousAId\", responseBody.id);"
+                  "pm.collectionVariables.set(\"ambiguousAId\", responseBody.id);",
+                  "(()=>{",
+                  "function fixtureValueIsValid(value, rule) {",
+                  "  const text=String(value ?? \"\");",
+                  "  if(rule===\"positiveId\") return /^[1-9][0-9]*$/.test(text) && Number.isSafeInteger(Number(value));",
+                  "  if(rule===\"nonNegativeInteger\") return /^[0-9]+$/.test(text) && Number.isSafeInteger(Number(value));",
+                  "  if(rule===\"uuid\") return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(text);",
+                  "  return typeof value===\"string\" && value.trim().length>0 && !value.includes(\"{{\");",
+                  "}",
+                  "const producedFixtureRules={\"ambiguousAId\":\"positiveId\"};",
+                  "const invalidProducedFixtures=Object.keys(producedFixtureRules).filter(key=>!fixtureValueIsValid(pm.collectionVariables.get(key),producedFixtureRules[key]));",
+                  "const fixtureResponseSucceeded=pm.response.code===201;",
+                  "pm.test(\"Setup returned usable fixture values\",()=>{pm.expect(fixtureResponseSucceeded,\"Unexpected setup response status\").to.eql(true);pm.expect(invalidProducedFixtures,\"Missing or invalid captured fixture values\").to.eql([]);});",
+                  "if(!fixtureResponseSucceeded || invalidProducedFixtures.length){Object.keys(producedFixtureRules).forEach(key=>{pm.collectionVariables.unset(key);pm.variables.unset(key);});console.error(\"Setup failed in \"+pm.info.requestName+\". Check this response before continuing.\");pm.execution.setNextRequest(null);}else{Object.keys(producedFixtureRules).forEach(key=>pm.variables.set(key,pm.collectionVariables.get(key)));}",
+                  "})();"
                 ]
               }
             }
@@ -3441,7 +4903,21 @@
                 "exec": [
                   "pm.test(\"HTTP 201\", () => pm.response.to.have.status(201));",
                   "var responseBody = pm.response.json();",
-                  "pm.collectionVariables.set(\"ambiguousBId\", responseBody.id);"
+                  "pm.collectionVariables.set(\"ambiguousBId\", responseBody.id);",
+                  "(()=>{",
+                  "function fixtureValueIsValid(value, rule) {",
+                  "  const text=String(value ?? \"\");",
+                  "  if(rule===\"positiveId\") return /^[1-9][0-9]*$/.test(text) && Number.isSafeInteger(Number(value));",
+                  "  if(rule===\"nonNegativeInteger\") return /^[0-9]+$/.test(text) && Number.isSafeInteger(Number(value));",
+                  "  if(rule===\"uuid\") return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(text);",
+                  "  return typeof value===\"string\" && value.trim().length>0 && !value.includes(\"{{\");",
+                  "}",
+                  "const producedFixtureRules={\"ambiguousBId\":\"positiveId\"};",
+                  "const invalidProducedFixtures=Object.keys(producedFixtureRules).filter(key=>!fixtureValueIsValid(pm.collectionVariables.get(key),producedFixtureRules[key]));",
+                  "const fixtureResponseSucceeded=pm.response.code===201;",
+                  "pm.test(\"Setup returned usable fixture values\",()=>{pm.expect(fixtureResponseSucceeded,\"Unexpected setup response status\").to.eql(true);pm.expect(invalidProducedFixtures,\"Missing or invalid captured fixture values\").to.eql([]);});",
+                  "if(!fixtureResponseSucceeded || invalidProducedFixtures.length){Object.keys(producedFixtureRules).forEach(key=>{pm.collectionVariables.unset(key);pm.variables.unset(key);});console.error(\"Setup failed in \"+pm.info.requestName+\". Check this response before continuing.\");pm.execution.setNextRequest(null);}else{Object.keys(producedFixtureRules).forEach(key=>pm.variables.set(key,pm.collectionVariables.get(key)));}",
+                  "})();"
                 ]
               }
             }
@@ -3480,7 +4956,21 @@
                   "var responseBody = pm.response.json();",
                   "pm.test(\"Expected behavior\", () => {",
                   "pm.expect(responseBody.rows[0].status).to.equal(\"NEW\"); pm.collectionVariables.set(\"differentDobImportId\",responseBody.importId);",
-                  "});"
+                  "});",
+                  "(()=>{",
+                  "function fixtureValueIsValid(value, rule) {",
+                  "  const text=String(value ?? \"\");",
+                  "  if(rule===\"positiveId\") return /^[1-9][0-9]*$/.test(text) && Number.isSafeInteger(Number(value));",
+                  "  if(rule===\"nonNegativeInteger\") return /^[0-9]+$/.test(text) && Number.isSafeInteger(Number(value));",
+                  "  if(rule===\"uuid\") return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(text);",
+                  "  return typeof value===\"string\" && value.trim().length>0 && !value.includes(\"{{\");",
+                  "}",
+                  "const producedFixtureRules={\"differentDobImportId\":\"uuid\"};",
+                  "const invalidProducedFixtures=Object.keys(producedFixtureRules).filter(key=>!fixtureValueIsValid(pm.collectionVariables.get(key),producedFixtureRules[key]));",
+                  "const fixtureResponseSucceeded=pm.response.code===200;",
+                  "pm.test(\"Setup returned usable fixture values\",()=>{pm.expect(fixtureResponseSucceeded,\"Unexpected setup response status\").to.eql(true);pm.expect(invalidProducedFixtures,\"Missing or invalid captured fixture values\").to.eql([]);});",
+                  "if(!fixtureResponseSucceeded || invalidProducedFixtures.length){Object.keys(producedFixtureRules).forEach(key=>{pm.collectionVariables.unset(key);pm.variables.unset(key);});console.error(\"Setup failed in \"+pm.info.requestName+\". Check this response before continuing.\");pm.execution.setNextRequest(null);}else{Object.keys(producedFixtureRules).forEach(key=>pm.variables.set(key,pm.collectionVariables.get(key)));}",
+                  "})();"
                 ]
               }
             }
@@ -3518,7 +5008,21 @@
                   "var responseBody = pm.response.json();",
                   "pm.test(\"Expected behavior\", () => {",
                   "pm.expect(responseBody.imported).to.equal(1); pm.expect(responseBody.updated).to.equal(0); pm.expect(responseBody.failed).to.equal(0); const createdId = responseBody.rows[0].athleteId; pm.expect(createdId).not.to.equal(Number(pm.collectionVariables.get(\"ambiguousAId\"))); pm.expect(createdId).not.to.equal(Number(pm.collectionVariables.get(\"ambiguousBId\"))); pm.collectionVariables.set(\"differentDobAthleteId\",createdId);",
-                  "});"
+                  "});",
+                  "(()=>{",
+                  "function fixtureValueIsValid(value, rule) {",
+                  "  const text=String(value ?? \"\");",
+                  "  if(rule===\"positiveId\") return /^[1-9][0-9]*$/.test(text) && Number.isSafeInteger(Number(value));",
+                  "  if(rule===\"nonNegativeInteger\") return /^[0-9]+$/.test(text) && Number.isSafeInteger(Number(value));",
+                  "  if(rule===\"uuid\") return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(text);",
+                  "  return typeof value===\"string\" && value.trim().length>0 && !value.includes(\"{{\");",
+                  "}",
+                  "const producedFixtureRules={\"differentDobAthleteId\":\"positiveId\"};",
+                  "const invalidProducedFixtures=Object.keys(producedFixtureRules).filter(key=>!fixtureValueIsValid(pm.collectionVariables.get(key),producedFixtureRules[key]));",
+                  "const fixtureResponseSucceeded=pm.response.code===200;",
+                  "pm.test(\"Setup returned usable fixture values\",()=>{pm.expect(fixtureResponseSucceeded,\"Unexpected setup response status\").to.eql(true);pm.expect(invalidProducedFixtures,\"Missing or invalid captured fixture values\").to.eql([]);});",
+                  "if(!fixtureResponseSucceeded || invalidProducedFixtures.length){Object.keys(producedFixtureRules).forEach(key=>{pm.collectionVariables.unset(key);pm.variables.unset(key);});console.error(\"Setup failed in \"+pm.info.requestName+\". Check this response before continuing.\");pm.execution.setNextRequest(null);}else{Object.keys(producedFixtureRules).forEach(key=>pm.variables.set(key,pm.collectionVariables.get(key)));}",
+                  "})();"
                 ]
               }
             }
@@ -3557,7 +5061,21 @@
                   "var responseBody = pm.response.json();",
                   "pm.test(\"Expected behavior\", () => {",
                   "pm.expect(responseBody.rows[0].status).to.equal(\"AMBIGUOUS\"); pm.expect(responseBody.rows[0].explanation).to.include(\"registration identifier\"); pm.collectionVariables.set(\"ambiguousImportId\",responseBody.importId);",
-                  "});"
+                  "});",
+                  "(()=>{",
+                  "function fixtureValueIsValid(value, rule) {",
+                  "  const text=String(value ?? \"\");",
+                  "  if(rule===\"positiveId\") return /^[1-9][0-9]*$/.test(text) && Number.isSafeInteger(Number(value));",
+                  "  if(rule===\"nonNegativeInteger\") return /^[0-9]+$/.test(text) && Number.isSafeInteger(Number(value));",
+                  "  if(rule===\"uuid\") return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(text);",
+                  "  return typeof value===\"string\" && value.trim().length>0 && !value.includes(\"{{\");",
+                  "}",
+                  "const producedFixtureRules={\"ambiguousImportId\":\"uuid\"};",
+                  "const invalidProducedFixtures=Object.keys(producedFixtureRules).filter(key=>!fixtureValueIsValid(pm.collectionVariables.get(key),producedFixtureRules[key]));",
+                  "const fixtureResponseSucceeded=pm.response.code===200;",
+                  "pm.test(\"Setup returned usable fixture values\",()=>{pm.expect(fixtureResponseSucceeded,\"Unexpected setup response status\").to.eql(true);pm.expect(invalidProducedFixtures,\"Missing or invalid captured fixture values\").to.eql([]);});",
+                  "if(!fixtureResponseSucceeded || invalidProducedFixtures.length){Object.keys(producedFixtureRules).forEach(key=>{pm.collectionVariables.unset(key);pm.variables.unset(key);});console.error(\"Setup failed in \"+pm.info.requestName+\". Check this response before continuing.\");pm.execution.setNextRequest(null);}else{Object.keys(producedFixtureRules).forEach(key=>pm.variables.set(key,pm.collectionVariables.get(key)));}",
+                  "})();"
                 ]
               }
             }
@@ -3634,7 +5152,21 @@
                   "var responseBody = pm.response.json();",
                   "pm.test(\"Expected behavior\", () => {",
                   "pm.expect(responseBody.rows[0].status).to.equal(\"UPDATE\"); pm.expect(responseBody.rows[0].athleteId).to.equal(Number(pm.collectionVariables.get(\"ambiguousAId\"))); pm.collectionVariables.set(\"confirmedIdentityImportId\",responseBody.importId);",
-                  "});"
+                  "});",
+                  "(()=>{",
+                  "function fixtureValueIsValid(value, rule) {",
+                  "  const text=String(value ?? \"\");",
+                  "  if(rule===\"positiveId\") return /^[1-9][0-9]*$/.test(text) && Number.isSafeInteger(Number(value));",
+                  "  if(rule===\"nonNegativeInteger\") return /^[0-9]+$/.test(text) && Number.isSafeInteger(Number(value));",
+                  "  if(rule===\"uuid\") return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(text);",
+                  "  return typeof value===\"string\" && value.trim().length>0 && !value.includes(\"{{\");",
+                  "}",
+                  "const producedFixtureRules={\"confirmedIdentityImportId\":\"uuid\"};",
+                  "const invalidProducedFixtures=Object.keys(producedFixtureRules).filter(key=>!fixtureValueIsValid(pm.collectionVariables.get(key),producedFixtureRules[key]));",
+                  "const fixtureResponseSucceeded=pm.response.code===200;",
+                  "pm.test(\"Setup returned usable fixture values\",()=>{pm.expect(fixtureResponseSucceeded,\"Unexpected setup response status\").to.eql(true);pm.expect(invalidProducedFixtures,\"Missing or invalid captured fixture values\").to.eql([]);});",
+                  "if(!fixtureResponseSucceeded || invalidProducedFixtures.length){Object.keys(producedFixtureRules).forEach(key=>{pm.collectionVariables.unset(key);pm.variables.unset(key);});console.error(\"Setup failed in \"+pm.info.requestName+\". Check this response before continuing.\");pm.execution.setNextRequest(null);}else{Object.keys(producedFixtureRules).forEach(key=>pm.variables.set(key,pm.collectionVariables.get(key)));}",
+                  "})();"
                 ]
               }
             }
@@ -3899,7 +5431,21 @@
                   "var responseBody = pm.response.json();",
                   "pm.test(\"Expected behavior\", () => {",
                   "pm.expect(responseBody.rows.map(r=>r.status)).to.eql([\"NEW\",\"DUPLICATE\"]); pm.expect(responseBody.rows[1].repeatedOfRowNumber).to.equal(2); pm.collectionVariables.set(\"repeatedImportId\",responseBody.importId);",
-                  "});"
+                  "});",
+                  "(()=>{",
+                  "function fixtureValueIsValid(value, rule) {",
+                  "  const text=String(value ?? \"\");",
+                  "  if(rule===\"positiveId\") return /^[1-9][0-9]*$/.test(text) && Number.isSafeInteger(Number(value));",
+                  "  if(rule===\"nonNegativeInteger\") return /^[0-9]+$/.test(text) && Number.isSafeInteger(Number(value));",
+                  "  if(rule===\"uuid\") return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(text);",
+                  "  return typeof value===\"string\" && value.trim().length>0 && !value.includes(\"{{\");",
+                  "}",
+                  "const producedFixtureRules={\"repeatedImportId\":\"uuid\"};",
+                  "const invalidProducedFixtures=Object.keys(producedFixtureRules).filter(key=>!fixtureValueIsValid(pm.collectionVariables.get(key),producedFixtureRules[key]));",
+                  "const fixtureResponseSucceeded=pm.response.code===200;",
+                  "pm.test(\"Setup returned usable fixture values\",()=>{pm.expect(fixtureResponseSucceeded,\"Unexpected setup response status\").to.eql(true);pm.expect(invalidProducedFixtures,\"Missing or invalid captured fixture values\").to.eql([]);});",
+                  "if(!fixtureResponseSucceeded || invalidProducedFixtures.length){Object.keys(producedFixtureRules).forEach(key=>{pm.collectionVariables.unset(key);pm.variables.unset(key);});console.error(\"Setup failed in \"+pm.info.requestName+\". Check this response before continuing.\");pm.execution.setNextRequest(null);}else{Object.keys(producedFixtureRules).forEach(key=>pm.variables.set(key,pm.collectionVariables.get(key)));}",
+                  "})();"
                 ]
               }
             }
@@ -3971,7 +5517,21 @@
                   "var responseBody = pm.response.json();",
                   "pm.test(\"Expected behavior\", () => {",
                   "pm.expect(responseBody.imported).to.equal(1); pm.expect(responseBody.skipped).to.equal(1); pm.expect(responseBody.failed).to.equal(0); pm.collectionVariables.set(\"repeatedAthleteId\",responseBody.rows[0].athleteId);",
-                  "});"
+                  "});",
+                  "(()=>{",
+                  "function fixtureValueIsValid(value, rule) {",
+                  "  const text=String(value ?? \"\");",
+                  "  if(rule===\"positiveId\") return /^[1-9][0-9]*$/.test(text) && Number.isSafeInteger(Number(value));",
+                  "  if(rule===\"nonNegativeInteger\") return /^[0-9]+$/.test(text) && Number.isSafeInteger(Number(value));",
+                  "  if(rule===\"uuid\") return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(text);",
+                  "  return typeof value===\"string\" && value.trim().length>0 && !value.includes(\"{{\");",
+                  "}",
+                  "const producedFixtureRules={\"repeatedAthleteId\":\"positiveId\"};",
+                  "const invalidProducedFixtures=Object.keys(producedFixtureRules).filter(key=>!fixtureValueIsValid(pm.collectionVariables.get(key),producedFixtureRules[key]));",
+                  "const fixtureResponseSucceeded=pm.response.code===200;",
+                  "pm.test(\"Setup returned usable fixture values\",()=>{pm.expect(fixtureResponseSucceeded,\"Unexpected setup response status\").to.eql(true);pm.expect(invalidProducedFixtures,\"Missing or invalid captured fixture values\").to.eql([]);});",
+                  "if(!fixtureResponseSucceeded || invalidProducedFixtures.length){Object.keys(producedFixtureRules).forEach(key=>{pm.collectionVariables.unset(key);pm.variables.unset(key);});console.error(\"Setup failed in \"+pm.info.requestName+\". Check this response before continuing.\");pm.execution.setNextRequest(null);}else{Object.keys(producedFixtureRules).forEach(key=>pm.variables.set(key,pm.collectionVariables.get(key)));}",
+                  "})();"
                 ]
               }
             }
@@ -4000,7 +5560,7 @@
       ]
     },
     {
-      "name": "06 - Deletion and cleanup",
+      "name": "07 - Deletion and cleanup",
       "description": "Deletes only IDs created/captured during this run. Categories and import jobs have no deletion endpoint and remain; use a disposable database.",
       "item": [
         {

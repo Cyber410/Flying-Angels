@@ -15,6 +15,8 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.RequestParam;
+import com.flyingangels.backend.meet.dto.MeetOverviewResponse;
 
 import java.util.List;
 
@@ -23,15 +25,17 @@ import java.util.List;
 public class MeetController {
 
 	private final MeetService meetService;
+    private final MeetOverviewService overview;
 
 	@GetMapping("/api/meets")
-	public List<MeetResponse> list() {
-		return meetService.list().stream().map(MeetResponse::from).toList();
+	public List<MeetOverviewResponse> list(@RequestParam(defaultValue = "ALL") MeetView view,
+                                          @RequestParam(defaultValue = "") String search) {
+		return overview.search(view, search);
 	}
 
 	@GetMapping("/api/meets/{id}")
 	public MeetProfileResponse get(@PathVariable Long id) {
-		return MeetProfileResponse.from(meetService.get(id));
+		return meetService.profile(id);
 	}
 
 	@GetMapping("/api/meets/{meetId}/events/{eventId}")

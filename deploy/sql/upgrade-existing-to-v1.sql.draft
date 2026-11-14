@@ -1,0 +1,113 @@
+-- DRAFT: previous committed code -> current V1 application schema.
+-- Reference source commit: 671a9aec091a20a914d4ec2fd0e2f568a8dd4a46
+-- This is NOT a verified description of the live RDS schema.
+-- Confirm the RDS schema-only export matches the reference before applying.
+-- Test on a restored copy and take a recoverable backup before any live upgrade.
+-- Run with application writers stopped and a client that stops on the first error.
+-- MySQL DDL may commit statement by statement; do not assume transaction rollback.
+-- Deliberately outside db/migration: this is a one-time existing-database upgrade,
+-- not a second Flyway migration and not a script for fresh databases.
+-- No existing records are deleted; new nullable fields preserve existing values.
+-- Record the V1 baseline only after the upgrade and schema review succeed.
+
+ALTER TABLE `meets` ADD COLUMN `start_time` time DEFAULT NULL;
+
+ALTER TABLE `event_results` ADD COLUMN `result_label` varchar(100) DEFAULT NULL;
+
+CREATE INDEX `idx_result_ranking`
+    ON `event_results` (`category_id`, `athlete_id`, `status`, `unit`, `score`);
+
+CREATE TABLE `staff_users` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `active` bit(1) NOT NULL,
+  `athlete_id` bigint DEFAULT NULL,
+  `created_at` datetime(6) NOT NULL,
+  `email` varchar(254) NOT NULL,
+  `invitation_pending` tinyint(1) NOT NULL DEFAULT '0',
+  `name` varchar(100) NOT NULL,
+  `password_hash` varchar(255) NOT NULL,
+  `password_set` tinyint(1) NOT NULL DEFAULT '1',
+  `role` enum('ADMIN','ATHLETE','COACH') NOT NULL,
+  `security_version` bigint NOT NULL,
+  `version` bigint NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `UKcg5gp3sunabfoh3rwkqml3xmg` (`email`),
+  UNIQUE KEY `UKpgy6fbj8i4fdikpvur1ibfvws` (`athlete_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+CREATE TABLE `user_invitations` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `consumed_at` datetime(6) DEFAULT NULL,
+  `expires_at` datetime(6) NOT NULL,
+  `security_version` bigint NOT NULL,
+  `token_hash` varchar(64) NOT NULL,
+  `user_id` bigint NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `UK2uscddiw4weydjhs13swcs6dk` (`token_hash`),
+  KEY `idx_invitation_user` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+CREATE TABLE `availability_requests` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `answered_revision` bigint DEFAULT NULL,
+  `assignment_count` int NOT NULL,
+  `assignment_revision` bigint NOT NULL,
+  `last_answer` enum('AVAILABLE','UNAVAILABLE') DEFAULT NULL,
+  `responded_at` datetime(6) DEFAULT NULL,
+  `version` bigint NOT NULL,
+  `athlete_id` bigint NOT NULL,
+  `meet_id` bigint NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_availability_meet_athlete` (`meet_id`,`athlete_id`),
+  KEY `FKa5xp7p8j9ht4ldl6p0f0q31vo` (`athlete_id`),
+  CONSTRAINT `FKa5xp7p8j9ht4ldl6p0f0q31vo` FOREIGN KEY (`athlete_id`) REFERENCES `athletes` (`id`),
+  CONSTRAINT `FKkbcqsq73n4xsmm2k6kl3wbkq0` FOREIGN KEY (`meet_id`) REFERENCES `meets` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+CREATE TABLE `availability_responses` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `answer` enum('AVAILABLE','UNAVAILABLE') NOT NULL,
+  `assignment_revision` bigint NOT NULL,
+  `athlete_user_id` bigint DEFAULT NULL,
+  `communication_method` enum('EMAIL','IN_PERSON','OTHER','PHONE','PORTAL','TEXT','WHATSAPP') NOT NULL,
+  `note` varchar(1000) DEFAULT NULL,
+  `responded_at` datetime(6) NOT NULL,
+  `staff_user_id` bigint DEFAULT NULL,
+  `submitted_version` bigint DEFAULT NULL,
+  `request_id` bigint NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_availability_response_request` (`request_id`,`id`),
+  CONSTRAINT `FK58ke2abwt1u6fh2qghypi3840` FOREIGN KEY (`request_id`) REFERENCES `availability_requests` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+CREATE TABLE `invitation_email_outbox` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `attempts` int NOT NULL,
+  `claim_id` varchar(36) DEFAULT NULL,
+  `claimed_until` datetime(6) DEFAULT NULL,
+  `created_at` datetime(6) NOT NULL,
+  `encrypted_payload` varchar(4096) DEFAULT NULL,
+  `invitation_id` bigint NOT NULL,
+  `last_error_code` varchar(40) DEFAULT NULL,
+  `next_attempt_at` datetime(6) NOT NULL,
+  `sent_at` datetime(6) DEFAULT NULL,
+  `status` enum('CANCELLED','FAILED','PENDING','PROCESSING','SENT') NOT NULL,
+  `updated_at` datetime(6) NOT NULL,
+  `user_id` bigint NOT NULL,
+  `version` bigint NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `UK4bxfmjtycchlcpoxjr0r1hk7o` (`invitation_id`),
+  KEY `idx_invitation_mail_due` (`status`,`next_attempt_at`,`claimed_until`),
+  KEY `idx_invitation_mail_user` (`user_id`,`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+CREATE TABLE `login_throttle_buckets` (
+  `bucket_key` varchar(72) NOT NULL,
+  `blocked_until` datetime(6) DEFAULT NULL,
+  `failures` int NOT NULL,
+  `last_seen_at` datetime(6) NOT NULL,
+  `version` bigint NOT NULL,
+  `window_started_at` datetime(6) NOT NULL,
+  PRIMARY KEY (`bucket_key`),
+  KEY `idx_login_throttle_seen` (`last_seen_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;

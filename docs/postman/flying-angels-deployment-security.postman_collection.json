@@ -1,0 +1,1436 @@
+{
+  "info": {
+    "name": "Flying Angels - Deployment, proxy, CORS and CSRF verification",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Run once in folder order against the authenticated disposable Postman stack. Clear cookies before running. Negative 400/401/403/429 responses are intentional passing assertions. No collection-wide CSRF injection is used, so missing-token tests remain meaningful. Creates and deletes one synthetic athlete. See deployment-security-walkthrough.md.\n\nRun every numbered folder in order from 00 - Proxy and anonymous access, one iteration. Generated fixture IDs are validated and saved automatically. Missing fixture values stop the run before an invalid URL is sent; failed fixture creation stops the run at its source. Role/authentication, CORS and CSRF rejection tests retain their expected negative responses.\n\nIncludes a six-request login-throttle check using an unknown, run-specific account. Total: 39 ordered requests. Uses default account threshold 5; server settings must match. Never targets the Admin account for lockout."
+  },
+  "auth": {
+    "type": "noauth"
+  },
+  "variable": [
+    {
+      "key": "csrfHeader",
+      "value": "X-CSRF-TOKEN"
+    },
+    {
+      "key": "csrfToken",
+      "value": ""
+    },
+    {
+      "key": "testAthleteId",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "00 - Proxy and anonymous access",
+      "item": [
+        {
+          "name": "Nginx serves the application and hides its version",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Nginx response\", () => pm.expect(pm.response.headers.get(\"Server\")).to.eql(\"nginx\"));",
+                  "pm.test(\"Existing application HTML\", () => pm.expect(pm.response.text()).to.include('id=\"root\"'));",
+                  "(()=>{",
+                  "function fixtureValueIsValid(value, rule) {",
+                  "  const text=String(value ?? \"\");",
+                  "  if(rule===\"positiveId\") return /^[1-9][0-9]*$/.test(text) && Number.isSafeInteger(Number(value));",
+                  "  if(rule===\"nonNegativeInteger\") return /^[0-9]+$/.test(text) && Number.isSafeInteger(Number(value));",
+                  "  if(rule===\"uuid\") return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(text);",
+                  "  return typeof value===\"string\" && value.trim().length>0 && !value.includes(\"{{\");",
+                  "}",
+                  "const producedFixtureRules={\"runId\":\"text\"};",
+                  "const invalidProducedFixtures=Object.keys(producedFixtureRules).filter(key=>!fixtureValueIsValid(pm.collectionVariables.get(key),producedFixtureRules[key]));",
+                  "const fixtureResponseSucceeded=pm.response.code===200;",
+                  "pm.test(\"Setup returned usable fixture values\",()=>{pm.expect(fixtureResponseSucceeded,\"Unexpected setup response status\").to.eql(true);pm.expect(invalidProducedFixtures,\"Missing or invalid captured fixture values\").to.eql([]);});",
+                  "if(!fixtureResponseSucceeded || invalidProducedFixtures.length){Object.keys(producedFixtureRules).forEach(key=>{pm.collectionVariables.unset(key);pm.variables.unset(key);});console.error(\"Setup failed in \"+pm.info.requestName+\". Check this response before continuing.\");pm.execution.setNextRequest(null);}else{Object.keys(producedFixtureRules).forEach(key=>pm.variables.set(key,pm.collectionVariables.get(key)));}",
+                  "})();"
+                ]
+              }
+            },
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "[\"runId\",\"testAthleteId\"].forEach(key=>{pm.collectionVariables.unset(key);pm.variables.unset(key);});",
+                  "pm.collectionVariables.set(\"runId\", Date.now().toString()+Math.random().toString(16).slice(2,8));",
+                  "pm.collectionVariables.unset(\"csrfToken\");",
+                  "pm.collectionVariables.unset(\"testAthleteId\");"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "API root redirects without losing host or port",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 308\", () => pm.response.to.have.status(308));",
+                  "pm.test(\"Relative redirect\", () => pm.expect(pm.response.headers.get(\"Location\")).to.eql(\"/api/\"));"
+                ]
+              }
+            }
+          ],
+          "protocolProfileBehavior": {
+            "followRedirects": false
+          }
+        },
+        {
+          "name": "Anonymous session confirms authentication is enabled",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/auth/me",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Authenticated mode; signed out\", () => { const body=pm.response.json(); pm.expect(body.authenticationRequired).to.eql(true); pm.expect(body.user).to.eql(null); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Anonymous athlete reads are denied",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/athletes",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 401\", () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "01 - CORS origin and preflight checks",
+      "item": [
+        {
+          "name": "Configured origin can preflight JSON and CSRF headers",
+          "request": {
+            "method": "OPTIONS",
+            "header": [
+              {
+                "key": "Origin",
+                "value": "{{trustedOrigin}}"
+              },
+              {
+                "key": "Access-Control-Request-Method",
+                "value": "POST"
+              },
+              {
+                "key": "Access-Control-Request-Headers",
+                "value": "Content-Type, X-CSRF-TOKEN"
+              }
+            ],
+            "url": "{{baseUrl}}/api/athletes",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Exact allowed origin\", () => pm.expect(pm.response.headers.get(\"Access-Control-Allow-Origin\")).to.eql(pm.environment.get(\"trustedOrigin\")));",
+                  "pm.test(\"Credentials enabled\", () => pm.expect(pm.response.headers.get(\"Access-Control-Allow-Credentials\")).to.eql(\"true\"));",
+                  "pm.test(\"CSRF and JSON headers allowed\", () => { const h=(pm.response.headers.get(\"Access-Control-Allow-Headers\")||\"\").toLowerCase(); pm.expect(h).to.include(\"content-type\"); pm.expect(h).to.include(\"x-csrf-token\"); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Untrusted origin is rejected",
+          "request": {
+            "method": "OPTIONS",
+            "header": [
+              {
+                "key": "Origin",
+                "value": "{{untrustedOrigin}}"
+              },
+              {
+                "key": "Access-Control-Request-Method",
+                "value": "POST"
+              },
+              {
+                "key": "Access-Control-Request-Headers",
+                "value": "Content-Type, X-CSRF-TOKEN"
+              }
+            ],
+            "url": "{{baseUrl}}/api/athletes",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 403\", () => pm.response.to.have.status(403));",
+                  "pm.test(\"No allow-origin response\", () => pm.expect(pm.response.headers.has(\"Access-Control-Allow-Origin\")).to.eql(false));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Lookalike origin is rejected",
+          "request": {
+            "method": "OPTIONS",
+            "header": [
+              {
+                "key": "Origin",
+                "value": "http://localhost.attacker.example.test:5173"
+              },
+              {
+                "key": "Access-Control-Request-Method",
+                "value": "POST"
+              },
+              {
+                "key": "Access-Control-Request-Headers",
+                "value": "Content-Type, X-CSRF-TOKEN"
+              }
+            ],
+            "url": "{{baseUrl}}/api/athletes",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 403\", () => pm.response.to.have.status(403));",
+                  "pm.test(\"No allow-origin response\", () => pm.expect(pm.response.headers.has(\"Access-Control-Allow-Origin\")).to.eql(false));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Untrusted Origin is rejected on actual API requests",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Origin",
+                "value": "{{untrustedOrigin}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/athletes",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 403\", () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "02 - Login, email validation and CSRF headers",
+      "item": [
+        {
+          "name": "Get login CSRF token and session cookie",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/csrf",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const csrf = pm.response.json();",
+                  "pm.collectionVariables.set(\"csrfToken\", csrf.token);",
+                  "pm.collectionVariables.set(\"csrfHeader\", csrf.headerName);",
+                  "pm.test(\"Server supplies CSRF metadata\", () => { pm.expect(csrf.token).to.be.a(\"string\").and.not.empty; pm.expect(csrf.headerName).to.eql(\"X-CSRF-TOKEN\"); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login without CSRF is rejected",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/auth/login",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 403\", () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login with incorrect CSRF token is rejected",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "{{csrfHeader}}",
+                "value": "intentionally-incorrect-token"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/auth/login",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 403\", () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Correct token in the wrong header is rejected",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-NOT-CSRF-TOKEN",
+                "value": "{{csrfToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/auth/login",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 403\", () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Malformed email is rejected before authentication",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "{{csrfHeader}}",
+                "value": "{{csrfToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/auth/login",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"not-an-email\",\n  \"password\": \"{{password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"Email validation error\", () => { const b=pm.response.json(); pm.expect(b.code).to.eql(\"VALIDATION_ERROR\"); pm.expect(b.message).to.include(\"email\"); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Valid email with incorrect password returns generic error",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "{{csrfHeader}}",
+                "value": "{{csrfToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/auth/login",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"deliberately-incorrect-password\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 401\", () => pm.response.to.have.status(401));",
+                  "pm.test(\"Generic credential error\", () => pm.expect(pm.response.json().message).to.eql(\"Email or password is incorrect\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Admin signs in with valid credentials and CSRF",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "{{csrfHeader}}",
+                "value": "{{csrfToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/auth/login",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Admin session\", () => pm.expect(pm.response.json().user.role).to.eql(\"ADMIN\"));",
+                  "let verifiedLogin;try{verifiedLogin=pm.response.json();}catch(error){verifiedLogin=null;}",
+                  "const verifiedRole=pm.response.code===200 && verifiedLogin && verifiedLogin.user && verifiedLogin.user.role===\"ADMIN\";",
+                  "pm.test(\"Active ADMIN session established\",()=>pm.expect(Boolean(verifiedRole)).to.eql(true));",
+                  "if(!verifiedRole){console.error(\"Sign-in failed. Check the selected environment credentials and cookie handling.\");pm.execution.setNextRequest(null);}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Refresh CSRF after login rotates session state",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/csrf",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const csrf = pm.response.json();",
+                  "pm.collectionVariables.set(\"csrfToken\", csrf.token);",
+                  "pm.collectionVariables.set(\"csrfHeader\", csrf.headerName);",
+                  "pm.test(\"Server supplies CSRF metadata\", () => { pm.expect(csrf.token).to.be.a(\"string\").and.not.empty; pm.expect(csrf.headerName).to.eql(\"X-CSRF-TOKEN\"); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Verify current Admin identity",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/auth/me",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Correct account\", () => { const u=pm.response.json().user; pm.expect(u.role).to.eql(\"ADMIN\"); pm.expect(u.email).to.eql(pm.environment.get(\"email\").trim().toLowerCase()); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "03 - Authenticated API, validation and protected writes",
+      "item": [
+        {
+          "name": "Trusted Origin can read with session cookie",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Origin",
+                "value": "{{trustedOrigin}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/athletes",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Trusted Origin echoed\", () => pm.expect(pm.response.headers.get(\"Access-Control-Allow-Origin\")).to.eql(pm.environment.get(\"trustedOrigin\")));",
+                  "pm.test(\"CSV attachment header exposed\", () => pm.expect(pm.response.headers.get(\"Access-Control-Expose-Headers\")).to.include(\"Content-Disposition\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Postman reads without Origin still require the session",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/athletes",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"No cross-origin grant needed\", () => pm.expect(pm.response.headers.has(\"Access-Control-Allow-Origin\")).to.eql(false));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "API error stays JSON rather than frontend HTML",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/athletes/9223372036854775807",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 404\", () => pm.response.to.have.status(404));",
+                  "pm.test(\"Application JSON error\", () => { pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\"); pm.expect(pm.response.json().code).to.eql(\"ATHLETE_NOT_FOUND\"); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Malformed invitation email is rejected",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "{{csrfHeader}}",
+                "value": "{{csrfToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/users/invitations",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"not-an-email\",\n  \"name\": \"Invalid Email Test\",\n  \"role\": \"COACH\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"Email field validation\", () => { const b=pm.response.json(); pm.expect(b.code).to.eql(\"VALIDATION_ERROR\"); pm.expect(b.message).to.include(\"email\"); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Blank invitation email is rejected",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "{{csrfHeader}}",
+                "value": "{{csrfToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/users/invitations",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"\",\n  \"name\": \"Invalid Email Test\",\n  \"role\": \"COACH\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"Email field validation\", () => { const b=pm.response.json(); pm.expect(b.code).to.eql(\"VALIDATION_ERROR\"); pm.expect(b.message).to.include(\"email\"); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Overlong invitation email is rejected",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "{{csrfHeader}}",
+                "value": "{{csrfToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/users/invitations",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test\",\n  \"name\": \"Invalid Email Test\",\n  \"role\": \"COACH\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"Email field validation\", () => { const b=pm.response.json(); pm.expect(b.code).to.eql(\"VALIDATION_ERROR\"); pm.expect(b.message).to.include(\"email\"); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Signed-in Admin cannot write without CSRF",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/athletes",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Proxy-{{runId}}\",\n  \"lastName\": \"Postman\",\n  \"dateOfBirth\": \"2010-01-01\",\n  \"gender\": \"Female\",\n  \"flyStatus\": \"In Roster\",\n  \"events\": []\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 403\", () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Signed-in Admin cannot write with incorrect CSRF",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "{{csrfHeader}}",
+                "value": "intentionally-incorrect-token"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/athletes",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Proxy-{{runId}}\",\n  \"lastName\": \"Postman\",\n  \"dateOfBirth\": \"2010-01-01\",\n  \"gender\": \"Female\",\n  \"flyStatus\": \"In Roster\",\n  \"events\": []\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 403\", () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Valid session and CSRF create one synthetic athlete",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "{{csrfHeader}}",
+                "value": "{{csrfToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/athletes",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Proxy-{{runId}}\",\n  \"lastName\": \"Postman\",\n  \"dateOfBirth\": \"2010-01-01\",\n  \"gender\": \"Female\",\n  \"flyStatus\": \"In Roster\",\n  \"events\": []\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set(\"testAthleteId\", pm.response.json().id);",
+                  "(()=>{",
+                  "function fixtureValueIsValid(value, rule) {",
+                  "  const text=String(value ?? \"\");",
+                  "  if(rule===\"positiveId\") return /^[1-9][0-9]*$/.test(text) && Number.isSafeInteger(Number(value));",
+                  "  if(rule===\"nonNegativeInteger\") return /^[0-9]+$/.test(text) && Number.isSafeInteger(Number(value));",
+                  "  if(rule===\"uuid\") return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(text);",
+                  "  return typeof value===\"string\" && value.trim().length>0 && !value.includes(\"{{\");",
+                  "}",
+                  "const producedFixtureRules={\"testAthleteId\":\"positiveId\"};",
+                  "const invalidProducedFixtures=Object.keys(producedFixtureRules).filter(key=>!fixtureValueIsValid(pm.collectionVariables.get(key),producedFixtureRules[key]));",
+                  "const fixtureResponseSucceeded=pm.response.code===201;",
+                  "pm.test(\"Setup returned usable fixture values\",()=>{pm.expect(fixtureResponseSucceeded,\"Unexpected setup response status\").to.eql(true);pm.expect(invalidProducedFixtures,\"Missing or invalid captured fixture values\").to.eql([]);});",
+                  "if(!fixtureResponseSucceeded || invalidProducedFixtures.length){Object.keys(producedFixtureRules).forEach(key=>{pm.collectionVariables.unset(key);pm.variables.unset(key);});console.error(\"Setup failed in \"+pm.info.requestName+\". Check this response before continuing.\");pm.execution.setNextRequest(null);}else{Object.keys(producedFixtureRules).forEach(key=>pm.variables.set(key,pm.collectionVariables.get(key)));}",
+                  "})();"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Read the created athlete through Nginx",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/athletes/{{testAthleteId}}",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Correct athlete\", () => pm.expect(pm.response.json().id).to.eql(Number(pm.collectionVariables.get(\"testAthleteId\"))));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Clean up the synthetic athlete",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "{{csrfHeader}}",
+                "value": "{{csrfToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/athletes/{{testAthleteId}}",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 204\", () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "04 - Logout and session invalidation",
+      "item": [
+        {
+          "name": "Logout without CSRF is rejected",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/auth/logout",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 403\", () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Logout with CSRF invalidates the session",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "{{csrfHeader}}",
+                "value": "{{csrfToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/auth/logout",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 204\", () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Former session cannot read staff API",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/athletes",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 401\", () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get new CSRF metadata after logout",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/csrf",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const csrf = pm.response.json();",
+                  "pm.collectionVariables.set(\"csrfToken\", csrf.token);",
+                  "pm.collectionVariables.set(\"csrfHeader\", csrf.headerName);",
+                  "pm.test(\"Server supplies CSRF metadata\", () => { pm.expect(csrf.token).to.be.a(\"string\").and.not.empty; pm.expect(csrf.headerName).to.eql(\"X-CSRF-TOKEN\"); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "CSRF token alone does not authorize staff writes",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "{{csrfHeader}}",
+                "value": "{{csrfToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/users/invitations",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"uncreated@example.test\",\n  \"name\": \"Must Not Be Created\",\n  \"role\": \"COACH\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 401\", () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "05 - Login throttling",
+      "description": "Five failures for a unique nonexistent email receive the normal generic 401. The next attempt receives 429 and Retry-After, including when forwarded-address headers are forged. Cooldown recovery and concurrent enforcement are covered by Java integration tests with a controllable clock. Uses the default account limit of five and 900-second block.",
+      "item": [
+        {
+          "name": "Throttle fixture failed login 1 of 5",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "{{csrfHeader}}",
+                "value": "{{csrfToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/auth/login",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"throttle.{{runId}}@example.test\",\n  \"password\": \"deliberately-incorrect-password\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Uses an unknown, run-specific email. Does not target or lock the Admin account. Assumes the fixture account limit is five."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 401\", () => pm.response.to.have.status(401));",
+                  "pm.test(\"Generic credential error\", () => pm.expect(pm.response.json().message).to.eql(\"Email or password is incorrect\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Throttle fixture failed login 2 of 5",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "{{csrfHeader}}",
+                "value": "{{csrfToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/auth/login",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"throttle.{{runId}}@example.test\",\n  \"password\": \"deliberately-incorrect-password\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Uses an unknown, run-specific email. Does not target or lock the Admin account. Assumes the fixture account limit is five."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 401\", () => pm.response.to.have.status(401));",
+                  "pm.test(\"Generic credential error\", () => pm.expect(pm.response.json().message).to.eql(\"Email or password is incorrect\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Throttle fixture failed login 3 of 5",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "{{csrfHeader}}",
+                "value": "{{csrfToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/auth/login",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"throttle.{{runId}}@example.test\",\n  \"password\": \"deliberately-incorrect-password\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Uses an unknown, run-specific email. Does not target or lock the Admin account. Assumes the fixture account limit is five."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 401\", () => pm.response.to.have.status(401));",
+                  "pm.test(\"Generic credential error\", () => pm.expect(pm.response.json().message).to.eql(\"Email or password is incorrect\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Throttle fixture failed login 4 of 5",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "{{csrfHeader}}",
+                "value": "{{csrfToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/auth/login",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"throttle.{{runId}}@example.test\",\n  \"password\": \"deliberately-incorrect-password\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Uses an unknown, run-specific email. Does not target or lock the Admin account. Assumes the fixture account limit is five."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 401\", () => pm.response.to.have.status(401));",
+                  "pm.test(\"Generic credential error\", () => pm.expect(pm.response.json().message).to.eql(\"Email or password is incorrect\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Throttle fixture failed login 5 of 5",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "{{csrfHeader}}",
+                "value": "{{csrfToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/auth/login",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"throttle.{{runId}}@example.test\",\n  \"password\": \"deliberately-incorrect-password\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Uses an unknown, run-specific email. Does not target or lock the Admin account. Assumes the fixture account limit is five."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 401\", () => pm.response.to.have.status(401));",
+                  "pm.test(\"Generic credential error\", () => pm.expect(pm.response.json().message).to.eql(\"Email or password is incorrect\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Excessive failed login is throttled with Retry-After",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "{{csrfHeader}}",
+                "value": "{{csrfToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Real-IP",
+                "value": "203.0.113.77"
+              },
+              {
+                "key": "X-Forwarded-For",
+                "value": "198.51.100.88"
+              },
+              {
+                "key": "Forwarded",
+                "value": "for=198.51.100.99"
+              }
+            ],
+            "url": "{{baseUrl}}/api/auth/login",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"throttle.{{runId}}@example.test\",\n  \"password\": \"deliberately-incorrect-password\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Uses an unknown, run-specific email. Does not target or lock the Admin account. Assumes the fixture account limit is five."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 429\",()=>pm.response.to.have.status(429));",
+                  "pm.test(\"Generic throttling response\",()=>{pm.expect(pm.response.json().code).to.eql(\"AUTHENTICATION_THROTTLED\");pm.expect(pm.response.text()).not.to.include(pm.variables.replaceIn(\"throttle.{{runId}}@example.test\"));});",
+                  "pm.test(\"Positive Retry-After seconds\",()=>{const delay=pm.response.headers.get(\"Retry-After\");pm.expect(delay).to.match(/^[1-9][0-9]*$/);pm.expect(Number(delay)).to.be.at.most(900);});",
+                  "pm.test(\"Throttle response is not cached\",()=>pm.expect(pm.response.headers.get(\"Cache-Control\")).to.include(\"no-store\"));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "const fixtureRules={\"runId\":\"text\",\"testAthleteId\":\"positiveId\"};",
+          "function fixtureValueIsValid(value, rule) {",
+          "  const text=String(value ?? \"\");",
+          "  if(rule===\"positiveId\") return /^[1-9][0-9]*$/.test(text) && Number.isSafeInteger(Number(value));",
+          "  if(rule===\"nonNegativeInteger\") return /^[0-9]+$/.test(text) && Number.isSafeInteger(Number(value));",
+          "  if(rule===\"uuid\") return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(text);",
+          "  return typeof value===\"string\" && value.trim().length>0 && !value.includes(\"{{\");",
+          "}",
+          "const fixtureRequestTemplate=JSON.stringify(pm.request.toJSON());",
+          "const missingFixtureKeys=Object.keys(fixtureRules).filter(key=>fixtureRequestTemplate.includes(\"{{\"+key+\"}}\") && !fixtureValueIsValid(pm.variables.get(key),fixtureRules[key]));",
+          "if(missingFixtureKeys.length){const message=\"Missing or invalid setup variable(s): \"+missingFixtureKeys.join(\", \")+\". Run this collection from 00 - Proxy and anonymous access. If setup ran, inspect its first failed response. No request was sent.\";pm.test(\"Required fixture setup is complete\",()=>{throw new Error(message);});console.error(message);pm.execution.setNextRequest(null);pm.execution.skipRequest();}"
+        ]
+      }
+    }
+  ]
+}

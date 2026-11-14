@@ -9,4 +9,7 @@ public record ResultUpdateRequest(
         @NotNull @Positive Long resultId,
         @NotBlank @Size(max=50) String result,
         @DecimalMin("0.0") BigDecimal score,
-        ResultUnit unit) {}
+        ResultUnit unit,
+        @Size(max=100, message="Result label must be 100 characters or fewer") String resultLabel) {
+    public ResultUpdateRequest(Long resultId, String result, BigDecimal score, ResultUnit unit) { this(resultId, result, score, unit, null); }
+}

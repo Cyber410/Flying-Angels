@@ -98,14 +98,6 @@ jobs:
           npm run lint -- --max-warnings=0
           npm run typecheck
 
-      - name: Build backend application
-        working-directory: backend
-        run: bash mvnw -B -DskipTests clean package
-
-      - name: Build frontend application
-        working-directory: frontend
-        run: npm run build
-
       - name: Run backend unit tests
         working-directory: backend
         run: bash mvnw -B -Punit-tests test
@@ -115,7 +107,7 @@ jobs:
         run: npm test
 
       # Build once, then test and publish these same images. ECS uses Linux/X86_64.
-      - name: Build runtime Docker images
+      - name: Build multi-stage Docker images from source
         run: |
           docker build --platform linux/amd64 --label "org.opencontainers.image.revision=$GITHUB_SHA" -f deploy/backend.Dockerfile -t "$BACKEND_IMAGE" .
           docker build --platform linux/amd64 --label "org.opencontainers.image.revision=$GITHUB_SHA" -f deploy/frontend.Dockerfile -t "$FRONTEND_IMAGE" .

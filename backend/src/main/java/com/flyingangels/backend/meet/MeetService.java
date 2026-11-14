@@ -17,6 +17,7 @@ public class MeetService {
 	private final MeetRepository repository;
 	private final EventRepository eventRepository;
     private final com.flyingangels.backend.note.AthleteNoteRepository noteRepository;
+    private final com.flyingangels.backend.availability.AvailabilityService availability;
 
 	@Transactional(readOnly = true)
 	public List<Meet> list() {
@@ -27,6 +28,11 @@ public class MeetService {
 	public Meet get(Long id) {
 		return repository.findById(id).orElseThrow(() -> new MeetNotFoundException(id));
 	}
+
+    @Transactional(readOnly = true)
+    public com.flyingangels.backend.meet.dto.MeetProfileResponse profile(Long id) {
+        return com.flyingangels.backend.meet.dto.MeetProfileResponse.from(get(id), availability.forMeet(id));
+    }
 
 	@Transactional(readOnly = true)
 	public Event event(Long meetId, Long eventId) {
@@ -45,15 +51,20 @@ public class MeetService {
 	@Transactional
 	public Meet update(Long id, MeetRequest request) {
 		Meet meet = get(id);
+		availability.lockMeet(id);
 		if (!request.isDateRangeValid() || meet.getEvents().stream().anyMatch(e->e.getEventDate().isBefore(request.effectiveStartDate()) || e.getEventDate().isAfter(request.effectiveEndDate())))
             throw new IllegalArgumentException("Meet dates must include all existing events");
+        if (!java.util.Objects.equals(meet.getStartDate(), request.effectiveStartDate()) || !java.util.Objects.equals(meet.getEndDate(), request.effectiveEndDate())
+                || !java.util.Objects.equals(meet.getStartTime(), request.startTime() == null ? java.time.LocalTime.MIDNIGHT : request.startTime())
+                || !java.util.Objects.equals(meet.getLocation(), request.location())) availability.proposalChangedForMeet(id);
         meet.updateFrom(request);
 		return repository.save(meet);
 	}
 
 	@Transactional
 	public void delete(Long id) {
-		var meet=get(id); meet.getEvents().forEach(e->noteRepository.detachEvent(e.getId())); repository.delete(meet);
+		var meet=get(id); availability.deleteForMeet(id);
+        meet.getEvents().forEach(e->noteRepository.detachEvent(e.getId())); repository.delete(meet);
 	}
 
 	public static class MeetNotFoundException extends RuntimeException {

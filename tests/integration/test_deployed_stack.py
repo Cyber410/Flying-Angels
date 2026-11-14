@@ -11,8 +11,10 @@ from urllib.request import Request, urlopen
 BASE_URL = os.environ.get("TEST_BASE_URL", "http://localhost:18080").rstrip("/")
 
 
-def request(method, path, body=None):
-    headers = {"Content-Type": "application/json"} if body is not None else {}
+def request(method, path, body=None, headers=None):
+    headers = dict(headers or {})
+    if body is not None:
+        headers.setdefault("Content-Type", "application/json")
     data = json.dumps(body).encode() if body is not None else None
     req = Request(BASE_URL + path, data=data, headers=headers, method=method)
     try:
@@ -27,6 +29,23 @@ def request(method, path, body=None):
 
 
 class DeployedStackTests(unittest.TestCase):
+    def test_untrusted_cors_preflight_is_rejected_through_proxy(self):
+        status, _ = request("OPTIONS", "/api/athletes", headers={
+            "Origin": "https://untrusted.example.test",
+            "Access-Control-Request-Method": "POST",
+            "Access-Control-Request-Headers": "Content-Type, X-CSRF-TOKEN",
+        })
+        self.assertEqual(status, 403)
+
+    def test_api_errors_are_not_replaced_with_frontend_html(self):
+        status, body = request("GET", "/api/athletes/9223372036854775807")
+        self.assertEqual(status, 404, body)
+        self.assertEqual(body["code"], "ATHLETE_NOT_FOUND")
+
+    def test_nginx_version_is_not_exposed(self):
+        with urlopen(BASE_URL + "/", timeout=15) as response:
+            self.assertEqual(response.headers.get("Server"), "nginx")
+
     def test_frontend_and_react_route_are_served(self):
         for path in ("/", "/athletes/123"):
             status, html = request("GET", path)

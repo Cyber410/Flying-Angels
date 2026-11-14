@@ -46,7 +46,23 @@ The backend manages athletes, meets, reusable event definitions, event participa
 | Results | Record multiple attempts, retrieve/correct/delete records, save batches, calculate an event leaderboard |
 | Notes | Append timestamped notes, optionally linked to a meet event, and retrieve newest first |
 | Imports | Parse CSV/TSV/XLSX, preview new/update/unchanged/invalid rows, import selected rows, and report outcomes |
-| Operations | Hibernate-managed schema, automated tests, configurable authenticated production access |
+| Meet exports | Download registration assignments or every recorded meet performance as CSV, with Admin/Coach permissions |
+| Operations | Flyway migrations, Hibernate schema validation, automated tests, configurable authenticated production access |
+
+### Updated Sprint 3 plan: UC-07 through UC-12
+
+The updated **Flying Angels - Sprint 3 Use Cases and Implementation Plan** adds these backend requirements to the earlier six use cases. Frontend screens remain outside this implementation.
+
+| Use case | Updated requirement and implementation |
+| --- | --- |
+| UC-07 | Admin/Coach/Athlete login accounts, one account per athlete record, invitation email, one-time password setup and resend. Account/ownership changes invalidate existing sessions. |
+| UC-08 | Athlete logins can read their own competition history, calculated personal bests and progression through GET `/api/portal/history`; staff Notes remain inaccessible. |
+| UC-09 | Configurable age bands and an explicit ageAsOf reference, shared personal-best/tie rules, and Athlete ranking access across all events and meets. Meet/event selectors and ranking context are visible without a nomination; other athletes' private profiles and staff information stay protected. Season requests are rejected until attribution is configured. |
+| UC-10 | My Meets includes nominations only. PENDING is the initial status. Replies close at meet start, using the configured timezone and optional start time, and identical retries are idempotent. Guardian use shares the Athlete account/audit identity. |
+| UC-11 | Staff availability rows include assigned events and latest response/audit context, plus full selected-meet counts. WHATSAPP joins the external response channels; no automated reminders are sent. |
+| UC-12 | Both CSV types include age_group and age_as_of. Filenames include a sanitized meet name; generation failures have an explicit retryable error. |
+
+The earlier `AWAITING_RESPONSE` filter remains an accepted alias for PENDING. `availabilitySummary.pending` is the canonical count; `awaitingResponse` remains a compatibility alias. Parent/guardian is not a separate role/entity. Athlete/parent access requires an invited, activated Athlete account. All new account API requests use invitations; supplying a password during account creation is rejected. The first Admin is bootstrapped only when no accounts exist.
 
 ### Important names
 
@@ -60,7 +76,7 @@ The backend manages athletes, meets, reusable event definitions, event participa
 - **Historical import:** a spreadsheet performance with no confirmed meet association. The backend does not invent one.
 - **Leaderboard:** best comparable attempt per athlete for one event. This is distinct from season rankings or verified personal bests.
 
-There is currently no personal-best service, season-ranking API, official-result verification workflow, Trackie connector, or club user-account database. Those features must not be inferred from the existence of an event leaderboard.
+Personal bests, progression data, central rankings and persisted login accounts are implemented below. Season attribution, official-result verification and a Trackie connector remain outside the implemented scope.
 
 ## 2. Technology stack
 
@@ -71,18 +87,18 @@ Versions below are taken from [pom.xml](pom.xml) and the repository's runtime co
 | Java 17 language target | Backend source and compilation target in Maven |
 | Spring Boot 4.1.1 | Application startup, configuration, web and persistence integration |
 | Spring Web MVC | REST controllers and JSON request/response handling |
-| Spring Data JPA / Hibernate | Entity persistence, repositories, schema creation/update, entity graphs, dirty checking |
-| Spring Security | HTTP Basic authentication, role authorization, CSRF and CORS integration |
+| Spring Data JPA / Hibernate | Entity persistence, repositories, schema validation, entity graphs, dirty checking |
+| Spring Security | Staff-session authentication, role authorization, CSRF and scoped athlete access |
 | Jakarta Validation | DTO field validation and nested request validation |
 | MySQL 8.4 | Relational database used by Docker Compose and integration tests |
-| Apache Commons CSV 1.14.1 | CSV and tab-delimited text parsing |
+| Apache Commons CSV 1.14.1 | CSV/tab-delimited parsing and RFC 4180 CSV export writing |
 | Apache POI OOXML 5.4.1 | XLSX workbook parsing and typed Excel date handling |
 | Lombok | Generated getters, constructors, and dependency-injection constructors |
 | Maven Wrapper | Consistent Maven invocation without a separate Maven installation |
 | JUnit, Mockito, Spring test / MockMvc | Unit tests, HTTP contract tests, and service testing |
 | Testcontainers 1.21.3 | Disposable real MySQL databases for startup and integration tests |
 
-The current backend Dockerfile uses **Eclipse Temurin JDK 21**, while Maven targets Java 17. It runs Maven's `spring-boot:run` inside the container. It is a development-oriented runner rather than a minimal packaged-JAR production image.
+The local `backend/DockerFile` uses Eclipse Temurin JDK 21 and Maven's `spring-boot:run` for development, while Maven targets Java 17. The deployment `deploy/backend.Dockerfile` uses a multi-stage build: Java 17 JDK plus Maven Wrapper compile the application, and a Java 17 JRE runs only the resulting JAR as UID 10001. Maven, source files and build caches are absent from the deployed runtime.
 
 ## 3. Architecture and design
 
@@ -117,7 +133,7 @@ Docker Compose runs frontend, backend, and MySQL as separate services. Container
 | Repository | Execute queries and persist entities | `AthleteRepository`, `EventResultRepository` |
 | Entity | Represent stored state and relationships; apply local state updates | `Meet.updateFrom()`, `EventResult.update()` |
 | DTO | Define the external request/response contract | `MeetRequest`, `AthleteProfileResponse` |
-| Shared infrastructure | Configure security/CORS, normalize API errors, configure entity-generated schema | `SecurityConfig`, `ApiExceptionHandler`, Hibernate settings |
+| Shared infrastructure | Configure security/CORS, normalize API errors, configure versioned schema migrations | `SecurityConfig`, `ApiExceptionHandler`, Flyway configuration |
 
 Services generally return entities that controllers map using DTO `static from()` methods. Athlete profile assembly and note operations return their response objects from services. There is no separate mapper framework or generic mapper layer.
 
@@ -191,6 +207,9 @@ backend/
 | Meet event | `EventController`, `EventService`, `EventRepository`, and `Event` manage instances inside meets. |
 | Participation | `EventParticipation` and its repository provide independent assignment state; the event service/controller expose its operations. |
 | Result | `EventResult`, `EventResultRepository`, `ResultValues`, `ResultUnit`, `ResultStatus`, and `RankingOrder` represent, normalize and compare performances. |
+| Rankings | `RankingsController` and `PortalRankingsController` expose staff/scoped projections. `RankingsService` assigns shared positions and pages best-athlete rows. `RankingQueryRepository` selects one canonical best result per athlete. `CompetitionResultPolicy` shares eligibility with athlete history. |
+| Availability | `AvailabilityService` connects assignments to meet-level requests, validates versioned responses and appends audit records. Staff and portal controllers expose separate permissions and scope. |
+| Meet exports | `MeetExportController` exposes options and downloads. `MeetExportService` reads meet-scoped assignments/results and writes CSV. `MeetExportType` and `MeetExportOptions` define choices and record counts. |
 | Notes | `AthleteNoteController`, `AthleteNoteService`, `AthleteNoteRepository`, and the note entity/DTOs handle append-only note creation and ordered retrieval. |
 | Import | `AthleteRegistrationParser` reads source data. `AthleteImportService` owns both upload routes, previews and commits. `AthleteImportMatcher` decides create/update/no-change. `ImportRowWriter` provides isolated row transactions. `ImportJob`/`ImportRow` and their repositories persist source bytes and outcomes. |
 
@@ -208,7 +227,7 @@ Request DTOs represent individual operations and batch wrappers. Response DTOs e
 | `EventCategory` / `event_categories` | ID, unique name, ranking direction, measurement unit | Reusable event definition |
 | `Event` / `events` | ID, name, date, location, event type, URL, meet/category IDs, ranking direction | Unique `(meet_id, category_id)` |
 | `EventParticipation` / `event_participations` | ID, event ID, athlete ID | Unique `(event_id, athlete_id)` |
-| `EventResult` / `event_results` | ID, optional event ID, category/athlete IDs, raw result, decimal score, unit/status, recorded time, source | Multiple rows for an athlete/event are allowed; numeric score is `DECIMAL(12,4)` |
+| `EventResult` / `event_results` | ID, optional event ID, category/athlete IDs, optional result label, raw result, decimal score, unit/status, recorded time, source | Multiple rows for an athlete/event are allowed; numeric score is `DECIMAL(12,4)` |
 | `AthleteNote` / `athlete_notes` | ID, athlete ID, optional event ID, text, created time | Indexed by athlete/time/ID for ordered retrieval |
 | `ImportJob` / `athlete_import_jobs` | UUID, filename, source, original file bytes, created time | Original upload stored as a large binary object |
 | `ImportRow` / `athlete_import_rows` | ID, job ID, source row number, status, explanation, imported athlete ID, repeated source-row number | Unique `(job_id, file_row_number)` |
@@ -320,7 +339,95 @@ For display, a legacy value is suppressed if a central result has the same categ
 
 `startDate` is required unless the compatibility `meetDate` field supplies it. An omitted `endDate` defaults to the effective start date. End must not precede start. If both `meetDate` and `startDate` are present they must agree.
 
-The entity retains `meetDate` as the effective start date. Meet lists sort newest meet date first, then name. Updating a meet cannot leave existing event dates outside its new range.
+Optional `startTime` is an ISO local time such as `10:00:00`; omitted/null means midnight. Availability closes at that time on startDate in the configured meet timezone. Start/end date categorization remains separate: an in-progress multi-day meet stays in Upcoming until its end date.
+
+The entity retains `meetDate` as the effective start date. Updating a meet cannot leave existing event dates outside its new range.
+
+### Meet views and centralized availability
+
+Admins and Coaches can use these read-only APIs to find competitions and outstanding availability responses:
+
+| Endpoint | Filters and response |
+| --- | --- |
+| GET `/api/meets` | `view=UPCOMING\|PAST\|ALL`, optional `search`; existing array shape plus an `availabilitySummary` on every meet |
+| GET `/api/availability` | Optional `meetId`, `status`, `view`, `search`, `page` and `size`; paginated requests across meets |
+| GET `/api/availability/{id}` | Request details and assigned events, using the request ID from the overview |
+
+`view` defaults to ALL on both collection endpoints. Calling `/api/meets` without filters preserves the existing array response and newest-start-date-first ordering. UPCOMING includes ongoing meets and meets ending today, ordered by start date ascending. PAST includes meets whose end date is before today, ordered by start date descending; ALL also orders by start date descending. Meet names (case insensitive) and IDs stabilize equal-date meet ordering. Date calculations use the same `APP_AVAILABILITY_TIME_ZONE` clock as portal availability (default `America/Toronto`). Legacy records fall back from endDate to startDate to meetDate. Unknown dates appear only in ALL, after dated meets.
+
+Meet search matches name or location. Centralized availability search matches the athlete's full name or meet name. Searches trim surrounding whitespace and ignore case; `%`, `_` and `!` are matched literally. Blank search clears the filter; values over 200 characters return 400. Filter names and enum values use the exact casing shown above.
+
+Each meet has the following summary, including zero counts for meets without assigned athletes:
+
+```json
+{
+  "availabilitySummary": {
+    "total": 3,
+    "pending": 1,
+    "available": 1,
+    "unavailable": 1
+  }
+}
+```
+
+Counts represent active athlete/meet requests. An athlete assigned to several events contributes once. Old confirmations invalidated by assignment changes count under awaitingResponse, rather than their previous answer. Removing the last assignment excludes that request from counts and overview lists while preserving its audit history. Counts derive from the same request state used by Meet Details and portal replies, without copying results or counting confirmation history.
+
+For follow-up, use `GET /api/availability?view=UPCOMING&status=PENDING&meetId=12&page=0&size=25`. The selected-meet workflow supplies meetId; omitting it retains the existing cross-meet overview. Status accepts PENDING, AVAILABLE or UNAVAILABLE. The response has `filters` (including the server's `asOf` club date), `content`, `page`, `size`, `totalElements`, `totalPages` and `summary`. Each row includes identity, meet dates, effective status, assignedEventCount, assigned `events`, responseDeadline/canRespond, versions and `latestResponse` audit context, including staff-only remarks. Summary counts cover all active nominees in the selected meet, independent of the status/search/page filter; with no meet selected they cover all active requests. Select a row ID to review its full detail or record an external response. This API sends no reminders; athletes respond through their authenticated accounts.
+
+Availability filters run together in the database before pagination. Page defaults to 0, size to 25, with size restricted to 1..100. Rows follow the selected meet-view date direction, then meet ID, case-insensitive athlete last/first name and request ID. A page beyond the end returns empty content with the actual filtered totals. No matching meets return an empty array; no matching requests or no outstanding replies return empty content and zero totals. A positive but unknown meetId returns 404; nonpositive/malformed IDs, invalid enum values, invalid paging or an unsupported numeric offset return 400. Past requests remain visible when selected and have canRespond=false.
+
+Meet listing uses grouped availability/event counts without loading every event, participant or result collection. The availability page fetches its athlete/meet context together. Both APIs require Admin or Coach; anonymous requests receive 401 and portal/unsupported roles receive 403. Reading these views does not create requests, change versions or record responses.
+
+Implementation: [MeetOverviewService](src/main/java/com/flyingangels/backend/meet/MeetOverviewService.java), [MeetOverviewRepository](src/main/java/com/flyingangels/backend/meet/MeetOverviewRepository.java), [MeetView](src/main/java/com/flyingangels/backend/meet/MeetView.java), [AvailabilityOverviewService](src/main/java/com/flyingangels/backend/availability/AvailabilityOverviewService.java) and [AvailabilityOverviewRepository](src/main/java/com/flyingangels/backend/availability/AvailabilityOverviewRepository.java).
+
+### Meet CSV exports
+
+Admins and Coaches can download the selected meet's registration list or competition results. These read-only operations work for past, current and future meets.
+
+| Endpoint | Contract |
+| --- | --- |
+| GET `/api/meets/{id}/exports` | JSON options with meet ID/name and each type's displayName, recordCount and available flag |
+| GET `/api/meets/{id}/export?type=REGISTRATION` | Download one CSV row per athlete-event assignment |
+| GET `/api/meets/{id}/export?type=RESULTS` | Download one CSV row per recorded performance |
+
+Read the options to review the selected type, then call its download endpoint when confirmed. Changing the selection only changes the type parameter. Cancelling requires no request; no export job or persistent file is created. Counts reflect the records at the time options were read; a later download reads current data and checks again whether records exist.
+
+Registration includes all assignments, including Pending and Unavailable athletes, with their current meet-level `availability_status`. An athlete assigned to two events has two rows. Several attempts in one event do not duplicate a registration row. If an assignment change invalidates an earlier answer, its rows show PENDING. Archived athletes' existing assignments remain included.
+
+Results include every result row belonging to the meet, preserving repeated attempts with identical values and labels such as Heat 1, Final and Attempt 2. VALID, DNS, DNF, NT, DQ, FOUL, PENDING and UNPARSED records remain visible; missing scores are empty cells. Results are not reduced to personal bests or leaderboard rows. A linked legacy result without a participation row is still exported, while imported values without a linked meet/event are excluded. Assignments without results contribute registration rows only. Updates and deletions through the normal APIs appear immediately in the next download.
+
+Both CSV types start with these columns, in order:
+
+```text
+meet_id,meet_name,meet_start_date,meet_end_date,meet_location,event_id,event_name,event_date,category_id,category_name,athlete_id,first_name,last_name,date_of_birth,gender,age_group,age_as_of
+```
+
+| Type | Additional columns, in order |
+| --- | --- |
+| REGISTRATION | participation_id,availability_status |
+| RESULTS | result_id,result_label,result,score,unit,status,recorded_at,ranking_order |
+
+Both CSVs include age_group and age_as_of. When club bands are configured, supply an explicit `ageAsOf=YYYY-MM-DD`; omission returns 400. The same reference date classifies every row in either file. Without configured bands, age_group stays empty and age_as_of records the supplied date or the meet start-date compatibility fallback. No club competition categories are guessed. Unknown DOBs or ages outside configured bands have an empty group. Export generation/storage failures return 503 / EXPORT_FAILED and can be retried.
+
+Dates use ISO `YYYY-MM-DD`; recording times use UTC ISO instants. `result` preserves the recorded display text, while `score` contains the normalized decimal value without locale separators or scientific notation. Unit/status/ranking direction use the existing enum names. Nulls become empty cells. Internal athlete/event/performance notes, communication notes, client retry IDs and athlete access secrets are omitted.
+
+Rows are ordered by event date, event ID, case-insensitive athlete last/first name and athlete ID. Registration then orders by participation ID. Results order each athlete's attempts by known recording time (unknown last), then result ID. Records are fetched with their required context together, without loading every athlete's history or issuing per-row queries. Each request uses one read transaction; exporting does not change assignments, availability versions or result records.
+
+Successful downloads use `text/csv;charset=UTF-8`, a UTF-8 BOM for spreadsheet Unicode detection, comma separators, RFC 4180 quoting and CRLF record endings. Commas, quotes and embedded line breaks round-trip as cell contents. Formula-like user text beginning with `=`, `+`, `-` or `@` after leading whitespace/control characters is prefixed with an apostrophe; leading tab/newline text is protected too. That prefix exists only in the download; stored data is unchanged. Numeric score/ID columns remain numeric. Machine readers should skip the initial BOM and account for the literal-text prefix in protected text cells.
+
+Files are attachments named `meet-{id}-{meet-slug}-registration.csv` or `meet-{id}-{meet-slug}-results.csv`. Responses use `Cache-Control: no-store, private`, and configured allowed browser origins can read Content-Disposition through CORS. The meet name is converted to a bounded ASCII slug; the numeric meet ID and export type identify the file without allowing header injection.
+
+| Situation | HTTP response |
+| --- | --- |
+| No assignments for REGISTRATION | 409 JSON with code NO_REGISTRATION_RECORDS and an explanatory message |
+| No recorded results for RESULTS | 409 JSON with code NO_RESULT_RECORDS and an explanatory message |
+| Unknown meet | 404 / MEET_NOT_FOUND |
+| Nonpositive/malformed meet ID, missing or unknown type | 400 / INVALID_REQUEST |
+| Anonymous / portal or unsupported role | 401 / 403 |
+
+Type values are case sensitive: REGISTRATION or RESULTS. Empty exports return a message instead of a header-only file, and errors remain JSON even when a caller requests CSV. GET downloads need the staff session cookie in secure mode and do not require a CSRF write token. CSVs are generated synchronously in memory for the selected meet; this feature adds no external storage or background service.
+
+Implementation: [MeetExportController](src/main/java/com/flyingangels/backend/meet/MeetExportController.java), [MeetExportService](src/main/java/com/flyingangels/backend/meet/MeetExportService.java), [MeetExportType](src/main/java/com/flyingangels/backend/meet/MeetExportType.java) and [MeetExportOptions](src/main/java/com/flyingangels/backend/meet/dto/MeetExportOptions.java).
 
 ### Event definitions
 
@@ -381,17 +488,24 @@ Create a performance using:
 {
   "athleteId": 7,
   "result": "2:44.07",
+  "resultLabel": "Final",
   "unit": "SECONDS"
 }
 ```
 
-`POST /api/events/{id}/results` appends a record and creates participation if necessary. Repeating the POST can create another attempt; there is no result-request idempotency key.
+`POST /api/events/{id}/results` appends a record and creates participation if necessary. Repeating a POST without a clientId creates another attempt. An optional clientId makes retries return the original record for the same participation; use a result-ID PUT to correct its value or label.
 
 `PUT /api/events/{id}/results/{resultId}` corrects one record. Its request can also change the athlete; the service creates participation for the replacement athlete if needed. The original athlete's assignment is not automatically removed.
 
 The compatibility route `PUT /api/events/{id}/participants/{athleteId}/result` requires an existing assignment and **appends** a result. Its behavior is not idempotent despite using PUT; new clients should use POST results for new performances.
 
 The result-batch wrapper is `{"results": [...]}`. One invalid record rolls back the complete batch. Bulk POST creates attempts. New `PUT /api/events/{id}/results/bulk` corrects existing attempts using `resultId`, `result`, optional `score` and `unit`; it preserves athlete/event ownership, IDs and recording timestamps. See [bulk editing and Results Overview](../docs/sprint2-api-updates.md).
+
+### Result labels
+
+Create, individual update, bulk create/update, participant-result append and browser-data migration requests accept optional `resultLabel` text, for example `Heat 1`, `Final`, or `Attempt 2`. Labels are trimmed and limited to 100 characters. They are descriptive labels, not new heat/round entities or unique identifiers; identical performances can have separate labeled result IDs.
+
+For corrections, an omitted or null resultLabel preserves the stored label so existing clients do not erase it. An explicit empty/whitespace label clears it. Labels are returned by event results/profiles/leaderboards, athlete profiles/history, Results Overview and the restricted own-athlete portal projection. New nullable database storage preserves all existing unlabeled rows; no database reset is required. Validation failure in a batch rolls back score and label changes together.
 
 ### Numeric measurement rules
 
@@ -440,7 +554,140 @@ The event service:
 
 The response is a list of result DTOs, not a separately stored ranking table. Historical event-less imports are not included. No season, age group, indoor/outdoor, wind, official-verification or ranking-point eligibility is evaluated.
 
+### Athlete competition history, personal bests and progression
+
+`GET /api/athletes/{id}/history` consolidates one athlete's meet assignments and recorded competition attempts. Optional `categoryId` filters by reusable event definition across meets, rather than by a single meet-event ID. The endpoint is read-only and available to Admin and Coach staff sessions; anonymous callers receive 401 and portal/unsupported roles receive 403. Athlete/parent access remains on its separately scoped portal API.
+
+| Response field | Meaning |
+| --- | --- |
+| athlete | Athlete ID and first/last name |
+| selectedCategoryId | Supplied filter, otherwise null |
+| status | AVAILABLE, NO_COMPETITION_HISTORY, or NO_MATCHING_EVENTS |
+| availableCategories | All competition definitions associated with this athlete; retained when a filter has no matches |
+| meets | Chronological meets with dates/location and nested events, participation IDs and every recorded attempt |
+| performances | Comparable per-definition/unit/ranking-order summaries: attempt counts, personal best and progression points |
+| unlinkedResults | Imported or legacy performances without known meet/event context, kept separate from competition summaries |
+
+Meets are ordered by start date then ID; events by event date then ID; attempts within an event by recording time then result ID, with unknown recording times last. Events without results remain present with status NO_RESULTS and an empty attempts array. Existing linked results without a participation row remain visible with a null participationId; reading history never synthesizes an assignment or claims attendance.
+
+Personal bests use VALID results with nonnegative normalized scores, a dated linked event and matching category/unit. Non-performance statuses (NT, DNS, DNF, DQ, FOUL, PENDING, UNPARSED), null scores and incompatible units remain visible but do not enter PB/chart calculations. Comparison follows each event's configured rankingOrder: ASC selects the lowest score; DESC selects the highest. Different definitions, units or order overrides never share a comparison series. These are best recorded competition values, not certified official records; wind, age-season and official-verification rules are not invented.
+
+Each progression series contains the best valid attempt per competition event, ordered by competition eventDate rather than the time someone entered the result. Every attempt remains in meets[].events[].attempts[]. A point carries result/meet/event IDs, competition date, raw result, label, normalized score and recording time. Tied best values choose the earliest competition date, then recording time/result ID, for a stable representative.
+
+| progressionStatus | Backend chart-data state |
+| --- | --- |
+| NO_VALID_PERFORMANCE | personalBest is null and progression is empty |
+| SINGLE_COMPETITION | One competition point; no multi-point progression is implied, even if that competition has several attempts |
+| PROGRESSION_AVAILABLE | At least two competition points, ordered chronologically |
+
+Imported historical values do not receive an invented meet/date or compete with linked results for a PB. Legacy values already represented by central unlinked results are not duplicated in unlinkedResults. Category filtering applies to competition events, summaries and matching unlinked values. A known category with no matching events returns 200/NO_MATCHING_EVENTS; malformed/nonpositive filter IDs return 400; missing athletes/categories return 404. Edits or deletions through the existing result APIs are reflected immediately because summaries derive from the same canonical result records.
+
+Implementation: [AthleteHistoryController](src/main/java/com/flyingangels/backend/athlete/AthleteHistoryController.java), [AthleteHistoryService](src/main/java/com/flyingangels/backend/athlete/AthleteHistoryService.java), [AthleteHistoryResponse](src/main/java/com/flyingangels/backend/athlete/dto/AthleteHistoryResponse.java) and [PerformanceSummaryService](src/main/java/com/flyingangels/backend/event/PerformanceSummaryService.java). No frontend code or chart renderer is included.
+
+### Centralized rankings
+
+Configure club age bands with APP_AGE_GROUP_BANDS, using nonoverlapping inclusive completed-year ranges, for example `Youth:0:17;Adult:18:150` (illustration only, not a prescribed club policy). Empty configuration disables named categories. GET `/api/age-groups` and scoped GET `/api/portal/age-groups` return configured labels, bounds and the age calculation rule. Select `ageGroup=Youth&ageAsOf=2026-11-12`, or retain numeric minAge/maxAge; supplying both is rejected. When bands are configured, all ranking requests require ageAsOf, even without an age filter, so the staff table's ageGroup/ageAsOf fields have an explicit reference. Missing/future DOBs remain unclassified. Season filtering is deliberately disabled: a nonblank season parameter returns 400 until reliable season attribution is agreed.
+
+Rankings compare each athlete's best recorded competition performance for one reusable event definition across meets. The APIs are read-only and compute results from the same canonical records used by athlete history and Meet Details.
+
+| Endpoint | Access and response |
+| --- | --- |
+| GET `/api/rankings/categories` | Admin/Coach: available event definitions with ID, name, unit and ranking direction |
+| GET `/api/rankings/meets` | Admin/Coach: ranking meet choices with ID/name/start/end dates |
+| GET `/api/rankings/events?meetId=...` | Admin/Coach: meet-event choices; omit meetId to list all event instances |
+| GET `/api/rankings` | Admin/Coach: best result per athlete with result/meet/event context and authorized profile access |
+| GET `/api/portal/rankings/categories` | Activated Athlete account: all event definitions |
+| GET `/api/portal/rankings/meets` | Athlete ranking choices across all past/current/future meets, including meets without a nomination |
+| GET `/api/portal/rankings/events?meetId=...` | Athlete meet-event choices for any meet; omit meetId to list all event instances |
+| GET `/api/portal/rankings` | Rankings for any category/meet/event, with performance/meet/event context and own-profile access only |
+
+Both ranking endpoints accept:
+
+| Parameter | Contract |
+| --- | --- |
+| categoryId | Required positive reusable event-definition ID; unknown ID returns 404 |
+| meetId | Optional positive meet ID; select any meet, including one without the authenticated athlete's nomination; unknown ID returns 404 |
+| eventId | Optional positive meet-event ID; must match categoryId and, when supplied, meetId; selecting an event also identifies its meet |
+| gender | Optional case-insensitive filter; recognized Male/Men and Female/Women aliases normalize to stored canonical values; blank clears it |
+| minAge, maxAge | Optional inclusive completed-year bounds, 0..150, min <= max |
+| ageAsOf | Explicit ISO date required when an age bound/group is supplied or club bands are configured; otherwise optional |
+| page, size | Zero-based page (default 0), size 1..100 (default 25) |
+
+Example: `GET /api/rankings?categoryId=3&gender=Female&minAge=12&maxAge=14&ageAsOf=2026-05-17&page=0&size=25`. Age is computed on that one date for every athlete, rather than on different competition dates. A February 29 birth advances on March 1 in non-leap years. Unknown/not-yet-born DOBs are excluded only with an active age filter. Age-group labels are mapped to numeric bounds by callers; the backend does not invent athletics categories. Competition results from all dates remain eligible; ageAsOf is an age reference, not a competition-date cutoff.
+
+`RankingsResponse` returns category metadata, applied filters, status, content, page, size, totalElements and totalPages. The database selects one best eligible attempt per athlete before paging; the service assigns positions across that complete best-athlete set and then slices the requested page. Repeated attempts cannot consume ranking slots. Equal numeric scores share competition positions such as **1, 1, 3**, including when a tie crosses page boundaries. Case-insensitive last/first names and athlete ID stabilize display order without breaking score ties. A page beyond the final page returns empty content with the real totals and AVAILABLE status.
+
+Eligibility uses the shared CompetitionResultPolicy: a dated linked event, matching category/unit, VALID status, and a nonnegative normalized score. Imports without a known meet/event, null/unparsed/non-performance values, and incompatible units are excluded. Across all meets, rankings use the selected definition's configured order and exclude opposite-order event overrides. Selecting a meet or event uses that event's effective configured order, so every configured event can be ranked consistently with its own rules. The meet/event scope is applied to candidate results and best-result selection before ranking and pagination. A better performance outside the selected meet cannot remove or replace the athlete's selected-meet performance. Archived athletes' recorded performances remain in historical rankings; the staff projection identifies archived rows.
+
+Equal best attempts for one athlete select the earliest competition date, then known recording time (unknown last), then result ID, matching history's stable PB representative for that comparison configuration. Updating or deleting a result immediately changes its derived ranking. The compound event-results ranking index supports category/athlete/status/unit/score lookups; no rank table, performance copy, new background job or external service is introduced. These are recorded competition rankings; season, wind and official-verification policies remain separate club decisions.
+
+Staff rows include position, athlete ID/name/gender, ageAtReference when a date is supplied, archive state, result ID/label/raw value/score, meet/event/date context and profileAccessible=true. Athlete ranking rows include position, athlete name, raw performance/score/unit, associated meet ID/name, event ID/name/date, and ageGroup/ageAsOf where available. Athletes can compare every category and meet even when they have no assignments or results there; distinct disciplines remain separate ranking tables. Their athleteId is null and profileAccessible=false for other athletes; only the authenticated athlete receives their own ID and true. DOB, staff notes, other athletes' IDs and internal result IDs are excluded. The ranking selectors return competition metadata only, never nominee lists, staff notes or availability details. My Meets remains restricted to nominations, and private profile/history access remains restricted to the authenticated athlete. Staff API endpoints remain forbidden to Athlete accounts. Expired or invalidated account sessions lose ranking access on their next request.
+
+Example Athlete workflow: GET `/api/portal/rankings/meets`, GET `/api/portal/rankings/events?meetId=12`, then GET `/api/portal/rankings?categoryId=3&meetId=12&eventId=24&ageAsOf=2026-11-12`. Omit meetId/eventId to compare best performances for that category across all meets. Known meets/categories without comparable results return the normal empty state; incompatible category/meet/event selections return 400.
+
+| Status | Meaning |
+| --- | --- |
+| AVAILABLE | At least one eligible athlete matches; requested page can be empty when out of range |
+| NO_EVENT_RESULTS | Selected definition has no comparable rankable competition results |
+| NO_MATCHING_ATHLETES | Comparable results exist, but the selected gender/age filters match nobody |
+
+Implementation: [RankingsService](src/main/java/com/flyingangels/backend/ranking/RankingsService.java), [RankingQueryRepository](src/main/java/com/flyingangels/backend/ranking/RankingQueryRepository.java), [RankingsResponse](src/main/java/com/flyingangels/backend/ranking/dto/RankingsResponse.java) and [CompetitionResultPolicy](src/main/java/com/flyingangels/backend/event/CompetitionResultPolicy.java). No frontend changes are included.
+
+### Athlete portal and meet availability
+
+Athlete accounts use GET `/api/portal/profile` for their basic profile, GET `/api/portal/history?categoryId=...` for their own history/personal bests/progression, and GET `/api/portal/meets?view=UPCOMING|PAST|ALL` for nominated meets. GET `/api/portal/meets/{meetId}` returns one nomination and rejects unrelated meet IDs. These endpoints derive the athlete from the current login, not from caller-supplied athlete IDs. They never include staff coaching notes or allow result edits.
+
+Every athlete-event assignment creates or updates **one availability request per athlete per meet**. Assigning two events in the same meet produces one request containing both events. Explicit/bulk assignment, result entry that implicitly assigns an athlete, and browser-data migration all use this rule in the same transaction. Failed assignments roll back availability changes too. Existing assignments are backfilled idempotently at application startup.
+
+| Endpoint | Access and response |
+| --- | --- |
+| GET `/api/meets/{id}` | Admin/Coach: existing meet/events plus `availabilityRequests` |
+| GET `/api/meets/{id}/availability` | Admin/Coach: active meet requests with athlete identity, assigned events and response status; empty array when nobody is assigned |
+| GET `/api/availability/{id}` | Admin/Coach: one request, including inactive requests retained for audit |
+| GET `/api/availability/{id}/responses` | Admin/Coach: confirmation history, newest first, with source, staff user ID, method, note, timestamp and covered assignment revision |
+| PUT `/api/availability/{id}/response` | Admin/Coach: record a response received externally |
+| GET `/api/portal/profile` | Scoped athlete session: existing profile/previous results, assignment meet/event IDs and upcoming `availabilityRequests` |
+| GET `/api/portal/availability` | Scoped athlete session: own active upcoming/current meet requests, ordered by meet start date and request ID |
+| GET `/api/portal/availability/{id}` | Scoped athlete session: own active request details |
+| PUT `/api/portal/availability/{id}/response` | Scoped athlete session: confirm or change own availability |
+
+Activated Athlete accounts sign in through `POST /api/auth/login` and receive ROLE_ATHLETE. Passwordless profile-link login is not supported. The server derives athlete scope from the validated session; supplied athlete IDs cannot expand it. Other athletes' request IDs return 404. Portal sessions cannot call staff availability/audit endpoints. Request/profile responses omit staff notes, staff contact details, token identifiers and token secrets. Expired or invalidated account sessions lose portal access. Secure mode requires CSRF tokens for all confirmations; refresh the token after switching identities.
+
+Read the request before replying and copy its `version` and `assignmentRevision`. A portal reply is:
+
+```json
+{
+  "status": "AVAILABLE",
+  "version": 0,
+  "assignmentRevision": 1
+}
+```
+
+A staff-recorded external reply adds a required communication method and optional internal note:
+
+```json
+{
+  "status": "UNAVAILABLE",
+  "version": 0,
+  "assignmentRevision": 1,
+  "communicationMethod": "PHONE",
+  "note": "Parent confirmed by phone"
+}
+```
+
+`status` accepts only AVAILABLE or UNAVAILABLE. External methods are PHONE, WHATSAPP, EMAIL, TEXT, IN_PERSON and OTHER; PORTAL is assigned by the server to portal confirmations and is rejected on the staff endpoint. Notes have a 1,000-character limit and are available only in staff audit/overview projections. Staff author IDs come from their authenticated session; local authentication-bypass runs leave the author ID null.
+
+New requests have PENDING status. Adding or removing an event increments `assignmentRevision` and returns the effective status to PENDING. The previous answer, covered revision and timestamp remain visible as `lastAnswer`, `answeredRevision` and `respondedAt`; those fields do not imply current confirmation. Replying after reviewing the current events establishes fresh coverage. Changed confirmations append audit entries. An identical retry of the last submission, from the same identity/channel and with the same original version, revision, answer and remarks, returns the existing response without a new audit entry. A conflicting stale version or assignment revision returns **409**, requiring a reload; concurrent conflicting replies cannot silently overwrite one another. Successful replies return the updated version.
+
+Removing the final assignment hides the inactive request from active lists and closes replies, preserving its audit history. Reassigning the athlete to that meet reuses the request ID and requires a new response. Deleting an event updates affected requests; an assigned event must have its assignments removed before moving to another meet. Physical athlete/meet deletion removes the dependent requests and response history with the rest of that record's data.
+
+Availability closes at the meet's start date and optional startTime, with midnight as the default, in `APP_AVAILABILITY_TIME_ZONE` (default `America/Toronto`). Submissions at or after responseDeadline return 409; no existing answer changes. In-progress meets remain in Upcoming until the end date but have canRespond=false. Request details expose responseDeadline and timeZone. Adding/removing events or changing event date/definition/location or meet dates/start time/location requires reconfirmation. Failed saves return 503 and roll back to the last confirmed state. A meet lock, unique meet/athlete constraint and version checks serialize changes.
+
+Implementation: [AvailabilityService](src/main/java/com/flyingangels/backend/availability/AvailabilityService.java), [AvailabilityController](src/main/java/com/flyingangels/backend/availability/AvailabilityController.java), [PortalAvailabilityController](src/main/java/com/flyingangels/backend/availability/PortalAvailabilityController.java) and [AvailabilityDtos](src/main/java/com/flyingangels/backend/availability/AvailabilityDtos.java). See [meet views and centralized availability](#meet-views-and-centralized-availability) for staff overview/filtering APIs.
+
 ## 9. Athlete notes
+
+Admin and Coach share all note endpoints. Both can create/read athlete notes and save/read event and participant notes. `MANAGE_NOTES` is returned in both roles' session permissions; Spring Security enforces role access. Athlete accounts cannot access staff notes, including their own athlete's staff notes. See the [complete endpoint role matrix and Postman instructions](../docs/postman/endpoint-role-access.md).
 
 The general `Athlete.note` field remains separate from note history.
 
@@ -793,7 +1040,7 @@ A missing event result currently uses `EVENT_NOT_FOUND`, not a separate result-s
 
 The row writer uses a pessimistic write lock to stop the same preview row being committed twice concurrently. Unique database keys protect assignment, meet/category and external-ID invariants during competing requests. Check-before-save logic alone is not a concurrency guarantee.
 
-There are no optimistic-lock version fields or general request idempotency keys. Demographic matching without a stable external ID is not database-unique and can still race between jobs.
+User accounts, assignments and availability requests have optimistic versions. Availability also recognizes identical retries of the last confirmation; result corrections still have no general request idempotency key. Demographic matching without a stable external ID is not database-unique and can still race between jobs.
 
 ### Fetching and DTO construction
 
@@ -805,30 +1052,108 @@ Large event/meet reads can fetch substantial related data. Pagination, narrow re
 
 ## 14. Security and CORS
 
+### Central CORS policy
+
+`WebConfig` owns CORS for `/api/**`; controllers have no CORS overrides. Set `APP_CORS_ALLOWED_ORIGINS` to a comma-separated list of exact browser origins, for example `http://localhost:5173,https://app.example.com`. The default is empty, so cross-origin API requests are denied. Same-origin requests through the Vite or Nginx `/api/` proxy need no CORS allowlist. Root Docker Compose forwards this variable; direct JVM runs and ECS tasks must receive it through their own environment configuration.
+
+Allowed origins support session credentials, the API's configured HTTP methods and request headers; `Content-Disposition` is exposed for CSV downloads. A wildcard origin is rejected at startup. CORS does not replace session authorization or CSRF checks and does not restrict clients such as Postman that omit the browser Origin header.
+
 ### Development mode
 
-By default, `app.security.require-authentication` resolves to false. All requests are permitted and CSRF is disabled. This supports the existing local frontend workflow.
+Authentication is enabled by default. Initialize the first Admin with `APP_ADMIN_EMAIL` and `APP_ADMIN_PASSWORD` (at least 12 characters; maximum 72 UTF-8 bytes). Startup refuses to initialize an empty staff table without valid bootstrap credentials. Accounts are persisted with BCrypt password hashes; environment changes never overwrite an existing staff account.
+
+For an isolated test fixture only, explicitly set `APP_REQUIRE_AUTHENTICATION=false`; this permits requests and disables CSRF. The production profile always requires authentication. Existing functional tests and the CI Compose fixture explicitly select test mode rather than weakening the application default.
 
 ### Authenticated mode
 
-The `prod` profile enables the property and uses Spring Security HTTP Basic authentication. Authorization rules are evaluated in this order:
+API clients use email/password sign-in and a server-side HTTP session. Login rotates the session ID; logout clears the session. Staff credential/role/status changes invalidate existing sessions on their next request. Session inactivity expires after 30 minutes. Frontend integration is separate work. Authorization rules are evaluated in this order:
 
 | Operation | Allowed roles |
 | --- | --- |
 | OPTIONS/preflight | Permitted; CORS policy still applies |
-| Any athlete-import route, including preview GET | ADMIN |
-| DELETE under `/api/**` | ADMIN |
-| Other GET under `/api/**` | ADMIN, COACH, VIEWER |
-| Other API writes | ADMIN, COACH |
-| Other paths | Authenticated |
+| CSRF bootstrap, login, auth status and invitation validation/acceptance | Public; unsafe requests remain CSRF-protected |
+| Account management | ADMIN |
+| Portal profile/history/meets | Activated ATHLETE account, restricted to its one athlete |
+| Athlete, event and participant notes | ADMIN, COACH; private from Athlete accounts |
+| Athlete imports | ADMIN, COACH; Coach profile-changing rows become ADMIN_REQUIRED |
+| Staff API reads | ADMIN, COACH |
+| Basic athlete and meet writes (including archive/deletion) | ADMIN |
+| Event, assignment, result and event-note writes | ADMIN, COACH |
 
-Role names are Spring roles with the normal ROLE_ prefix internally. The shipped production properties configure one bootstrap ADMIN account through environment variables. No database-backed account provisioning or role-management endpoints exist.
+Role names use Spring's ROLE_ prefix internally. ADMIN and COACH are staff roles; ATHLETE is a linked login account restricted to its own portal. Passwordless profile-link access is removed. Athlete accounts cannot access the staff directory, staff notes, meet management, exports or user management. The last active Admin and the acting Admin cannot be deactivated/demoted through staff management.
 
-CSRF remains enabled with a cookie token repository. An authenticated write client retrieves `/api/csrf`, retains its cookies/session, and submits the returned token using the indicated header name. HTTP Basic credentials alone do not authorize a write request lacking a CSRF token. Use HTTPS for a shared deployment.
+CSRF tokens live in the HTTP session. Before login or any other write, retrieve `/api/csrf`, retain the cookies and submit the returned token using its headerName. Refresh after authentication/logout because tokens rotate. This applies to JSON and multipart requests. HTTP Basic is no longer a login mechanism. Use HTTPS for shared deployments; the production profile sets Secure session cookies by default.
+
+| Endpoint | Contract |
+| --- | --- |
+| POST `/api/auth/login` | JSON email/password; generic failure response; creates an account session |
+| GET `/api/auth/me` | authenticationRequired, safe user fields and permissions; null user when not signed in with an account |
+| POST `/api/auth/logout` | CSRF-protected; invalidates the session |
+| GET, POST `/api/users`; PATCH `/api/users/{id}` | Admin-only account list/create/edit/deactivate; creation sends an invitation and rejects a supplied password; linked Athlete IDs are unique |
+| GET `/api/portal/profile` | Own basic profile, assignments and results; no staff notes or other athletes |
+
+All roles use POST `/api/auth/login` with email/password. Athletes and parents activate an invited ATHLETE account linked to exactly one athlete, then use the authenticated `/api/portal/**` APIs. The portal is an account-restricted view, not a second login mechanism. Ownership is revalidated from the account on each request, and availability audit records identify `athleteUserId` directly.
+
+The passwordless athlete-link endpoints, token generator, token entity/repository and ROLE_PORTAL identity have been removed. Existing unused link tables/columns are not read by the application; no database reset or destructive cleanup is required. Account deactivation, security changes or deletion/relinking of the athlete ends access through account validation.
+
+### Login throttling
+
+POST `/api/auth/login` now uses shared MySQL failure counters in `login_throttle_buckets`. Defaults are five failed attempts per normalized email address and 100 failed attempts per source IP in a 900-second observation window. Reaching either threshold starts a 900-second temporary block. The threshold-reaching failure still returns the usual 401; subsequent requests return 429, including requests with the correct password, until the cooldown expires. `Retry-After` contains positive whole seconds rounded up, accounting for whichever account/IP block lasts longer. The JSON code is `AUTHENTICATION_THROTTLED` with a generic message and Cache-Control: no-store. Allowed browser origins can read Retry-After through the CORS exposed-header list.
+
+Unknown, inactive and active accounts use the same failure/throttle response shapes. The account counter resolves the stored canonical email using the same database lookup as authentication, then trims/lowercases it. Thus database-equivalent spellings (including accent-insensitive aliases where the schema uses that collation) share a counter. Unknown emails use their normalized submitted identifier. IP counters use canonical numeric IP addresses. Only SHA-256 identifier keys and failure/window metadata are stored; passwords, raw email addresses and raw IP strings are not stored in the throttle table. A successful sign-in clears that account's failure count; it does not clear the IP's failure history. Blocked requests do not extend the cooldown, deactivate accounts or invalidate already authenticated sessions. Malformed JSON/validation errors, CORS rejections and missing/invalid CSRF are rejected before the limiter and do not consume the password-failure allowance.
+
+Each login locks its IP bucket before its account bucket, performs local password verification, and commits failure counters before returning the credential error. This serializes simultaneous guesses for the same account/IP so they cannot race past a threshold. A blocked IP is rejected without creating more account buckets, preventing arbitrary email values from generating new rows after the source has been blocked. Authentication-provider infrastructure errors roll back counter changes. This design uses the existing database across backend instances and survives backend restarts; it adds a small database write/locking cost to login. Limits apply to login only, not ordinary authenticated API calls.
+
+Client-address trust is explicit. `server.forward-headers-strategy=none` preserves the actual socket peer. By default `APP_LOGIN_TRUSTED_PROXIES` is empty, so client-supplied X-Real-IP, X-Forwarded-For and Forwarded headers cannot change the bucket. If the immediate peer matches a configured numeric IP/CIDR, the limiter accepts exactly one valid numeric X-Real-IP header, which the existing Nginx edge overwrites. Hostnames, ports, address lists, scoped IPv6 addresses and duplicate X-Real-IP headers fall back to the socket peer. Do not allow broad/untrusted networks. With an empty allowlist behind Nginx, the source-IP counter covers the proxy's aggregate traffic; per-account limits still apply independently. For the documented ECS setup where both containers share a task and Nginx connects over loopback, explicitly set `APP_LOGIN_TRUSTED_PROXIES=127.0.0.1/32,::1/128` and keep backend port 8080 inaccessible publicly. Separate Docker proxy containers require their actual trusted IP/CIDR; do not copy ECS's loopback setting blindly. Another upstream load balancer requires revisiting the trust chain before changing these settings.
+
+Expired inactive buckets are deleted in bounded batches. Cleanup selects candidates, then conditionally deletes one key per short transaction, preserving recently updated counters and active blocks. The login path also refreshes expired windows/cooldowns, so cleanup timing does not determine when login becomes available again. The default cleanup interval is 60 seconds and batch size is 200. Account-based throttling intentionally permits a temporary lockout caused by repeated guesses against an email; use operational monitoring and edge protections for sustained abuse. It does not replace MFA or broader network-level rate limiting. See [OWASP authentication throttling guidance](https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html#login-throttling).
+
+The explicitly authentication-disabled CI fixture bypasses throttle storage. `APP_LOGIN_THROTTLE_ENABLED=false` is an explicit operational override; enabled is the normal default. Tests use isolated database cleanup and a controllable clock rather than sleeping through production cooldowns. No public counter-reset endpoint is provided.
+
+### Account invitations and password setup
+
+POST `/api/users` without a password, or POST `/api/users/invitations`, creates an invitation and queues its email. Both are Admin-only:
+
+```json
+{
+  "email": "athlete@example.test",
+  "name": "Invited Athlete",
+  "role": "ATHLETE",
+  "athleteId": 12
+}
+```
+
+For Admin/Coach invitations, omit athleteId. For Athlete accounts it is mandatory and unique, including while the account is inactive or awaiting activation. Account responses include athleteId and accountStatus (INVITED, ACTIVE or INACTIVE), without activation secrets or hashes. Supplying a password when creating any account is rejected; recipients set their own passwords through invitation acceptance. Initial-Admin bootstrap is the only startup exception. Pending accounts cannot sign in or be manually activated before password setup.
+
+The email contains a random 32-byte secret in `APP_ACTIVATION_URL#token=...`. Only its SHA-256 hash, account/security version, expiry and consumption state are stored in `user_invitations`. The default lifetime is 48 hours, configurable with APP_INVITATION_HOURS (1..168). POST `/api/users/{id}/invitation/resend` replaces earlier tokens. Pending-account deactivation, email/role/athlete-link changes invalidate outstanding tokens. Invalid, expired, superseded and reused tokens receive the same 400 unavailable response. No password is emailed.
+
+Use the public, CSRF-protected endpoints POST `/api/auth/invitations/validate` with `{"token":"..."}` and POST `/api/auth/invitations/accept` with `{"token":"...","password":"..."}`. Passwords require 12 characters and at most 72 UTF-8 bytes and are BCrypt hashed. Acceptance activates the account; the user then signs in normally. Concurrent accepts cannot consume a token twice. Deactivating/relinking an Athlete account invalidates its sessions, and deleting its athlete record detaches and deactivates the login.
+
+Invitation delivery uses a transactional MySQL outbox (`invitation_email_outbox`). Account, invitation and encrypted pending email are committed together. No SMTP call occurs inside that transaction. POST creation still returns 201 with accountStatus=INVITED; this means queued, not delivered. SMTP outages no longer roll back newly created accounts. A resend replaces the old token immediately and cancels older queued delivery even if SMTP is unavailable.
+
+A scheduled worker claims due records with MySQL `FOR UPDATE SKIP LOCKED`, commits its short claim transaction, rechecks the invitation, calls the existing SMTP sender outside any database transaction, and records success or a retry in a separate transaction. A claim token fences stale acknowledgements. Expired leases can be recovered after a backend crash. Configure the lease longer than the maximum SMTP attempt duration; a pause or network operation that outlasts a lease can still lead to duplicate email.
+
+Statuses are PENDING, PROCESSING, SENT, FAILED and CANCELLED. SENT means the SMTP server accepted the message, not proof of inbox delivery. Temporary errors use exponential backoff (defaults: 60, 120, 240, 480 seconds, capped at 3,600; at most five attempts). Authentication, invalid-recipient and malformed-payload failures are terminal. Error codes are sanitized; provider exception text, activation links and credentials are not exposed. Resend queues a fresh invitation after staff correct a failure. Pending mail for accepted, superseded, expired or invalidated invitations is skipped/cancelled. An email already in flight may still arrive; replaced links remain invalid.
+
+The outbox stores the activation URL encrypted with AES-256-GCM, bound to the user and invitation IDs. `user_invitations` continues to store only the secret hash. Set `APP_MAIL_OUTBOX_KEY` to a private Base64-encoded 32-byte key (generate once with `openssl rand -base64 32`); retain it across backend restarts and protect it in the deployed secret store. Production startup refuses a missing or invalid key. In non-production the backend can start without it, but invitation creation receives 503 until configured and the worker leaves existing queued messages untouched. Ciphertext is erased on SENT/FAILED/CANCELLED. Do not change the key while messages are pending or processing; key rotation requires draining/cancelling those messages first. Never log decrypted payloads or enable SMTP protocol debug in production.
+
+Admin-only `GET /api/users/{id}/invitation/delivery` returns the latest delivery metadata: id, userId, invitationId, status, attempts, maxAttempts, nextAttemptAt, claimedUntil, lastErrorCode, createdAt, updatedAt and sentAt. It returns 404 for an unknown account or an account without an outbox record, including invitations created before this release. It never returns the encrypted payload, activation URL or secret. Responses use Cache-Control: no-store. Existing POST `/api/users/{id}/invitation/resend` is the staff recovery operation. All these routes require ADMIN in secured mode.
+
+Delivery is at least once: if SMTP accepts a message and the backend crashes before recording SENT, a retry can send a duplicate. Token acceptance remains single-use. Queue durability depends on a persistent database; the disposable Postman MySQL fixture uses tmpfs and is intentionally erased by stopping/removing that MySQL container.
+
+Configure SMTP_HOST, SMTP_PORT, SMTP_FROM, and, where required, SMTP_USERNAME, SMTP_PASSWORD, SMTP_AUTH and SMTP_STARTTLS. Production SMTP configuration must use the chosen provider's settings; Mailpit only captures mail locally. No cloud email provider is provisioned by this change.
+
+For a local email inbox, start:
+
+```sh
+docker compose --profile mail up --build mysql backend mailpit
+```
+
+Open `http://localhost:8025`. The optional Mailpit service captures SMTP internally on port 1025 and publishes its inbox only on localhost. See [Mailpit's Docker documentation](https://mailpit.axllent.org/docs/install/docker/). No activation page is implemented: backend/Postman clients copy the token from the captured link and call the validation/acceptance APIs. APP_ACTIVATION_URL is the future client route, not an added frontend screen. The [invitation Postman collection](../docs/postman/flying-angels-invitations.postman_collection.json) automates this through the local inbox API with synthetic recipients.
 
 ### Browser origin policy
 
-`WebConfig` currently permits `http://localhost:5173` for `/api/**`, methods GET/POST/PUT/DELETE/OPTIONS, and any request header. The configuration is hard-coded and does not enable cross-origin credentials. A separately hosted production frontend requiring cookies/authentication needs deliberate CORS configuration, or a same-origin proxy deployment.
+`WebConfig` permits credentialed requests only from exact origins configured through `APP_CORS_ALLOWED_ORIGINS`, methods GET/POST/PUT/PATCH/DELETE/OPTIONS, and request headers. The default origin list is empty. The supplied frontend uses a same-origin `/api` proxy. A separately hosted frontend needs its exact trusted origin configured; wildcard credentialed CORS is not enabled.
 
 CORS controls browser access; it does not replace authentication or restrict a non-browser HTTP client.
 
@@ -842,7 +1167,7 @@ CORS controls browser access; it does not replace authentication or restrict a n
 | HTTP port | 8080 |
 | JDBC URL | `jdbc:mysql://mysql:3306/flying_angels?createDatabaseIfNotExist=true&useSSL=false&serverTimezone=UTC` |
 | Default DB username/password | root / empty password; local Compose overrides these using `.env` |
-| Hibernate schema action | update; creates missing tables/columns from entity mappings |
+| Hibernate schema action | validate; Flyway applies versioned SQL changes before JPA initialization |
 | Open EntityManager in View | false |
 | SQL logging | enabled in default profile |
 | Max file / multipart request | 10 MB / 11 MB |
@@ -855,10 +1180,26 @@ CORS controls browser access; it does not replace authentication or restrict a n
 | `SPRING_DATASOURCE_USERNAME` | DB user |
 | `SPRING_DATASOURCE_PASSWORD` | DB password |
 | `SERVER_PORT` | Change backend HTTP port |
+| `APP_AGE_GROUP_BANDS` | Inclusive club-defined bands as `label:minAge:maxAge;label:minAge:maxAge`; empty means unconfigured |
+| `APP_AVAILABILITY_TIME_ZONE` | Meet-local clock and response cutoff zone; defaults to America/Toronto |
+| `APP_ACTIVATION_URL`, `APP_INVITATION_HOURS` | Client activation-link route and token lifetime |
+| `APP_MAIL_OUTBOX_KEY` | Private Base64-encoded 32-byte encryption key; mandatory in prod; retain across restarts |
+| `APP_MAIL_OUTBOX_ENABLED`, `APP_MAIL_OUTBOX_POLL_MS` | Scheduled processing toggle and interval (defaults true / 5000 ms); disabled processing still queues mail |
+| `APP_MAIL_OUTBOX_BATCH_SIZE`, `APP_MAIL_OUTBOX_MAX_ATTEMPTS` | Per-poll send batch and attempt limit (20 / 5) |
+| `APP_MAIL_OUTBOX_RETRY_BASE_SECONDS`, `APP_MAIL_OUTBOX_RETRY_MAX_SECONDS` | Exponential retry base/cap (60 / 3600 seconds) |
+| `APP_MAIL_OUTBOX_LEASE_SECONDS` | Claim recovery timeout (120 seconds); must exceed SMTP attempt duration |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_FROM` | Invitation email transport and sender |
+| `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_AUTH`, `SMTP_STARTTLS` | Optional SMTP authentication and required STARTTLS settings |
 | `SPRING_PROFILES_ACTIVE` | Select `prod` when required |
 | `APP_SECURITY_REQUIRE_AUTHENTICATION` | Override authentication mode through Spring property binding |
-| `APP_ADMIN_USERNAME` | Required bootstrap username when using supplied prod settings |
-| `APP_ADMIN_PASSWORD` | Required bootstrap password when using supplied prod settings |
+| `APP_REQUIRE_AUTHENTICATION` | Explicit default-profile override; false is reserved for isolated test fixtures |
+| `APP_LOGIN_THROTTLE_ENABLED` | Enable login throttling (default true; authentication-disabled CI bypasses it) |
+| `APP_LOGIN_THROTTLE_ACCOUNT_LIMIT`, `APP_LOGIN_THROTTLE_IP_LIMIT` | Failed-attempt thresholds per normalized account/source IP (5 / 100) |
+| `APP_LOGIN_THROTTLE_WINDOW_SECONDS`, `APP_LOGIN_THROTTLE_BLOCK_SECONDS` | Observation window and temporary block duration (900 / 900 seconds) |
+| `APP_LOGIN_TRUSTED_PROXIES` | Explicit immediate-proxy numeric IP/CIDR allowlist; empty trusts no forwarding headers |
+| `APP_LOGIN_THROTTLE_CLEANUP_ENABLED`, `APP_LOGIN_THROTTLE_CLEANUP_MS` | Scheduled expired-counter cleanup (true / 60000 ms) |
+| `APP_ADMIN_EMAIL` | Email to create the first persisted Admin; legacy APP_ADMIN_USERNAME is accepted only when it contains a valid email |
+| `APP_ADMIN_PASSWORD` | Bootstrap password for an empty staff table; at least 12 characters |
 | `DATABASE_URL` | JDBC URL read by prod properties |
 | `DATABASE_USERNAME` | Database user read by prod properties |
 | `DATABASE_PASSWORD` | Database password read by prod properties |
@@ -889,9 +1230,7 @@ For the full development stack:
 docker compose up --build
 ```
 
-The MySQL health check gates backend startup and reads its root password from the container environment. For local import testing, MySQL currently uses a temporary `tmpfs` mount at `/var/lib/mysql`: its database contents are lost whenever the MySQL container stops or restarts. Recreate the containers after changing storage configuration (`docker compose down`, then the startup command above). An existing `mysql_data` volume is not mounted or deleted by this configuration. Frontend listens on 5173, backend on 8080, and MySQL on host port 3306. Compose reads database credentials from `.env`. Frontend/backend share the `application` bridge; backend/MySQL share the `database` bridge. Published host ports remain separate access paths. See [local Docker setup](../docs/local-docker.md).
-
-To restore persistent storage, replace the MySQL mount with `- mysql_data:/var/lib/mysql`, restore the top-level `volumes: { mysql_data: {} }` declaration, and recreate the containers. Use a persistent configuration for data you intend to retain.
+The MySQL health check gates backend startup and reads its root password from the container environment. MySQL uses the named `mysql_data` volume at `/var/lib/mysql`, preserving records across container restarts/recreation. Frontend listens on 5173, backend on 8080, and MySQL on host port 3306. Starting only `mysql backend` does not start the frontend. Compose reads database credentials from `.env`. Frontend/backend share the `application` bridge; backend/MySQL share the `database` bridge. Published host ports remain separate access paths. See [local Docker setup](../docs/local-docker.md).
 
 Check the API and logs:
 
@@ -937,28 +1276,27 @@ The packaged application is `target/backend-0.0.1-SNAPSHOT.jar`:
 java -jar target/backend-0.0.1-SNAPSHOT.jar
 ```
 
-Database variables still apply when running the JAR. To use production settings, provide all five production account/database variables listed above and select `SPRING_PROFILES_ACTIVE=prod`. Hibernate creates/updates the schema from entity mappings during startup before normal request handling.
+Database variables still apply when running the JAR. To use production settings, provide all five production account/database variables listed above and select `SPRING_PROFILES_ACTIVE=prod`. Flyway applies pending migrations during startup, then Hibernate validates the schema before normal request handling.
 
 ## 17. Database schema management
 
-The application starts with an empty MySQL database and loads athlete data through the CSV/TSV/XLSX importer. Hibernate manages the current schema directly from the JPA entities:
+Flyway owns schema changes; Hibernate checks the result:
 
 ```properties
-spring.jpa.hibernate.ddl-auto=update
+spring.jpa.hibernate.ddl-auto=validate
+spring.flyway.locations=classpath:db/migration
+spring.flyway.target=latest
+spring.flyway.baseline-on-migrate=false
+spring.flyway.clean-disabled=true
 ```
 
-At startup Hibernate creates missing tables/columns and applies supported mapping changes. Table names, relationships, unique constraints, result precision, column lengths and the note-order index are declared in entity annotations. There are no SQL migration files or migration-runner dependencies. The decision is documented in [ADR-0006](../docs/adr/0006-hibernate-schema-management.md).
+A fresh MySQL database runs `V1__application_schema.sql`, containing all 16 current tables, including the invitation email outbox and login-throttling counters. Flyway records successful versions and checksums in `flyway_schema_history`. Later startups validate applied scripts and run only pending versions. CSV imports remain explicit API operations.
 
-### Local workflow
+An existing non-empty database without Flyway history stops by default. After a backup and manual review against V1, set `SPRING_FLYWAY_BASELINE_ON_MIGRATE=true` with `SPRING_FLYWAY_BASELINE_VERSION=1` for one startup. Standard Flyway records that starting version; there is no custom schema verifier. Hibernate checks entity compatibility afterward. A different older schema requires a reviewed conversion before baselining. Reset baseline-on-migrate to false afterward.
 
-1. Start MySQL and the backend.
-2. Hibernate creates the current tables, including participation, notes and import jobs/rows.
-3. Upload a client file, review the preview, and commit selected eligible rows.
-4. Use the meet, event, participation, result and note APIs normally.
+For the next persisted change, add V2 and update the entity mappings together. Do not edit applied migration files. Setting a lower target does not undo earlier changes; the application version must remain compatible with the selected schema. MySQL DDL is not guaranteed to roll back as a unit, so test upgrades with representative records and maintain backups.
 
-Restarting only the backend keeps the existing database rows. The current Compose MySQL mount is temporary: stopping/restarting MySQL clears its data, and the next backend startup creates fresh tables. CSV importing is an explicit API operation; startup does not automatically import the client file.
-
-For a persisted schema change, update the appropriate entity mapping and verify it against disposable MySQL. Hibernate schema update does not perform custom historical-data conversions; this sprint assumes a fresh initial database rather than an older deployed client schema.
+See [Database migrations](../docs/database-migrations.md) for **every variable**, adoption commands, version selection, rollback behavior and RDS rollout precautions. [ADR-0012](../docs/adr/0012-versioned-database-migrations.md) supersedes the earlier Hibernate-update decision.
 
 ## 18. Testing and verification
 
@@ -978,12 +1316,21 @@ For a persisted schema change, update the appropriate entity mapping and verify 
 | `ImportPreviewValidationIntegrationTest` | Empty/header-only files, empty selections, repeated registrations, accented names, cancellation and commit-time identity rechecks |
 | `AthleteRegistrationParserTest` | Header mapping, club format, warnings and row errors |
 | `ResultValuesTest` | Track/field normalization, statuses, precision/format mismatches |
+| `LoginThrottleIntegrationTest`, `LoginClientAddressTest` | Account/IP limits, concurrency, cooldown/observation-window expiry, successful-login reset, restart persistence, trusted proxy handling, cleanup and test-mode bypass |
+| `InvitationMailOutboxIntegrationTest`, `InvitationMailCipherTest` | Atomic rollback, uncommitted isolation, encryption/tampering, retry timing/limits, stale leases, concurrent claims, safe Admin status and lifecycle cancellation |
+| `EndpointRoleMatrixIntegrationTest` | All 84 API endpoints under four identities, complete route inventory, 160 missing-CSRF checks and shared staff note persistence/privacy |
 | `ManagementIntegrationTest` | Independent participation, attempts, rollback, copy, notes, imports, deletes and consistent updates |
 | `EventParticipationIntegrationTest` | Empty/duplicate/missing athlete selections, assignment rollback, multiple events and scoped result deletion |
 | `ResultEditingIntegrationTest` | Atomic bulk PUT, existing result identity, malformed values and wrong-event/not-found records |
 | `ResultsOverviewIntegrationTest` | Cross-meet filters, age at meet start, discipline-appropriate performance sorting, all attempts and pagination |
+| `RankingsIntegrationTest` | Cross-meet best selection, score direction, age/gender filters, ties across pages, canonical PB representatives, invalid/legacy values, empty states and live edits/deletion |
+| `RankingsSecurityTest`, `AuthenticationIntegrationTest` | Staff-only ranking context, real scoped portal projections, own-profile access, forged-scope rejection and account deactivation |
+| `AvailabilityIntegrationTest`, `AvailabilitySecurityTest`, `AuthenticationIntegrationTest` | Meet-level deduplication, response audit/changes, stale revisions, concurrent assignments/replies, atomic rollback, startup backfill, removals/deletion, past meets, CSRF and real scoped portal access |
+| `MeetAvailabilityOverviewIntegrationTest`, `MeetOverviewSecurityTest` | Upcoming/Past/All views, club-date boundaries, legacy date fallback, search, distinct-athlete summaries, stale response coverage, combined filters, stable paging, bounded query counts and staff-only access |
+| `MeetExportIntegrationTest`, `MeetExportSecurityTest`, `AuthenticationIntegrationTest` | Registration/result row granularity, repeated attempts, empty exports, CSV Unicode/escaping/formula handling, download headers, query bounds, scope, no data mutation and real staff/portal permissions |
 | `ProductionSecurityTest` | Authentication, role restrictions and CSRF enforcement |
-| `BackendApplicationTests` | Hibernate creates every current table and the note-order index on empty MySQL, without a migration-history table |
+| `BackendApplicationTests` | Flyway creates every current table and history on empty MySQL; Hibernate validates the mappings |
+| `DatabaseMigrationIntegrationTest` | Fresh V1 schema; explicit baseline with existing records; refusal without a baseline; repeat startup; checksums; disabled clean; draft upgrade from the previous committed schema with data preservation |
 | `DatabaseIntegrationTest` | Shared MySQL container setup and child-before-parent cleanup for integration subclasses |
 
 The completed working-tree verification on 2026-10-30 recorded **127 JUnit tests passing**, using real MySQL for schema-startup and integration tests. The functional Newman run also passed **139 requests and 226 assertions** against a fresh temporary database. This includes import preview/selection guards, exact age filtering, participation removal scope, atomic result corrections and Results Overview, alongside the existing identity and measurement tests. See [execution evidence](../docs/postman/verification.md) for the tested base commit, profiles and limits; the separate security collection was not rerun in this update.
@@ -1033,11 +1380,11 @@ The frontend build and its 27 tests passed during the preceding backend implemen
 | Host backend cannot resolve `mysql` | Use localhost in JDBC URL when running outside Compose |
 | DB connection refused or access denied | Confirm MySQL health, host/port and the active profile's credentials |
 | Port 8080 already in use | Stop the duplicate development runner or choose SERVER_PORT |
-| Tables are missing or schema update fails | Confirm ddl-auto=update, the active datasource and database account CREATE/ALTER privileges; inspect Hibernate startup logs |
+| Migration or schema validation fails | Check Flyway logs, datasource, CREATE/ALTER privileges and migration history; an unversioned populated DB needs a backup, schema review and explicit baseline. Keep ddl-auto=validate |
 | `./mvnw` permission denied | Use `bash mvnw ...` as shown, or deliberately set wrapper execution permission |
 | Docker tests report old client API | Use the tested `-Dapi.version=1.44` override for this environment |
-| Secure GET returns 401 | Supply credentials and verify required production account variables |
-| Secure write returns 401/403 | Check credentials, role and CSRF token/cookie handling; live Basic-auth writes without valid CSRF currently return 401, while pre-authenticated role/CSRF tests can return 403 |
+| Secure GET returns 401 | Sign in through POST /api/auth/login and retain the session cookie; check account status and bootstrap settings |
+| Secure write returns 401/403 | Check the staff role, session cookie and fresh CSRF token. Basic Auth is not supported; absent/invalid CSRF yields 403 |
 | Browser request fails CORS | Current allowed origin is localhost:5173; proxy or configure production origin/credentials |
 | CSV import cannot find first/last name | Confirm the first record is the actual header and delimiter is comma/tab |
 | Import row has missing/invalid DOB | Supply a valid past ISO date or typed XLSX date and create a new preview; invalid rows cannot be saved |
@@ -1052,9 +1399,9 @@ The frontend build and its 27 tests passed during the preceding backend implemen
 
 These are boundaries of the current implementation, not features already delivered:
 
-- Official-result verification, personal-best eligibility, seasons, age-category calculation, wind conditions and indoor/outdoor ranking distinctions need club-approved rules and additional services/data.
+- Recorded competition personal bests and chronological progression are available through athlete history. Official-result verification, official PB eligibility, seasons, age-category calculation, wind conditions and indoor/outdoor ranking distinctions still need club-approved rules and additional services/data.
 - The event identity rule does not model heats, rounds or divisions. Extend the constraint and DTOs together if these are needed.
-- Performance records have no explicit attempt number, result-version field or full correction audit trail; individual IDs distinguish attempts.
+- Performance records have optional descriptive result labels, but no structured attempt number, result-version field or full correction audit trail; individual IDs distinguish attempts.
 - Team filtering interprets populated status rather than membership meaning. Status text remains open-ended.
 - External registration ID reliability is assumed only within a supplied source; no external identity verification runs.
 - Demographic matching can be ambiguous and is not safe against all concurrent duplicate creation.
@@ -1064,7 +1411,7 @@ These are boundaries of the current implementation, not features already deliver
 - Import source files/outcomes persist without a configured cleanup/retention mechanism.
 - Only the first XLSX worksheet is imported. Administrative columns remain in original bytes but are not extracted as separate metadata.
 - There is no club-account lifecycle, password-reset API, JWT/OAuth integration, audit author tracking, or access control per individual athlete/meet.
-- Production CORS and frontend login/CSRF integration need deployment-specific configuration.
+- Frontend login, role-aware navigation and athlete-link screens are not included; clients must integrate the new session/CSRF APIs. Separately hosted clients also need an exact trusted production CORS origin.
 - No Actuator, metrics/tracing setup, application cache, OpenAPI generator or notification service is configured in the current dependencies.
 
 ## 22. Design decisions and maintenance guide
@@ -1082,7 +1429,7 @@ These are boundaries of the current implementation, not features already deliver
 | Single import module/service | Both upload routes use the same create/update/skip policy; athlete CRUD contains no file-import orchestration |
 | Separate row-writer bean | Makes per-row rollback effective through Spring's transaction proxy |
 | DTO responses | Avoids exposing recursive JPA relationships and keeps client contracts explicit |
-| Hibernate entity-generated schema | Keeps fresh-database setup simple; mappings define the current tables and constraints |
+| Flyway SQL with Hibernate validation | Reviews schema changes explicitly and checks that the resulting database matches entity mappings |
 | Compatibility routes/fields retained | Reduces disruption to current athlete screens and older callers |
 
 ### Adding or changing a feature
@@ -1091,7 +1438,7 @@ These are boundaries of the current implementation, not features already deliver
 2. Add/update DTO constraints and explicit response fields.
 3. Put workflow rules in the appropriate feature service; keep controller code focused on HTTP concerns.
 4. Add repository queries/entity-graph paths that satisfy response reads with Open-in-View disabled.
-5. Update entity mappings for persisted changes and verify schema generation against disposable MySQL.
+5. Add the next Flyway SQL migration, update entity mappings, and verify fresh creation plus populated upgrades against disposable MySQL.
 6. Add tests for the business outcome, transaction rollback and database constraint where relevant.
 7. Check production authorization/CSRF behavior for any new route.
 8. Update this guide and the relevant editable/SVG code diagram.

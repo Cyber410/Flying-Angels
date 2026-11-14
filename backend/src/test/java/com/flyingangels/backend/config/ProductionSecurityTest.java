@@ -21,7 +21,8 @@ class ProductionSecurityTest {
     @Test void anonymousReadsRequireLoginAndViewersCannotWrite() throws Exception {
         when(athletes.search("","","")).thenReturn(List.of());
         mvc.perform(get("/api/athletes")).andExpect(status().isUnauthorized());
-        mvc.perform(get("/api/athletes").with(user("viewer").roles("VIEWER"))).andExpect(status().isOk());
+        mvc.perform(get("/api/athletes").with(user("viewer").roles("VIEWER"))).andExpect(status().isForbidden());
+        mvc.perform(get("/api/athletes").with(user("coach").roles("COACH"))).andExpect(status().isOk());
         mvc.perform(delete("/api/athletes/1").with(user("viewer").roles("VIEWER")).with(csrf())).andExpect(status().isForbidden());
     }
     @Test void deletionRequiresAdminAndCsrfToken() throws Exception {

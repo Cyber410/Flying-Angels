@@ -31,6 +31,8 @@ public class Meet {
 	private LocalDate meetDate;
     private LocalDate startDate;
     private LocalDate endDate;
+    private java.time.LocalTime startTime;
+    public java.time.LocalTime getStartTime() { return startTime == null ? java.time.LocalTime.MIDNIGHT : startTime; }
 	private String location;
 	@jakarta.persistence.Column(length=500) private String externalUrl;
 
@@ -50,6 +52,7 @@ public class Meet {
 		this.name = request.name().trim();
         this.startDate = request.effectiveStartDate();
         this.endDate = request.effectiveEndDate();
+        this.startTime = request.startTime();
         this.meetDate = this.startDate;
 		this.location = request.location();
 		this.externalUrl = request.externalUrl();

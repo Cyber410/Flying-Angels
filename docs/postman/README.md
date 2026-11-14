@@ -1,17 +1,46 @@
 # Backend testing in Postman
 
-This test pack covers **all 41 controller endpoints** and the main backend changes. It includes 139 ordered functional requests, 8 separate secured-mode requests, response assertions, captured IDs, and synthetic import files. No frontend changes are required to run this test pack. See [new backend contracts](../sprint2-api-updates.md) for the API integration changes.
+For the multi-stage Docker images, Nginx reverse proxy, configurable CORS, CSRF headers and email validation, start with the [deployment/security walkthrough](deployment-security-walkthrough.md). It includes an isolated authenticated local stack, an importable verification collection, manual request instructions and the run order for all backend collections. The CI fixture alone disables authentication; the walkthrough adds the authenticated Postman override.
+
+This test pack exercises the core backend workflows with 186 ordered functional requests, 438 separate secured-mode requests, response assertions, captured IDs, and synthetic import files. No frontend changes are required to run this test pack. See [new backend contracts](../sprint2-api-updates.md), [competition history](../../backend/README.md#athlete-competition-history-personal-bests-and-progression), [centralized rankings](../../backend/README.md#centralized-rankings), [portal availability](../../backend/README.md#athlete-portal-and-meet-availability), [meet/availability overviews](../../backend/README.md#meet-views-and-centralized-availability) and [meet CSV exports](../../backend/README.md#meet-csv-exports) for the API integration changes.
 
 For choosing endpoints by task and testing the real client CSV, read [Backend workflows](../backend-workflows.md). The bundled fixture assertions and cleanup are intended for synthetic data; use a separate manual collection for client records.
+
+For a pre-existing local database without migration history, follow [one-time database baseline](../database-migrations.md#first-run-against-an-existing-database) before running collections. Postman tests API behavior; SQL migration history is checked at backend startup and in integration tests.
 
 ## Files
 
 | File | Purpose |
 | --- | --- |
-| [flying-angels-backend.postman_collection.json](flying-angels-backend.postman_collection.json) | Full development/ADMIN functional run, including positive and negative paths |
-| [flying-angels-security.postman_collection.json](flying-angels-security.postman_collection.json) | Authentication and CSRF checks; run only in secured mode |
+| [flying-angels-deployment-security.postman_collection.json](flying-angels-deployment-security.postman_collection.json) | 39 Nginx/CORS/CSRF/email-validation/login-throttling requests in six ordered folders for the authenticated proxy fixture |
+| [proxy.postman_environment.json](proxy.postman_environment.json) | Proxy URL, local Mailpit URL, allowed-origin values and empty Admin credentials |
+| [flying-angels-backend.postman_collection.json](flying-angels-backend.postman_collection.json) | 186-request development/ADMIN functional run in eight ordered folders, including positive and negative paths |
+| [flying-angels-security.postman_collection.json](flying-angels-security.postman_collection.json) | Account roles, invitations and CSRF; requires secured mode and local Mailpit |
+| [flying-angels-invitations.postman_collection.json](flying-angels-invitations.postman_collection.json) | 48-request local email activation and Athlete-account demonstration in five ordered folders; requires the Mailpit profile |
 | [local.postman_environment.json](local.postman_environment.json) | Local base URL and empty credential placeholders |
 | [fixtures](fixtures) | Synthetic CSV, TSV and typed-date XLSX uploads |
+
+## Ordering and setup checks for every collection
+
+Reimport all updated collection JSON files. Each collection now uses only numbered folders at the root, so Postman desktop and Newman execute the same sequence. Start a fresh run with all folders selected in ascending order; saved older runs may retain earlier selections or ordering.
+
+| Collection | Ordered folders | Ordered requests | Passing assertions |
+| --- | --- | --- | --- |
+| Deployment/proxy/CORS/CSRF | 00–05 | 39 | 74 |
+| Account roles and athlete permissions | 00–02 | 438 | 512 |
+| Invitations and Athlete accounts | 00–04 | 48 | 83 |
+| Complete backend verification | 00–07 | 186 | 355 |
+| Total | | 711 | 1,024 |
+
+All four collections include the asynchronous-outbox update. Mailpit lookup steps poll until delivery, using configurable collection values `mailPollAttempts` (40) and `mailPollDelayMs` (500). Their polling adds HTTP subrequests, so runner network-request totals can exceed the ordered collection-request counts above. Set the private outbox key before starting the backend; the proxy fixture reads `POSTMAN_MAIL_OUTBOX_KEY` from `.env.postman.local`. The explicitly authentication-disabled CI fixture also passed 183 HTTP requests and 349 assertions; its three login steps remain skipped. Fixture IDs are generated by the run; do not enter database IDs manually. The main, deployment/security and invitation collections now validate captured IDs (and import job UUIDs where relevant), clear stale generated values at initialization, and stop on failed fixture setup. Required request variables are checked before an HTTP request is sent. Missing setup produces a named error such as `Missing or invalid setup variable(s): athleteAId`, rather than a backend error for a literal `{{athleteAId}}` path. Expected negative tests retain their intentional 400/401/403/404/409 responses.
+
+These folders are stages in a workflow, not standalone suites. Run each parent collection from the beginning; selecting only a notes, results, availability, invitation or cleanup folder skips its required setup. A deliberately isolated dependent request was verified to stop before any HTTP request in each of the three updated collections. A deliberately failed main-collection athlete creation was verified to stop at that request before creating subsequent fixtures.
+
+The focused deployment/security collection now ends with **05 - Login throttling**: five failed sign-ins for a unique nonexistent email receive generic 401 errors; the next receives 429, `AUTHENTICATION_THROTTLED`, a positive Retry-After header and Cache-Control: no-store. It never uses the Admin email for lockout testing. This folder assumes the server defaults of five account failures and a 900-second block. If you change that policy, adjust the test steps to match. Java integration tests verify cooldown recovery without waiting 15 minutes. Clearing cookies or restarting the backend does not clear shared database failure counters.
+
+The invitation collection stages are **00 - Admin sign-in and athlete setup**, **01 - Invitation delivery, replacement and activation**, **02 - Meet and ranking fixtures**, **03 - Athlete sign-in, privacy and availability**, and **04 - Staff audit, cleanup and sign out**.
+
+For the running disposable proxy stack, use **Flying Angels - Local proxy and security tests** with `baseUrl=http://localhost:18080` and `mailpitUrl=http://localhost:18025`, and set Admin email/password in that environment. The direct-backend environment on 8080 is for the separate development setup described below.
 
 ## 1. Start the current backend
 
@@ -29,13 +58,53 @@ Use a **disposable test database** for this pack. Requests deliberately create, 
 
 ## 2. Import into Postman
 
-1. Import both collection JSON files and the environment JSON.
+1. Import the collection JSON files you need and their matching environment JSON. The proxy walkthrough uses its separate proxy environment; direct backend testing uses the local environment below.
 2. Select the **Flying Angels local** environment.
 3. Set `baseUrl` to the current backend URL, with no trailing slash.
-4. For ordinary local development, leave the main collection's Authorization as **No Auth**.
+4. Leave collection Authorization as **No Auth**. Staff authentication uses the session cookie from login; this setting does not disable backend authentication.
 5. Keep Postman's cookie handling enabled.
 6. Use the desktop app/agent to reach a backend on localhost.
 7. Run the complete main collection in its displayed folder order, one iteration.
+
+### Recommended run order with the default secured backend
+
+The updated UC-07..UC-12 flow has a separate invitation collection. Start `docker compose --profile mail up --build mysql backend mailpit`, reimport the environment (including ageAsOf and mailpitUrl), and run **Flying Angels - Updated Sprint 3 invitations and Athlete accounts** as one iteration with Admin email/password. Its 48 requests create a fictional athlete, invite/resend through the local capture inbox, activate a password, log in as ATHLETE, inspect owned history/nominations, test idempotent availability retries and staff denials, then deactivate and clean up the synthetic athlete/meet. One inactive account and reusable categories remain because those records have no delete endpoint. It reads only emails addressed to its unique example.test recipient and does not delete other inbox messages. The activation frontend is not part of this backend-only work.
+
+Mailpit's local UI is `http://localhost:8025`; mailpitUrl defaults to that address. The activation secret is extracted from the message's `#token=` fragment. For a manual run, copy that fragment into POST `/api/auth/invitations/validate` and `/api/auth/invitations/accept`; then use ordinary email/password login. Do not export populated activation-token variables.
+
+Age bands are empty until configured by the club. Set APP_AGE_GROUP_BANDS with `label:minAge:maxAge` entries separated by semicolons, and set the Postman ageAsOf environment value to the chosen ISO reference date. Both exports and ranking calls require that date when bands are configured; the main/security collection URLs include it except the deliberate missing-date rejection case. New CSV fields are age_group/age_as_of, filenames include a meet slug, and initial availability is PENDING. The old AWAITING_RESPONSE filter and awaitingResponse summary count remain compatibility aliases.
+
+Availability now closes at the meet's startDate/startTime in America/Toronto by default, not at its end. Date-only meets close at midnight; use future fixtures or an explicit later startTime when testing replies. Identical repeats of the last request succeed without another audit entry. A conflicting stale version/revision still returns 409. Staff overview rows now include events and latestResponse, and summary covers all nominees for the selected meet, independent of list filters.
+
+Set environment `baseUrl=http://localhost:8080`, `email` to your initial/existing Admin's email, and `password` to that account's password. The sample environment has blank credential fields. The initial Admin comes from APP_ADMIN_EMAIL/APP_ADMIN_PASSWORD only when no staff accounts exist; changing those settings does not reset an existing account's password.
+
+1. Clear cookies for the backend host before starting the security collection, so its initial anonymous-denial checks are meaningful.
+2. Reimport and run **Flying Angels - Account roles and athlete permissions** from the beginning: 438 ordered requests, one iteration. Select all three numbered folders: **00 - Account setup and use-case checks**, **01 - All endpoints - role access matrix**, then **02 - Cleanup and sign out**. Start a fresh run so an older saved selection/order is not reused. Expected 400/401/403/409 responses are passing negative tests when their assertions pass. The last requests log out the Admin.
+3. The main collection signs in independently. Select the environment with Admin email/password and keep cookies enabled; no requests from another collection are required.
+4. Run **Flying Angels - Complete backend verification** from folder 00 through 07: 186 requests, one iteration. **00 - Authentication** checks server mode, gets CSRF, signs in as Admin and refreshes CSRF. Invalid credentials or a non-Admin login stop the run before CRUD. Only the explicitly authentication-disabled CI fixture skips the three sign-in steps. Do not reorder requests or use upload fixtures as a Runner iteration data file.
+5. Inspect Runner assertion results. The security collection requires Mailpit and ends signed out, while the main collection deletes the synthetic test athletes/meets in its final cleanup folder. To inspect their data manually, stop before cleanup or create separate manual fixtures.
+
+Using `localhost` for login and `127.0.0.1` for later requests can lose the intended cookie scope; keep one baseUrl throughout. A successful login must return a staff session, not HTTP Basic credentials or a bearer token. Reauthenticate and obtain fresh CSRF metadata after switching between staff and portal identities.
+
+For a manual collection, add GET `{{baseUrl}}/api/csrf` and put this in **Scripts → Post-response**:
+
+```javascript
+const csrf = pm.response.json();
+pm.collectionVariables.set("csrfToken", csrf.token);
+pm.collectionVariables.set("csrfHeader", csrf.headerName);
+```
+
+On that manual collection's **Scripts → Pre-request**, add:
+
+```javascript
+if (!["GET", "HEAD", "OPTIONS"].includes(pm.request.method)) {
+  const token = pm.collectionVariables.get("csrfToken");
+  const header = pm.collectionVariables.get("csrfHeader");
+  if (token && header) pm.request.headers.upsert({ key: header, value: token });
+}
+```
+
+Then send GET CSRF, POST `/api/auth/login` with `{"email":"{{email}}","password":"{{password}}"}`, and GET CSRF again. Use raw JSON for JSON request bodies. Successful staff login is 200; GET `/api/auth/me` identifies the current staff role. Refresh CSRF after signing in to any Admin, Coach or Athlete account and after logout. Signing into another account replaces the current account identity in that session.
 
 The first request resets IDs/token state and creates `runId` and `importSource`. Later response scripts save numeric athlete, meet, category, event and result IDs automatically. You do not need to type database IDs manually.
 
@@ -51,19 +120,20 @@ Leave the multipart `source` value as `{{importSource}}` for the entire run. Cha
 
 | Folder | Main checks |
 | --- | --- |
-| 00 — Setup and athletes | Create with missing DOB, directory fields/filtering, profile structure, invalid names/future CRUD dates, duplicate identity and malformed IDs |
-| 01 — Meets and definitions | Date ranges and legacy meetDate, definition reuse/uniqueness, event CRUD, bulk creation rollback, event ownership and dates |
-| 02 — Participation | Assign without a fake result, reject duplicate assignments, bulk rollback, same athlete in different events |
-| 03 — Results | Multiple attempts, correction by result ID, mm:ss normalization, field metres, NT/FOUL statuses, unit/score validation, bulk rollback and best-attempt leaderboard |
-| 04 — Notes/copy | Newest-first note history, meet context, validation, selected copying without source athletes/results |
-| 05 — Imports | Reject missing/invalid/future DOB, selected create, later profile update, time/distance profile results, unchanged skip, blank optional fields, retry, ambiguous identity, immediate route, TSV/XLSX |
-| 06 — Deletion/cleanup | Result deletion preserves participation, removal deletes attempts, event/meet cascade, notes survive detached, athlete deletion and 404 |
+| 00 — Authentication | Explicit server-mode detection, login CSRF, Admin sign-in and post-login token refresh; failed authentication stops before CRUD |
+| 01 — Setup and athletes | Create with missing DOB, directory fields/filtering, profile structure, invalid names/future CRUD dates, duplicate identity, malformed IDs and no-competition-history state |
+| 02 — Meets and definitions | Date ranges and legacy meetDate, definition reuse/uniqueness, event CRUD, bulk creation rollback, event ownership/dates, Upcoming/Past/All ordering, meet search, empty export choices and export errors |
+| 03 — Participation | Assign without a fake result, reject duplicate assignments, bulk rollback, same athlete in different events, history retaining assignments without results, one availability request per athlete/meet, Meet Details availability, centralized filtering/paging and registration CSV without results |
+| 04 — Results | Multiple labeled attempts, corrections/normalization, non-performance statuses, validation/rollback, leaderboard, history/PBs/progression, rankings and CSV exports retaining every performance |
+| 05 — Notes/copy | Newest-first note history, meet context, validation, selected copying without source athletes/results |
+| 06 — Imports | Reject missing/invalid/future DOB, selected create, later profile update, time/distance profile results, unchanged skip, blank optional fields, retry, ambiguous identity, immediate route, TSV/XLSX |
+| 07 — Deletion/cleanup | Result deletion preserves participation, removal deletes attempts, event/meet cascade, notes survive detached, athlete deletion and 404 |
 
 Tests check both HTTP status and response values. A returned 200 alone is not sufficient evidence of correct updates or rollback.
 
 ## 4. Complete endpoint checklist
 
-The following tables are generated from the existing backend API guide; every method/path has at least one request in the functional collection.
+The following tables summarize the core functional endpoints. Authentication/staff/token and scoped availability-response operations have a separate secured-mode collection; database-backed JUnit tests also cover supporting note, migration and archive APIs.
 
 ### Athletes
 
@@ -71,6 +141,7 @@ The following tables are generated from the existing backend API guide; every me
 | --- | --- | --- | --- |
 | GET | `/api/athletes` | search/gender/team; minAge/maxAge with ageAsOf | 200; summary array |
 | GET | `/api/athletes/{id}` | Athlete ID | 200; AthleteProfileResponse |
+| GET | `/api/athletes/{id}/history` | Athlete ID; optional categoryId | 200; meets/events/attempts, personal bests, chronological progression and separate unlinked results |
 | POST | `/api/athletes` | AthleteRequest | 201; AthleteProfileResponse |
 | PUT | `/api/athletes/{id}` | AthleteRequest | 200; AthleteProfileResponse |
 | DELETE | `/api/athletes/{id}` | Athlete ID | 204 |
@@ -79,8 +150,8 @@ The following tables are generated from the existing backend API guide; every me
 
 | Method | Path | Input | Success / response |
 | --- | --- | --- | --- |
-| GET | `/api/meets` | None | 200; MeetResponse array |
-| GET | `/api/meets/{id}` | Meet ID | 200; `{meet, events}` |
+| GET | `/api/meets` | view=UPCOMING/PAST/ALL (default ALL), search | 200; meet array with availabilitySummary counts |
+| GET | `/api/meets/{id}` | Meet ID | 200; `{meet, events, availabilityRequests}` |
 | POST | `/api/meets` | MeetRequest | 201; MeetResponse |
 | PUT | `/api/meets/{id}` | MeetRequest | 200; MeetResponse |
 | DELETE | `/api/meets/{id}` | Meet ID | 204 |
@@ -124,7 +195,32 @@ The following tables are generated from the existing backend API guide; every me
 | GET | `/api/athletes/import/{id}` | Import UUID | 200; ImportPreviewResponse |
 | POST | `/api/athletes/import/{id}/commit` | `{rowNumbers: [...]}` | 200; ImportCommitResponse |
 | POST | `/api/athletes/import` | Multipart `file`, optional `source` | 200; create/update/skip/failure count response |
-| GET | `/api/csrf` | Authenticated context in secure mode | 200; CSRF token metadata/value |
+| GET | `/api/csrf` | Session cookie retained; works before login too | 200; CSRF token metadata/value |
+
+### Availability overview
+
+| Method | Path | Input | Success / response |
+| --- | --- | --- | --- |
+| GET | `/api/availability` | meetId, status, view, search, page/size | 200; filtered paginated requests with athlete/meet identity and assignedEventCount |
+| GET | `/api/meets/{id}/availability` | Meet ID | 200; active requests and assigned events for one meet |
+| GET | `/api/availability/{id}` | Request ID | 200; request details, events, current status, version and assignmentRevision |
+| GET | `/api/availability/{id}/responses` | Request ID | 200; staff-only confirmation audit history |
+| PUT | `/api/availability/{id}/response` | status, version, assignmentRevision, communicationMethod, optional note | 200; updated request |
+
+Use `view=UPCOMING&status=PENDING` to find athletes needing follow-up. Clear meetId to search across meets. Status is PENDING, AVAILABLE or UNAVAILABLE. The default view is ALL; page defaults to 0 and size to 25 (maximum 100). Search matches athlete full name or meet name; the meet-list search matches meet name or location. Empty filters restore the full view. No matching requests return empty content and zero totals. Request details and external-response recording use the existing request-ID routes. Athlete/parent sessions use their separate scoped portal APIs and cannot access these staff endpoints.
+
+### Meet CSV exports
+
+| Method | Path | Input | Success / response |
+| --- | --- | --- | --- |
+| GET | `/api/meets/{id}/exports` | Meet ID | 200 JSON; REGISTRATION/RESULTS choices with independent recordCount and available values |
+| GET | `/api/meets/{id}/export` | Required type=REGISTRATION or RESULTS; ageAsOf required when club age bands are configured | 200 CSV attachment; one row per assignment or per recorded result respectively |
+
+Both routes require an Admin or Coach session in secure mode. GET downloads use the session cookie without a CSRF write token. To save a file manually, select the export type and use Postman's **Send and Download**; otherwise inspect the CSV response body. Download filenames are `meet-{id}-{meet-slug}-registration.csv` and `meet-{id}-{meet-slug}-results.csv`. The backend uses UTF-8 with a BOM, standard CSV quoting, CRLF record endings and no-store/private cache headers. See the [CSV column contract](../../backend/README.md#meet-csv-exports) for the exact fields and spreadsheet text protection.
+
+No registration rows return 409 JSON / NO_REGISTRATION_RECORDS; no result rows return 409 / NO_RESULT_RECORDS. An unknown meet returns 404; a missing/invalid type returns 400. Error responses remain JSON even with Accept: text/csv. Cancelling after reviewing options requires no additional request and creates no stored export.
+
+The functional collection first verifies disabled choices, then registration-only exports, then both CSV types after results exist. It compares row counts against options and checks that repeated athlete-event attempts remain separate result rows. The fixed synthetic fixture contains no multiline CSV fields; the JUnit suite parses CSV with Commons CSV to cover Unicode, commas, quotes, line breaks, null cells and formula-like values.
 
 ## 5. Request bodies and ID variables
 
@@ -221,34 +317,47 @@ Import counters are job-wide/cumulative. `VALID` performance status means parsea
 
 ## 7. Secured-mode testing
 
-Do not run the security collection against anonymous development mode: its expected security rejection responses would correctly fail there.
+Authentication is enabled by default. Use an isolated local database and configure the initial Admin email/password, or an existing active Admin. The security collection expects secured mode; the main CI functional fixture explicitly uses APP_REQUIRE_AUTHENTICATION=false.
 
-Enable secured mode through the prod configuration, supplying its required account/database variables, or enable the equivalent security property in an isolated test runner. See [security](../../backend/README.md#14-security-and-cors).
+Set private environment values `email` and `password` to your Admin credentials, keep cookies enabled, and start with a fresh cookie jar. SMTP/Mailpit is required: use the [authenticated proxy fixture](deployment-security-walkthrough.md), or start the root stack with `docker compose --profile mail up --build mysql backend mailpit`. Set `mailpitUrl` to the local inbox (18025 for the proxy fixture, 8025 for the root stack). Do not export passwords or invitation secrets into shared files.
 
-Set environment `username`/`password` **locally** to the bootstrap ADMIN credentials. Keep real passwords out of exported shared files. The security collection has 8 ordered checks:
+The **Flying Angels - Account roles and athlete permissions** collection has 438 ordered requests in three numbered top-level folders (00 setup, 01 role matrix, 02 cleanup). Setup must run before role checks: it captures `securityAthleteId`, `securityMeetId` and `securityEventId`. Missing numeric IDs stop the run before sending invalid URLs. The layout avoids Postman desktop running nested role checks before loose root-level setup requests. See [ordering details and expected folder counts](endpoint-role-access.md). It covers:
 
-1. Anonymous GET is rejected with 401.
-2. Incorrect Basic credentials are rejected with 401.
-3. Valid ADMIN obtains a CSRF token and cookie.
-4. POST with Basic credentials but no CSRF token is rejected with 401 in the current live configuration.
-5. POST with Basic credentials and an invalid CSRF token is likewise rejected with 401.
-6. Authenticated POST with the retrieved token succeeds with 201.
-7. ADMIN deletes that created athlete with the token, expecting 204.
-8. Its authenticated profile GET returns 404.
+1. Anonymous denial, CSRF bootstrap, generic credential errors, Admin login and safe account responses.
+2. Coach invitation and local email capture, password setup, shared login, permitted athlete reads and denial of account/basic athlete/meet management.
+3. Admin creation of a synthetic athlete, meet and event, plus assignment/availability initialization.
+4. Athlete invitation and local email capture, password setup, shared login and own-athlete profile scope.
+5. Athlete rankings across categories/meets/events, without access to staff projections or other private profiles.
+6. Account-scoped availability confirmations and changes, idempotent retry, stale-version rejection and staff audit restrictions.
+7. Admin reauthentication, staff availability summaries, audit history and CSV exports.
+8. All 84 API endpoints checked as Admin, Coach, Athlete and Anonymous (336 role checks), plus actual shared notes and portal note privacy. See the [complete endpoint role matrix and testing instructions](endpoint-role-access.md).
+9. Athlete-account deactivation and rejected login, synthetic meet/athlete cleanup, Coach deactivation, and CSRF-protected Admin logout.
 
-The live Basic-auth requests above return 401 on CSRF failure; the pre-authenticated MockMvc tests return 403. This is an observed distinction between these request contexts, so do not treat a valid username/password alone as evidence that a write will succeed.
+There are no passwordless profile links, token-exchange login or link-revocation requests. All three roles use `/api/auth/login`. The run leaves two inactive synthetic accounts and reusable event definitions because no account/category delete APIs exist; use a disposable database. It reads only messages addressed to its uniquely generated synthetic recipients and does not delete other inbox messages.
 
-Keep cookies enabled between token retrieval and writes. The response's `headerName` determines the token header; use the returned token rather than copying the cookie manually.
+Writes return 403 for absent/invalid CSRF. Refresh after login/logout and retain the session cookie. The main functional collection has its own **00 - Authentication** folder and signs in independently using the selected environment's Admin email/password. Run it in order; do not switch collections to obtain its CSRF token.
 
-To run the **main** functional collection in secured mode, set its collection Authorization to Basic Auth with `{{username}}`/`{{password}}`. Its CSRF request captures the token and its collection pre-request script attaches the header to writes.
-
-Only the bootstrap ADMIN account is provisioned by current prod properties. Postman cannot log in as an unimplemented COACH/VIEWER user. Role-denial behavior is covered by [ProductionSecurityTest](../../backend/src/test/java/com/flyingangels/backend/config/ProductionSecurityTest.java); add real test identities before doing equivalent manual role tests.
+Database-backed tests additionally verify session invalidation, invitation expiry/replacement/single use, last-Admin protection, account ownership, removed link endpoints, availability actor identity, and import-time reauthorization. The security collection is a manual companion; it is not run against the authentication-disabled CI fixture.
 
 ## 8. What HTTP tests do not prove
 
+Competition-history assertions are part of the main functional run. Result labels are supplied on the first/second race attempts and the measured attempt; later result corrections omit the label and verify it remains present in history. The history requests cover no competition history, assigned events without results, filtered personal bests, a single-competition progression state, no matching category events, FOUL without an invented numeric PB, and oversized-label rejection.
+
+The MySQL-backed AthleteHistoryIntegrationTest and ResultLabelIntegrationTest additionally verify multi-meet chronology, ASC/DESC/points comparison, ties, non-performance and malformed stored values, legacy/import separation, result edits/deletions, atomic label changes, compatible old payloads and browser-migration retry behavior. AthleteHistorySecurityTest and the session integration tests verify Admin/Coach access and portal/anonymous rejection. These backend checks do not create or render frontend charts.
+
+The main collection also checks ranking categories, one best row per athlete, shared score positions, explicit-date age/gender filters, pagination after aggregation, separate no-results/no-matches states and missing-age-reference rejection. RankingsIntegrationTest covers cross-meet selection, normalized time/distance/points, ties across pages, historical imports, incompatible values/configurations, leap days and live corrections/deletions. RankingsSecurityTest and the real-session integration test verify token validity, restricted row fields and own-profile access. The manual security ranking queries use an empty isolated definition. The invitation collection additionally creates a competitor in an unassigned meet and verifies that Athlete ranking selectors and result rows expose the permitted competition context while private profiles stay protected.
+
+MeetExportIntegrationTest additionally covers one row per assignment/performance, duplicate-valued attempts and labels, non-performance statuses, linked legacy results without assignments, omission of unlinked imports, live corrections/removal, spreadsheet-safe text, encoding/attachment headers, bounded query counts and unchanged database state. MeetExportSecurityTest and AuthenticationIntegrationTest verify both staff roles and deny portal access even for its own athlete's meet.
+
+Staff endpoints are GET `/api/rankings/categories` and GET `/api/rankings?categoryId=...`. Portal equivalents are GET `/api/portal/rankings/categories` and GET `/api/portal/rankings?categoryId=...`, using the existing scoped session. Both support gender, minAge/maxAge, explicit ageAsOf, page and size. Clear age/gender parameters to compare the full event ranking. Portal rows permit profile access only for the authenticated athlete; other profile/staff APIs remain forbidden.
+
+Athletes can browse rankings for **all event categories and all meets**, including meets they were not nominated for. Use GET `/api/portal/rankings/meets` for competition choices and GET `/api/portal/rankings/events?meetId={{meetId}}` for that meet's event instances; omit meetId to list every event instance. Then request GET `/api/portal/rankings?categoryId={{categoryId}}&meetId={{meetId}}&eventId={{eventId}}&ageAsOf={{ageAsOf}}`. Meet/event filters are optional and apply before selecting the best performance and assigning ranks. Without them, the selected category ranks performances across all meets. Staff have equivalent `/api/rankings/meets` and `/api/rankings/events` selectors.
+
+Athlete rows now include meet ID/name, event ID/name/date, units and age-group context where configured. DOB, coaching notes, internal result IDs and other athletes' private profile IDs remain excluded. My Meets remains limited to nominations; the ranking catalogue intentionally covers every meet. The invitation collection demonstrates another athlete's ranking in a different meet while confirming that the private profile access stays unavailable.
+
 The collection demonstrates API-visible outcomes. Continue running the JUnit suite for:
 
-- Hibernate schema creation and entity-defined indexes on empty MySQL.
+- Flyway initialization and Hibernate validation on empty MySQL, plus explicit baselining of a populated schema, checksum checks and disabled clean.
 - Injected database/write failures and rollback of partially updated profiles.
 - Role checks using controlled test principals.
 - Cases not represented by the bundled fixtures, including concurrency and larger datasets.

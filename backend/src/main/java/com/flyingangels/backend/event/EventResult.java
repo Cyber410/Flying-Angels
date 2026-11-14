@@ -20,7 +20,7 @@ import lombok.NoArgsConstructor;
 import java.math.BigDecimal;
 
 @Entity
-@Table(name = "event_results")
+@Table(name = "event_results", indexes = @jakarta.persistence.Index(name = "idx_result_ranking", columnList = "category_id,athlete_id,status,unit,score"))
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class EventResult {
@@ -43,6 +43,17 @@ public class EventResult {
 
 	@Column(length = 50)
 	private String result;
+
+    @Column(length = 100)
+    private String resultLabel;
+
+    public void setResultLabel(String label) { this.resultLabel = normalizeResultLabel(label); }
+    public static String normalizeResultLabel(String label) {
+        if (label == null) return null;
+        String clean = label.trim();
+        if (clean.length() > 100) throw new IllegalArgumentException("Result label must be 100 characters or fewer");
+        return clean.isEmpty() ? null : clean;
+    }
 
 	@Column(precision = 12, scale = 4)
 	private BigDecimal score;

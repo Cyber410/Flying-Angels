@@ -11,6 +11,8 @@ public record ParticipantResultRequest(
 		@NotBlank(message = "Result is required")
 		@Size(max = 50, message = "Result must be 50 characters or fewer") String result,
 
-		@DecimalMin(value = "0.0", inclusive = true, message = "Score cannot be negative") BigDecimal score, com.flyingangels.backend.event.ResultUnit unit) {
+		@DecimalMin(value = "0.0", inclusive = true, message = "Score cannot be negative") BigDecimal score, com.flyingangels.backend.event.ResultUnit unit,
+        @Size(max=100, message="Result label must be 100 characters or fewer") String resultLabel) {
+    public ParticipantResultRequest(String result, BigDecimal score, com.flyingangels.backend.event.ResultUnit unit) { this(result, score, unit, null); }
     public ParticipantResultRequest(String result, BigDecimal score) { this(result, score, null); }
 }

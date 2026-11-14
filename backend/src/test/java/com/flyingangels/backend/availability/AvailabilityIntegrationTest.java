@@ -140,9 +140,14 @@ class AvailabilityIntegrationTest extends DatabaseIntegrationTest {
         participationRepository.saveAndFlush(new EventParticipation(race, ada));
         participationRepository.saveAndFlush(new EventParticipation(jump, ada));
         availability.initializeExistingAssignments();
-        var before = reply(request(), Answer.AVAILABLE);
+        reply(request(), Answer.AVAILABLE);
+        // Compare persisted snapshots: MySQL stores timestamps at microsecond precision.
+        var before = request();
+        var historyBefore = availability.history(before.id());
+        assertEquals(Status.AVAILABLE, before.status()); assertEquals(1, historyBefore.size());
         availability.initializeExistingAssignments();
         assertEquals(before, request()); assertEquals(1, availabilityRequestRepository.count());
+        assertEquals(historyBefore, availability.history(before.id()));
         assertEquals(2, availabilityRequestRepository.findById(before.id()).orElseThrow().getAssignmentCount());
     }
 

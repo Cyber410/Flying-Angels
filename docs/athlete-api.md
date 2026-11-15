@@ -2,7 +2,7 @@
 
 Start with [Backend workflows: which endpoint to use and when](backend-workflows.md) for business-task mapping, preview/commit behavior and real-client CSV testing.
 
-The complete backend architecture, structure, endpoint contracts, payload examples, import rules, setup, security, Hibernate schema management, and testing guide is [backend/README.md](../backend/README.md). The focused explanation of recent changes is in [backend-changes.md](backend-changes.md).
+The complete backend architecture, structure, endpoint contracts, payload examples, import rules, setup, security, Flyway schema management, and testing guide is [backend/README.md](../backend/README.md). The focused explanation of recent changes is in [backend-changes.md](backend-changes.md).
 
 The backend supports:
 

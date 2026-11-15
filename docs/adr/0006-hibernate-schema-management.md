@@ -2,7 +2,7 @@
 
 - Recorded: 2026-10-14
 - Revised: 2026-10-26
-- Status: **Implemented; awaiting team ratification**
+- Status: **Superseded by [ADR-0012](0012-versioned-database-migrations.md) on 2026-11-13**
 - Scope: Backend database initialization
 - Basis: The project owner clarified that the initial database is empty and populated from the client CSV, and requested removal of Flyway.
 - Approver: Team ratification has not yet been recorded.

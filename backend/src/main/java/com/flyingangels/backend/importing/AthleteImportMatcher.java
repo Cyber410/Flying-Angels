@@ -45,8 +45,8 @@ public class AthleteImportMatcher {
             // Known different birth dates identify different people, even when only one name matches.
         }
         var incomingEvents = request.events() == null ? List.<AthleteEventRequest>of() : request.events();
-        if (match == null) return new Plan("NEW", withWarnings("Create athlete", row),
-                null, List.of("newAthlete"), distinct(incomingEvents));
+        if (match == null) return authorize(new Plan("NEW", withWarnings("Create athlete", row),
+                null, List.of("newAthlete"), distinct(incomingEvents)));
 
         List<String> changes = new ArrayList<>();
         changed(changes, "firstName", match.getFirstName(), request.firstName());
@@ -65,7 +65,17 @@ public class AthleteImportMatcher {
         if (!newEvents.isEmpty()) changes.add("events");
         String action = changes.isEmpty() ? "UNCHANGED" : "UPDATE";
         String explanation = changes.isEmpty() ? "No supplied information has changed; skipped" : "Update: " + String.join(", ", changes);
-        return new Plan(action, withWarnings(explanation, row), match, List.copyOf(changes), newEvents);
+        return authorize(new Plan(action, withWarnings(explanation, row), match, List.copyOf(changes), newEvents));
+    }
+    private static Plan authorize(Plan plan) {
+        var auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        boolean coach = auth != null && auth.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_COACH"))
+                && auth.getAuthorities().stream().noneMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+        if (coach && (plan.action().equals("NEW") || plan.action().equals("UPDATE")
+                && plan.changedFields().stream().anyMatch(field -> !field.equals("events"))))
+            return new Plan("ADMIN_REQUIRED", "An Admin must create this athlete or change their basic information. Coaches may import performances for confirmed existing athletes.",
+                    plan.athlete(), plan.changedFields(), plan.newEvents());
+        return plan;
     }
     private static List<AthleteEventRequest> distinct(List<AthleteEventRequest> events) {
         Map<String,AthleteEventRequest> distinct = new LinkedHashMap<>();

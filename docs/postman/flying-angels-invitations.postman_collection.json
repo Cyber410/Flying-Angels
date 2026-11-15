@@ -1,0 +1,1570 @@
+{
+  "info": {
+    "name": "Flying Angels - Updated Sprint 3 invitations and Athlete accounts",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Local-only email activation demonstration. Start the mail Compose profile. Uses Mailpit to capture messages for synthetic example.test accounts. Leaves an inactive account/category after cleanup.\n\nRun every numbered folder in order from 00 - Admin sign-in and athlete setup, one iteration. Generated fixture IDs are validated and saved automatically. Missing fixture values stop the run before an invalid URL is sent; failed fixture creation stops the run at its source. Role/authentication, CORS and CSRF rejection tests retain their expected negative responses.\n\nInvitations are queued durably. Mailpit search steps poll for asynchronous delivery; configurable mailPollAttempts (default 40) and mailPollDelayMs (default 500) bound the wait."
+  },
+  "auth": {
+    "type": "noauth"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080"
+    },
+    {
+      "key": "mailpitUrl",
+      "value": "http://localhost:8025"
+    },
+    {
+      "key": "athletePassword",
+      "value": "Postman-athlete-test-123!"
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "const fixtureRules={\"athleteEmail\":\"text\",\"athleteId\":\"positiveId\",\"categoryId\":\"positiveId\",\"competitorId\":\"positiveId\",\"eventId\":\"positiveId\",\"invitationToken\":\"text\",\"meetId\":\"positiveId\",\"messageId\":\"text\",\"oldInvitationToken\":\"text\",\"otherCategoryId\":\"positiveId\",\"otherEventId\":\"positiveId\",\"otherMeetId\":\"positiveId\",\"requestId\":\"positiveId\",\"revision\":\"nonNegativeInteger\",\"runId\":\"text\",\"userId\":\"positiveId\",\"version\":\"nonNegativeInteger\"};",
+          "function fixtureValueIsValid(value, rule) {",
+          "  const text=String(value ?? \"\");",
+          "  if(rule===\"positiveId\") return /^[1-9][0-9]*$/.test(text) && Number.isSafeInteger(Number(value));",
+          "  if(rule===\"nonNegativeInteger\") return /^[0-9]+$/.test(text) && Number.isSafeInteger(Number(value));",
+          "  if(rule===\"uuid\") return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(text);",
+          "  return typeof value===\"string\" && value.trim().length>0 && !value.includes(\"{{\");",
+          "}",
+          "const fixtureRequestTemplate=JSON.stringify(pm.request.toJSON());",
+          "const missingFixtureKeys=Object.keys(fixtureRules).filter(key=>fixtureRequestTemplate.includes(\"{{\"+key+\"}}\") && !fixtureValueIsValid(pm.variables.get(key),fixtureRules[key]));",
+          "if(missingFixtureKeys.length){const message=\"Missing or invalid setup variable(s): \"+missingFixtureKeys.join(\", \")+\". Run this collection from 00 - Admin sign-in and athlete setup. If setup ran, inspect its first failed response. No request was sent.\";pm.test(\"Required fixture setup is complete\",()=>{throw new Error(message);});console.error(message);pm.execution.setNextRequest(null);pm.execution.skipRequest();}",
+          "if (![\"GET\",\"HEAD\",\"OPTIONS\"].includes(pm.request.method)) { const token=pm.collectionVariables.get(\"csrfToken\"); const header=pm.collectionVariables.get(\"csrfHeader\"); if(token&&header)pm.request.headers.upsert({key:header,value:token}); }"
+        ]
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "00 - Admin sign-in and athlete setup",
+      "item": [
+        {
+          "name": "Initialize local invitation run and get CSRF",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/csrf"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const responsePayload=pm.response.json(); pm.collectionVariables.set(\"csrfToken\",responsePayload.token); pm.collectionVariables.set(\"csrfHeader\",responsePayload.headerName);",
+                  "(()=>{",
+                  "function fixtureValueIsValid(value, rule) {",
+                  "  const text=String(value ?? \"\");",
+                  "  if(rule===\"positiveId\") return /^[1-9][0-9]*$/.test(text) && Number.isSafeInteger(Number(value));",
+                  "  if(rule===\"nonNegativeInteger\") return /^[0-9]+$/.test(text) && Number.isSafeInteger(Number(value));",
+                  "  if(rule===\"uuid\") return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(text);",
+                  "  return typeof value===\"string\" && value.trim().length>0 && !value.includes(\"{{\");",
+                  "}",
+                  "const producedFixtureRules={\"athleteEmail\":\"text\",\"runId\":\"text\"};",
+                  "const invalidProducedFixtures=Object.keys(producedFixtureRules).filter(key=>!fixtureValueIsValid(pm.collectionVariables.get(key),producedFixtureRules[key]));",
+                  "const fixtureResponseSucceeded=pm.response.code===200;",
+                  "pm.test(\"Setup returned usable fixture values\",()=>{pm.expect(fixtureResponseSucceeded,\"Unexpected setup response status\").to.eql(true);pm.expect(invalidProducedFixtures,\"Missing or invalid captured fixture values\").to.eql([]);});",
+                  "if(!fixtureResponseSucceeded || invalidProducedFixtures.length){Object.keys(producedFixtureRules).forEach(key=>{pm.collectionVariables.unset(key);pm.variables.unset(key);});console.error(\"Setup failed in \"+pm.info.requestName+\". Check this response before continuing.\");pm.execution.setNextRequest(null);}else{Object.keys(producedFixtureRules).forEach(key=>pm.variables.set(key,pm.collectionVariables.get(key)));}",
+                  "})();"
+                ]
+              }
+            },
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "[\"athleteEmail\",\"athleteId\",\"categoryId\",\"competitorId\",\"eventId\",\"invitationToken\",\"meetId\",\"messageId\",\"oldInvitationToken\",\"otherCategoryId\",\"otherEventId\",\"otherMeetId\",\"requestId\",\"revision\",\"runId\",\"userId\",\"version\"].forEach(key=>{pm.collectionVariables.unset(key);pm.variables.unset(key);});",
+                  "pm.collectionVariables.set(\"runId\", String(Date.now()));",
+                  "[\"invitationToken\",\"oldInvitationToken\",\"messageId\",\"athleteId\",\"userId\",\"meetId\",\"eventId\",\"categoryId\",\"requestId\",\"version\",\"revision\",\"savedVersion\",\"csrfToken\",\"csrfHeader\"].forEach(key=>pm.collectionVariables.unset(key));",
+                  "pm.collectionVariables.set(\"athleteEmail\",\"sprint3.athlete.\"+pm.collectionVariables.get(\"runId\")+\"@example.test\");",
+                  "[\"competitorId\",\"otherMeetId\",\"otherEventId\",\"otherCategoryId\"].forEach(key=>pm.collectionVariables.unset(key));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Admin signs in",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"email\":\"{{email}}\",\"password\":\"{{password}}\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Admin identity\",()=>pm.expect(pm.response.json().user.role).to.eql(\"ADMIN\"));",
+                  "let verifiedLogin;try{verifiedLogin=pm.response.json();}catch(error){verifiedLogin=null;}",
+                  "const verifiedRole=pm.response.code===200 && verifiedLogin && verifiedLogin.user && verifiedLogin.user.role===\"ADMIN\";",
+                  "pm.test(\"Active ADMIN session established\",()=>pm.expect(Boolean(verifiedRole)).to.eql(true));",
+                  "if(!verifiedRole){console.error(\"Sign-in failed. Check the selected environment credentials and cookie handling.\");pm.execution.setNextRequest(null);}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Refresh Admin CSRF",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/csrf"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const responsePayload=pm.response.json(); pm.collectionVariables.set(\"csrfToken\",responsePayload.token); pm.collectionVariables.set(\"csrfHeader\",responsePayload.headerName);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create synthetic athlete",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/athletes",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"firstName\":\"Invitation\",\"lastName\":\"Runner{{runId}}\",\"dateOfBirth\":\"2010-01-01\",\"gender\":\"Female\",\"events\":[]}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set(\"athleteId\",pm.response.json().id);",
+                  "(()=>{",
+                  "function fixtureValueIsValid(value, rule) {",
+                  "  const text=String(value ?? \"\");",
+                  "  if(rule===\"positiveId\") return /^[1-9][0-9]*$/.test(text) && Number.isSafeInteger(Number(value));",
+                  "  if(rule===\"nonNegativeInteger\") return /^[0-9]+$/.test(text) && Number.isSafeInteger(Number(value));",
+                  "  if(rule===\"uuid\") return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(text);",
+                  "  return typeof value===\"string\" && value.trim().length>0 && !value.includes(\"{{\");",
+                  "}",
+                  "const producedFixtureRules={\"athleteId\":\"positiveId\"};",
+                  "const invalidProducedFixtures=Object.keys(producedFixtureRules).filter(key=>!fixtureValueIsValid(pm.collectionVariables.get(key),producedFixtureRules[key]));",
+                  "const fixtureResponseSucceeded=pm.response.code===201;",
+                  "pm.test(\"Setup returned usable fixture values\",()=>{pm.expect(fixtureResponseSucceeded,\"Unexpected setup response status\").to.eql(true);pm.expect(invalidProducedFixtures,\"Missing or invalid captured fixture values\").to.eql([]);});",
+                  "if(!fixtureResponseSucceeded || invalidProducedFixtures.length){Object.keys(producedFixtureRules).forEach(key=>{pm.collectionVariables.unset(key);pm.variables.unset(key);});console.error(\"Setup failed in \"+pm.info.requestName+\". Check this response before continuing.\");pm.execution.setNextRequest(null);}else{Object.keys(producedFixtureRules).forEach(key=>pm.variables.set(key,pm.collectionVariables.get(key)));}",
+                  "})();"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "01 - Invitation delivery, replacement and activation",
+      "item": [
+        {
+          "name": "Invite one linked Athlete account without assigning a password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/users",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"email\":\"{{athleteEmail}}\",\"name\":\"Invited Athlete\",\"role\":\"ATHLETE\",\"athleteId\":{{athleteId}}}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", () => pm.response.to.have.status(201));",
+                  "const user=pm.response.json(); pm.collectionVariables.set(\"userId\",user.id); pm.test(\"Pending activation and no secret in response\",()=>{pm.expect(user.accountStatus).to.eql(\"INVITED\");pm.expect(user.active).to.eql(false);pm.expect(user).not.to.have.property(\"token\");});",
+                  "(()=>{",
+                  "function fixtureValueIsValid(value, rule) {",
+                  "  const text=String(value ?? \"\");",
+                  "  if(rule===\"positiveId\") return /^[1-9][0-9]*$/.test(text) && Number.isSafeInteger(Number(value));",
+                  "  if(rule===\"nonNegativeInteger\") return /^[0-9]+$/.test(text) && Number.isSafeInteger(Number(value));",
+                  "  if(rule===\"uuid\") return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(text);",
+                  "  return typeof value===\"string\" && value.trim().length>0 && !value.includes(\"{{\");",
+                  "}",
+                  "const producedFixtureRules={\"userId\":\"positiveId\"};",
+                  "const invalidProducedFixtures=Object.keys(producedFixtureRules).filter(key=>!fixtureValueIsValid(pm.collectionVariables.get(key),producedFixtureRules[key]));",
+                  "const fixtureResponseSucceeded=pm.response.code===201;",
+                  "pm.test(\"Setup returned usable fixture values\",()=>{pm.expect(fixtureResponseSucceeded,\"Unexpected setup response status\").to.eql(true);pm.expect(invalidProducedFixtures,\"Missing or invalid captured fixture values\").to.eql([]);});",
+                  "if(!fixtureResponseSucceeded || invalidProducedFixtures.length){Object.keys(producedFixtureRules).forEach(key=>{pm.collectionVariables.unset(key);pm.variables.unset(key);});console.error(\"Setup failed in \"+pm.info.requestName+\". Check this response before continuing.\");pm.execution.setNextRequest(null);}else{Object.keys(producedFixtureRules).forEach(key=>pm.variables.set(key,pm.collectionVariables.get(key)));}",
+                  "})();"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Find invitation in local Mailpit inbox",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{mailpitUrl}}/api/v1/messages?limit=50"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const email=pm.collectionVariables.get(\"athleteEmail\"); const message=pm.response.json().messages.find(m=>(m.To||[]).some(to=>to.Address===email)); pm.test(\"Invitation captured locally\",()=>pm.expect(message).to.exist); if(message) pm.collectionVariables.set(\"messageId\",message.ID);",
+                  "(()=>{",
+                  "function fixtureValueIsValid(value, rule) {",
+                  "  const text=String(value ?? \"\");",
+                  "  if(rule===\"positiveId\") return /^[1-9][0-9]*$/.test(text) && Number.isSafeInteger(Number(value));",
+                  "  if(rule===\"nonNegativeInteger\") return /^[0-9]+$/.test(text) && Number.isSafeInteger(Number(value));",
+                  "  if(rule===\"uuid\") return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(text);",
+                  "  return typeof value===\"string\" && value.trim().length>0 && !value.includes(\"{{\");",
+                  "}",
+                  "const producedFixtureRules={\"messageId\":\"text\"};",
+                  "const invalidProducedFixtures=Object.keys(producedFixtureRules).filter(key=>!fixtureValueIsValid(pm.collectionVariables.get(key),producedFixtureRules[key]));",
+                  "const fixtureResponseSucceeded=pm.response.code===200;",
+                  "pm.test(\"Setup returned usable fixture values\",()=>{pm.expect(fixtureResponseSucceeded,\"Unexpected setup response status\").to.eql(true);pm.expect(invalidProducedFixtures,\"Missing or invalid captured fixture values\").to.eql([]);});",
+                  "if(!fixtureResponseSucceeded || invalidProducedFixtures.length){Object.keys(producedFixtureRules).forEach(key=>{pm.collectionVariables.unset(key);pm.variables.unset(key);});console.error(\"Setup failed in \"+pm.info.requestName+\". Check this response before continuing.\");pm.execution.setNextRequest(null);}else{Object.keys(producedFixtureRules).forEach(key=>pm.variables.set(key,pm.collectionVariables.get(key)));}",
+                  "})();"
+                ]
+              }
+            },
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const mailRecipient=pm.variables.get(\"athleteEmail\");",
+                  "const previousMailId=null;",
+                  "pm.collectionVariables.set(\"mailPreviousMessageId\",previousMailId || \"\");",
+                  "const mailPollLimit=Number(pm.variables.get(\"mailPollAttempts\") || 40);",
+                  "const mailPollDelay=Number(pm.variables.get(\"mailPollDelayMs\") || 500);",
+                  "function waitForInvitation(attempt){pm.sendRequest({url:pm.variables.replaceIn(pm.request.url.toString()),method:\"GET\"},(error,response)=>{",
+                  "let message;try{if(!error && response.code===200)message=(response.json().messages || []).find(m=>m.ID!==previousMailId && (m.To || []).some(to=>to.Address===mailRecipient));}catch(parseError){}",
+                  "if(message)return;",
+                  "if(attempt>=mailPollLimit){pm.test(\"Queued invitation reaches Mailpit before timeout\",()=>{throw new Error(\"Invitation email did not arrive. Check the Admin delivery-status endpoint, worker configuration and SMTP.\");});pm.execution.setNextRequest(null);pm.execution.skipRequest();return;}",
+                  "setTimeout(()=>waitForInvitation(attempt+1),mailPollDelay);});}",
+                  "waitForInvitation(1);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Read the captured activation link",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{mailpitUrl}}/api/v1/message/{{messageId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const message=pm.response.json(); const token=(message.Text||\"\").match(/#token=([A-Za-z0-9_-]{43})/); pm.test(\"Activation link present\",()=>pm.expect(token).not.to.eql(null)); if(token)pm.collectionVariables.set(\"invitationToken\",token[1]);",
+                  "pm.collectionVariables.set(\"oldInvitationToken\",pm.collectionVariables.get(\"invitationToken\"));",
+                  "(()=>{",
+                  "function fixtureValueIsValid(value, rule) {",
+                  "  const text=String(value ?? \"\");",
+                  "  if(rule===\"positiveId\") return /^[1-9][0-9]*$/.test(text) && Number.isSafeInteger(Number(value));",
+                  "  if(rule===\"nonNegativeInteger\") return /^[0-9]+$/.test(text) && Number.isSafeInteger(Number(value));",
+                  "  if(rule===\"uuid\") return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(text);",
+                  "  return typeof value===\"string\" && value.trim().length>0 && !value.includes(\"{{\");",
+                  "}",
+                  "const producedFixtureRules={\"invitationToken\":\"text\",\"oldInvitationToken\":\"text\"};",
+                  "const invalidProducedFixtures=Object.keys(producedFixtureRules).filter(key=>!fixtureValueIsValid(pm.collectionVariables.get(key),producedFixtureRules[key]));",
+                  "const fixtureResponseSucceeded=pm.response.code===200;",
+                  "pm.test(\"Setup returned usable fixture values\",()=>{pm.expect(fixtureResponseSucceeded,\"Unexpected setup response status\").to.eql(true);pm.expect(invalidProducedFixtures,\"Missing or invalid captured fixture values\").to.eql([]);});",
+                  "if(!fixtureResponseSucceeded || invalidProducedFixtures.length){Object.keys(producedFixtureRules).forEach(key=>{pm.collectionVariables.unset(key);pm.variables.unset(key);});console.error(\"Setup failed in \"+pm.info.requestName+\". Check this response before continuing.\");pm.execution.setNextRequest(null);}else{Object.keys(producedFixtureRules).forEach(key=>pm.variables.set(key,pm.collectionVariables.get(key)));}",
+                  "})();"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Validate the first invitation",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/auth/invitations/validate",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"token\":\"{{invitationToken}}\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Admin resends the invitation",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/users/{{userId}}/invitation/resend"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Earlier invitation is now invalid",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/auth/invitations/validate",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"token\":\"{{oldInvitationToken}}\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Find replacement invitation",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{mailpitUrl}}/api/v1/messages?limit=50"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const email=pm.collectionVariables.get(\"athleteEmail\"); const message=pm.response.json().messages.find(m=>m.ID!==pm.collectionVariables.get(\"mailPreviousMessageId\") && (m.To||[]).some(to=>to.Address===email)); pm.test(\"Invitation captured locally\",()=>pm.expect(message).to.exist); if(message) pm.collectionVariables.set(\"messageId\",message.ID);",
+                  "(()=>{",
+                  "function fixtureValueIsValid(value, rule) {",
+                  "  const text=String(value ?? \"\");",
+                  "  if(rule===\"positiveId\") return /^[1-9][0-9]*$/.test(text) && Number.isSafeInteger(Number(value));",
+                  "  if(rule===\"nonNegativeInteger\") return /^[0-9]+$/.test(text) && Number.isSafeInteger(Number(value));",
+                  "  if(rule===\"uuid\") return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(text);",
+                  "  return typeof value===\"string\" && value.trim().length>0 && !value.includes(\"{{\");",
+                  "}",
+                  "const producedFixtureRules={\"messageId\":\"text\"};",
+                  "const invalidProducedFixtures=Object.keys(producedFixtureRules).filter(key=>!fixtureValueIsValid(pm.collectionVariables.get(key),producedFixtureRules[key]));",
+                  "const fixtureResponseSucceeded=pm.response.code===200;",
+                  "pm.test(\"Setup returned usable fixture values\",()=>{pm.expect(fixtureResponseSucceeded,\"Unexpected setup response status\").to.eql(true);pm.expect(invalidProducedFixtures,\"Missing or invalid captured fixture values\").to.eql([]);});",
+                  "if(!fixtureResponseSucceeded || invalidProducedFixtures.length){Object.keys(producedFixtureRules).forEach(key=>{pm.collectionVariables.unset(key);pm.variables.unset(key);});console.error(\"Setup failed in \"+pm.info.requestName+\". Check this response before continuing.\");pm.execution.setNextRequest(null);}else{Object.keys(producedFixtureRules).forEach(key=>pm.variables.set(key,pm.collectionVariables.get(key)));}",
+                  "})();"
+                ]
+              }
+            },
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const mailRecipient=pm.variables.get(\"athleteEmail\");",
+                  "const previousMailId=pm.variables.get(\"messageId\");",
+                  "pm.collectionVariables.set(\"mailPreviousMessageId\",previousMailId || \"\");",
+                  "const mailPollLimit=Number(pm.variables.get(\"mailPollAttempts\") || 40);",
+                  "const mailPollDelay=Number(pm.variables.get(\"mailPollDelayMs\") || 500);",
+                  "function waitForInvitation(attempt){pm.sendRequest({url:pm.variables.replaceIn(pm.request.url.toString()),method:\"GET\"},(error,response)=>{",
+                  "let message;try{if(!error && response.code===200)message=(response.json().messages || []).find(m=>m.ID!==previousMailId && (m.To || []).some(to=>to.Address===mailRecipient));}catch(parseError){}",
+                  "if(message)return;",
+                  "if(attempt>=mailPollLimit){pm.test(\"Queued invitation reaches Mailpit before timeout\",()=>{throw new Error(\"Invitation email did not arrive. Check the Admin delivery-status endpoint, worker configuration and SMTP.\");});pm.execution.setNextRequest(null);pm.execution.skipRequest();return;}",
+                  "setTimeout(()=>waitForInvitation(attempt+1),mailPollDelay);});}",
+                  "waitForInvitation(1);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Capture the replacement activation link",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{mailpitUrl}}/api/v1/message/{{messageId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const message=pm.response.json(); const token=(message.Text||\"\").match(/#token=([A-Za-z0-9_-]{43})/); pm.test(\"Activation link present\",()=>pm.expect(token).not.to.eql(null)); if(token)pm.collectionVariables.set(\"invitationToken\",token[1]);",
+                  "pm.test(\"Resend replaced the secret\",()=>pm.expect(pm.collectionVariables.get(\"invitationToken\")).not.to.eql(pm.collectionVariables.get(\"oldInvitationToken\")));",
+                  "(()=>{",
+                  "function fixtureValueIsValid(value, rule) {",
+                  "  const text=String(value ?? \"\");",
+                  "  if(rule===\"positiveId\") return /^[1-9][0-9]*$/.test(text) && Number.isSafeInteger(Number(value));",
+                  "  if(rule===\"nonNegativeInteger\") return /^[0-9]+$/.test(text) && Number.isSafeInteger(Number(value));",
+                  "  if(rule===\"uuid\") return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(text);",
+                  "  return typeof value===\"string\" && value.trim().length>0 && !value.includes(\"{{\");",
+                  "}",
+                  "const producedFixtureRules={\"invitationToken\":\"text\"};",
+                  "const invalidProducedFixtures=Object.keys(producedFixtureRules).filter(key=>!fixtureValueIsValid(pm.collectionVariables.get(key),producedFixtureRules[key]));",
+                  "const fixtureResponseSucceeded=pm.response.code===200;",
+                  "pm.test(\"Setup returned usable fixture values\",()=>{pm.expect(fixtureResponseSucceeded,\"Unexpected setup response status\").to.eql(true);pm.expect(invalidProducedFixtures,\"Missing or invalid captured fixture values\").to.eql([]);});",
+                  "if(!fixtureResponseSucceeded || invalidProducedFixtures.length){Object.keys(producedFixtureRules).forEach(key=>{pm.collectionVariables.unset(key);pm.variables.unset(key);});console.error(\"Setup failed in \"+pm.info.requestName+\". Check this response before continuing.\");pm.execution.setNextRequest(null);}else{Object.keys(producedFixtureRules).forEach(key=>pm.variables.set(key,pm.collectionVariables.get(key)));}",
+                  "})();"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Athlete sets their own password and activates",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/auth/invitations/accept",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"token\":\"{{invitationToken}}\",\"password\":\"{{athletePassword}}\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Activated\",()=>pm.expect(pm.response.json().accountStatus).to.eql(\"ACTIVE\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Activation cannot be reused",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/auth/invitations/accept",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"token\":\"{{invitationToken}}\",\"password\":\"{{athletePassword}}\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "02 - Meet and ranking fixtures",
+      "item": [
+        {
+          "name": "Admin creates future nominated meet",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/meets",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"name\":\"Invitation meet {{runId}}\",\"startDate\":\"2050-05-10\",\"endDate\":\"2050-05-11\",\"startTime\":\"10:00:00\",\"location\":\"Synthetic track\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set(\"meetId\",pm.response.json().id);",
+                  "(()=>{",
+                  "function fixtureValueIsValid(value, rule) {",
+                  "  const text=String(value ?? \"\");",
+                  "  if(rule===\"positiveId\") return /^[1-9][0-9]*$/.test(text) && Number.isSafeInteger(Number(value));",
+                  "  if(rule===\"nonNegativeInteger\") return /^[0-9]+$/.test(text) && Number.isSafeInteger(Number(value));",
+                  "  if(rule===\"uuid\") return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(text);",
+                  "  return typeof value===\"string\" && value.trim().length>0 && !value.includes(\"{{\");",
+                  "}",
+                  "const producedFixtureRules={\"meetId\":\"positiveId\"};",
+                  "const invalidProducedFixtures=Object.keys(producedFixtureRules).filter(key=>!fixtureValueIsValid(pm.collectionVariables.get(key),producedFixtureRules[key]));",
+                  "const fixtureResponseSucceeded=pm.response.code===201;",
+                  "pm.test(\"Setup returned usable fixture values\",()=>{pm.expect(fixtureResponseSucceeded,\"Unexpected setup response status\").to.eql(true);pm.expect(invalidProducedFixtures,\"Missing or invalid captured fixture values\").to.eql([]);});",
+                  "if(!fixtureResponseSucceeded || invalidProducedFixtures.length){Object.keys(producedFixtureRules).forEach(key=>{pm.collectionVariables.unset(key);pm.variables.unset(key);});console.error(\"Setup failed in \"+pm.info.requestName+\". Check this response before continuing.\");pm.execution.setNextRequest(null);}else{Object.keys(producedFixtureRules).forEach(key=>pm.variables.set(key,pm.collectionVariables.get(key)));}",
+                  "})();"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create synthetic event",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/events",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"name\":\"Invitation race {{runId}}\",\"categoryName\":\"Invitation race {{runId}}\",\"meetId\":{{meetId}},\"eventDate\":\"2050-05-10\",\"rankingOrder\":\"ASC\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", () => pm.response.to.have.status(201));",
+                  "const event=pm.response.json();pm.collectionVariables.set(\"eventId\",event.id);pm.collectionVariables.set(\"categoryId\",event.category.id);",
+                  "(()=>{",
+                  "function fixtureValueIsValid(value, rule) {",
+                  "  const text=String(value ?? \"\");",
+                  "  if(rule===\"positiveId\") return /^[1-9][0-9]*$/.test(text) && Number.isSafeInteger(Number(value));",
+                  "  if(rule===\"nonNegativeInteger\") return /^[0-9]+$/.test(text) && Number.isSafeInteger(Number(value));",
+                  "  if(rule===\"uuid\") return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(text);",
+                  "  return typeof value===\"string\" && value.trim().length>0 && !value.includes(\"{{\");",
+                  "}",
+                  "const producedFixtureRules={\"categoryId\":\"positiveId\",\"eventId\":\"positiveId\"};",
+                  "const invalidProducedFixtures=Object.keys(producedFixtureRules).filter(key=>!fixtureValueIsValid(pm.collectionVariables.get(key),producedFixtureRules[key]));",
+                  "const fixtureResponseSucceeded=pm.response.code===201;",
+                  "pm.test(\"Setup returned usable fixture values\",()=>{pm.expect(fixtureResponseSucceeded,\"Unexpected setup response status\").to.eql(true);pm.expect(invalidProducedFixtures,\"Missing or invalid captured fixture values\").to.eql([]);});",
+                  "if(!fixtureResponseSucceeded || invalidProducedFixtures.length){Object.keys(producedFixtureRules).forEach(key=>{pm.collectionVariables.unset(key);pm.variables.unset(key);});console.error(\"Setup failed in \"+pm.info.requestName+\". Check this response before continuing.\");pm.execution.setNextRequest(null);}else{Object.keys(producedFixtureRules).forEach(key=>pm.variables.set(key,pm.collectionVariables.get(key)));}",
+                  "})();"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Nominate the athlete",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/events/{{eventId}}/participants",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"athleteId\":{{athleteId}}}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Record a labeled synthetic result",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/events/{{eventId}}/results",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"athleteId\":{{athleteId}},\"result\":\"12.4\",\"resultLabel\":\"Final\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create another athlete for public competition rankings",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/athletes",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"firstName\":\"Competitor\",\"lastName\":\"Rankings{{runId}}\",\"dateOfBirth\":\"2010-01-01\",\"gender\":\"Female\",\"events\":[]}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\",()=>pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set(\"competitorId\",pm.response.json().id);",
+                  "(()=>{",
+                  "function fixtureValueIsValid(value, rule) {",
+                  "  const text=String(value ?? \"\");",
+                  "  if(rule===\"positiveId\") return /^[1-9][0-9]*$/.test(text) && Number.isSafeInteger(Number(value));",
+                  "  if(rule===\"nonNegativeInteger\") return /^[0-9]+$/.test(text) && Number.isSafeInteger(Number(value));",
+                  "  if(rule===\"uuid\") return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(text);",
+                  "  return typeof value===\"string\" && value.trim().length>0 && !value.includes(\"{{\");",
+                  "}",
+                  "const producedFixtureRules={\"competitorId\":\"positiveId\"};",
+                  "const invalidProducedFixtures=Object.keys(producedFixtureRules).filter(key=>!fixtureValueIsValid(pm.collectionVariables.get(key),producedFixtureRules[key]));",
+                  "const fixtureResponseSucceeded=pm.response.code===201;",
+                  "pm.test(\"Setup returned usable fixture values\",()=>{pm.expect(fixtureResponseSucceeded,\"Unexpected setup response status\").to.eql(true);pm.expect(invalidProducedFixtures,\"Missing or invalid captured fixture values\").to.eql([]);});",
+                  "if(!fixtureResponseSucceeded || invalidProducedFixtures.length){Object.keys(producedFixtureRules).forEach(key=>{pm.collectionVariables.unset(key);pm.variables.unset(key);});console.error(\"Setup failed in \"+pm.info.requestName+\". Check this response before continuing.\");pm.execution.setNextRequest(null);}else{Object.keys(producedFixtureRules).forEach(key=>pm.variables.set(key,pm.collectionVariables.get(key)));}",
+                  "})();"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create a meet without a nomination for the logged-in athlete",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/meets",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"name\":\"Other rankings meet {{runId}}\",\"startDate\":\"2050-06-10\",\"endDate\":\"2050-06-10\",\"location\":\"Other track\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\",()=>pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set(\"otherMeetId\",pm.response.json().id);",
+                  "(()=>{",
+                  "function fixtureValueIsValid(value, rule) {",
+                  "  const text=String(value ?? \"\");",
+                  "  if(rule===\"positiveId\") return /^[1-9][0-9]*$/.test(text) && Number.isSafeInteger(Number(value));",
+                  "  if(rule===\"nonNegativeInteger\") return /^[0-9]+$/.test(text) && Number.isSafeInteger(Number(value));",
+                  "  if(rule===\"uuid\") return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(text);",
+                  "  return typeof value===\"string\" && value.trim().length>0 && !value.includes(\"{{\");",
+                  "}",
+                  "const producedFixtureRules={\"otherMeetId\":\"positiveId\"};",
+                  "const invalidProducedFixtures=Object.keys(producedFixtureRules).filter(key=>!fixtureValueIsValid(pm.collectionVariables.get(key),producedFixtureRules[key]));",
+                  "const fixtureResponseSucceeded=pm.response.code===201;",
+                  "pm.test(\"Setup returned usable fixture values\",()=>{pm.expect(fixtureResponseSucceeded,\"Unexpected setup response status\").to.eql(true);pm.expect(invalidProducedFixtures,\"Missing or invalid captured fixture values\").to.eql([]);});",
+                  "if(!fixtureResponseSucceeded || invalidProducedFixtures.length){Object.keys(producedFixtureRules).forEach(key=>{pm.collectionVariables.unset(key);pm.variables.unset(key);});console.error(\"Setup failed in \"+pm.info.requestName+\". Check this response before continuing.\");pm.execution.setNextRequest(null);}else{Object.keys(producedFixtureRules).forEach(key=>pm.variables.set(key,pm.collectionVariables.get(key)));}",
+                  "})();"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create an event in the other meet",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/events",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"name\":\"Other race {{runId}}\",\"categoryName\":\"Other race {{runId}}\",\"eventDate\":\"2050-06-10\",\"meetId\":{{otherMeetId}},\"rankingOrder\":\"ASC\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\",()=>pm.response.to.have.status(201));",
+                  "const event=pm.response.json();pm.collectionVariables.set(\"otherEventId\",event.id);pm.collectionVariables.set(\"otherCategoryId\",event.category.id);",
+                  "(()=>{",
+                  "function fixtureValueIsValid(value, rule) {",
+                  "  const text=String(value ?? \"\");",
+                  "  if(rule===\"positiveId\") return /^[1-9][0-9]*$/.test(text) && Number.isSafeInteger(Number(value));",
+                  "  if(rule===\"nonNegativeInteger\") return /^[0-9]+$/.test(text) && Number.isSafeInteger(Number(value));",
+                  "  if(rule===\"uuid\") return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(text);",
+                  "  return typeof value===\"string\" && value.trim().length>0 && !value.includes(\"{{\");",
+                  "}",
+                  "const producedFixtureRules={\"otherCategoryId\":\"positiveId\",\"otherEventId\":\"positiveId\"};",
+                  "const invalidProducedFixtures=Object.keys(producedFixtureRules).filter(key=>!fixtureValueIsValid(pm.collectionVariables.get(key),producedFixtureRules[key]));",
+                  "const fixtureResponseSucceeded=pm.response.code===201;",
+                  "pm.test(\"Setup returned usable fixture values\",()=>{pm.expect(fixtureResponseSucceeded,\"Unexpected setup response status\").to.eql(true);pm.expect(invalidProducedFixtures,\"Missing or invalid captured fixture values\").to.eql([]);});",
+                  "if(!fixtureResponseSucceeded || invalidProducedFixtures.length){Object.keys(producedFixtureRules).forEach(key=>{pm.collectionVariables.unset(key);pm.variables.unset(key);});console.error(\"Setup failed in \"+pm.info.requestName+\". Check this response before continuing.\");pm.execution.setNextRequest(null);}else{Object.keys(producedFixtureRules).forEach(key=>pm.variables.set(key,pm.collectionVariables.get(key)));}",
+                  "})();"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Record another athlete performance in the other meet",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/events/{{otherEventId}}/results",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"athleteId\":{{competitorId}},\"result\":\"13.0\",\"resultLabel\":\"Final\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\",()=>pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "03 - Athlete sign-in, privacy and availability",
+      "item": [
+        {
+          "name": "Athlete signs in with email and chosen password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"email\":\"{{athleteEmail}}\",\"password\":\"{{athletePassword}}\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Athlete role\",()=>pm.expect(pm.response.json().user.role).to.eql(\"ATHLETE\"));",
+                  "let verifiedLogin;try{verifiedLogin=pm.response.json();}catch(error){verifiedLogin=null;}",
+                  "const verifiedRole=pm.response.code===200 && verifiedLogin && verifiedLogin.user && verifiedLogin.user.role===\"ATHLETE\";",
+                  "pm.test(\"Active ATHLETE session established\",()=>pm.expect(Boolean(verifiedRole)).to.eql(true));",
+                  "if(!verifiedRole){console.error(\"Sign-in failed. Check the selected environment credentials and cookie handling.\");pm.execution.setNextRequest(null);}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Refresh Athlete CSRF",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/csrf"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const responsePayload=pm.response.json(); pm.collectionVariables.set(\"csrfToken\",responsePayload.token); pm.collectionVariables.set(\"csrfHeader\",responsePayload.headerName);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "My Profile is restricted to the linked athlete",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/portal/profile"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Own athlete\",()=>pm.expect(pm.response.json().id).to.eql(Number(pm.collectionVariables.get(\"athleteId\"))));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "My performance history contains personal bests",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/portal/history"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Personal best available\",()=>pm.expect(pm.response.json().performances[0].personalBest.score).to.eql(12.4));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "My Meets contains only nominations and starts Pending",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/portal/meets"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const requests=pm.response.json();pm.test(\"One pending nomination\",()=>{pm.expect(requests).to.have.lengthOf(1);pm.expect(requests[0].status).to.eql(\"PENDING\");pm.expect(requests[0].canRespond).to.eql(true);});pm.collectionVariables.set(\"requestId\",requests[0].id);pm.collectionVariables.set(\"version\",requests[0].version);pm.collectionVariables.set(\"revision\",requests[0].assignmentRevision);",
+                  "(()=>{",
+                  "function fixtureValueIsValid(value, rule) {",
+                  "  const text=String(value ?? \"\");",
+                  "  if(rule===\"positiveId\") return /^[1-9][0-9]*$/.test(text) && Number.isSafeInteger(Number(value));",
+                  "  if(rule===\"nonNegativeInteger\") return /^[0-9]+$/.test(text) && Number.isSafeInteger(Number(value));",
+                  "  if(rule===\"uuid\") return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(text);",
+                  "  return typeof value===\"string\" && value.trim().length>0 && !value.includes(\"{{\");",
+                  "}",
+                  "const producedFixtureRules={\"requestId\":\"positiveId\",\"revision\":\"nonNegativeInteger\",\"version\":\"nonNegativeInteger\"};",
+                  "const invalidProducedFixtures=Object.keys(producedFixtureRules).filter(key=>!fixtureValueIsValid(pm.collectionVariables.get(key),producedFixtureRules[key]));",
+                  "const fixtureResponseSucceeded=pm.response.code===200;",
+                  "pm.test(\"Setup returned usable fixture values\",()=>{pm.expect(fixtureResponseSucceeded,\"Unexpected setup response status\").to.eql(true);pm.expect(invalidProducedFixtures,\"Missing or invalid captured fixture values\").to.eql([]);});",
+                  "if(!fixtureResponseSucceeded || invalidProducedFixtures.length){Object.keys(producedFixtureRules).forEach(key=>{pm.collectionVariables.unset(key);pm.variables.unset(key);});console.error(\"Setup failed in \"+pm.info.requestName+\". Check this response before continuing.\");pm.execution.setNextRequest(null);}else{Object.keys(producedFixtureRules).forEach(key=>pm.variables.set(key,pm.collectionVariables.get(key)));}",
+                  "})();"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Athlete confirms availability",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/portal/availability/{{requestId}}/response",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"status\":\"AVAILABLE\",\"version\":{{version}},\"assignmentRevision\":{{revision}}}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set(\"savedVersion\",pm.response.json().version);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Identical retry succeeds without creating another response",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/portal/availability/{{requestId}}/response",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"status\":\"AVAILABLE\",\"version\":{{version}},\"assignmentRevision\":{{revision}}}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Same saved version\",()=>pm.expect(pm.response.json().version).to.eql(Number(pm.collectionVariables.get(\"savedVersion\"))));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Conflicting stale response is rejected",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/portal/availability/{{requestId}}/response",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"status\":\"UNAVAILABLE\",\"version\":{{version}},\"assignmentRevision\":{{revision}}}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 409\", () => pm.response.to.have.status(409));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Athlete cannot read staff notes",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/athletes/{{athleteId}}/notes"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 403\", () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Athlete cannot read staff availability",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/availability"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 403\", () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Athlete cannot download staff exports",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/meets/{{meetId}}/export?type=RESULTS&ageAsOf={{ageAsOf}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 403\", () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Athlete rankings retain scoped access",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/portal/rankings?categoryId={{categoryId}}&ageAsOf={{ageAsOf}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Own profile access\",()=>pm.expect(pm.response.json().content[0].profileAccessible).to.eql(true));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Athlete can see all ranking meets including an unassigned meet",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/portal/rankings/meets"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\",()=>pm.response.to.have.status(200));",
+                  "pm.test(\"Unassigned competition visible\",()=>pm.expect(pm.response.json().map(m=>m.id)).to.include(Number(pm.collectionVariables.get(\"otherMeetId\"))));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Athlete can browse events in a meet they were not nominated for",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/portal/rankings/events?meetId={{otherMeetId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\",()=>pm.response.to.have.status(200));",
+                  "pm.test(\"Other meet event visible\",()=>pm.expect(pm.response.json().map(e=>e.id)).to.include(Number(pm.collectionVariables.get(\"otherEventId\"))));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Athlete can rank another event and meet without private profile access",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/portal/rankings?categoryId={{otherCategoryId}}&meetId={{otherMeetId}}&eventId={{otherEventId}}&ageAsOf={{ageAsOf}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\",()=>pm.response.to.have.status(200));",
+                  "pm.test(\"Public performance context, protected private profile\",()=>{const rows=pm.response.json().content;pm.expect(rows).to.have.lengthOf(1);pm.expect(rows[0].firstName).to.eql(\"Competitor\");pm.expect(rows[0].meetId).to.eql(Number(pm.collectionVariables.get(\"otherMeetId\")));pm.expect(rows[0].athleteId).to.eql(null);pm.expect(rows[0].profileAccessible).to.eql(false);});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "04 - Staff audit, cleanup and sign out",
+      "item": [
+        {
+          "name": "Admin signs back in",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"email\":\"{{email}}\",\"password\":\"{{password}}\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "let verifiedLogin;try{verifiedLogin=pm.response.json();}catch(error){verifiedLogin=null;}",
+                  "const verifiedRole=pm.response.code===200 && verifiedLogin && verifiedLogin.user && verifiedLogin.user.role===\"ADMIN\";",
+                  "pm.test(\"Active ADMIN session established\",()=>pm.expect(Boolean(verifiedRole)).to.eql(true));",
+                  "if(!verifiedRole){console.error(\"Sign-in failed. Check the selected environment credentials and cookie handling.\");pm.execution.setNextRequest(null);}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Refresh staff CSRF",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/csrf"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const responsePayload=pm.response.json(); pm.collectionVariables.set(\"csrfToken\",responsePayload.token); pm.collectionVariables.set(\"csrfHeader\",responsePayload.headerName);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Staff overview includes assignments and reconciled counts",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/availability?meetId={{meetId}}&status=AVAILABLE"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const responsePayload=pm.response.json();pm.test(\"Shared record and audit identity\",()=>{pm.expect(responsePayload.summary.total).to.eql(1);pm.expect(responsePayload.summary.pending).to.eql(0);pm.expect(responsePayload.content[0].events).to.have.lengthOf(1);pm.expect(responsePayload.content[0].latestResponse.athleteUserId).to.eql(Number(pm.collectionVariables.get(\"userId\")));});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Retry created exactly one audit entry",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/availability/{{requestId}}/responses"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"One confirmation\",()=>pm.expect(pm.response.json()).to.have.lengthOf(1));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Admin deactivates synthetic Athlete account",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/users/{{userId}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"email\":\"{{athleteEmail}}\",\"name\":\"Invited Athlete\",\"role\":\"ATHLETE\",\"active\":false,\"athleteId\":{{athleteId}}}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Deactivated Athlete cannot sign in",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"email\":\"{{athleteEmail}}\",\"password\":\"{{athletePassword}}\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 401\", () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Delete only the other synthetic ranking meet",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/api/meets/{{otherMeetId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 204\",()=>pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Delete only the other synthetic competitor",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/api/athletes/{{competitorId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 204\",()=>pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Delete only synthetic meet",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/api/meets/{{meetId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 204\", () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Delete only synthetic athlete",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/api/athletes/{{athleteId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 204\", () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Admin signs out and clears captured tokens",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/auth/logout"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 204\", () => pm.response.to.have.status(204));",
+                  "[\"invitationToken\",\"oldInvitationToken\",\"csrfToken\",\"csrfHeader\"].forEach(key=>pm.collectionVariables.unset(key));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

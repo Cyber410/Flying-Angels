@@ -24,7 +24,7 @@ services:
       SPRING_DATASOURCE_USERNAME: ci_user
       SPRING_DATASOURCE_PASSWORD: ci-app-password
       SPRING_JPA_SHOW_SQL: "false"
-      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      APP_REQUIRE_AUTHENTICATION: "false"
 
   frontend:
     image: ${FRONTEND_IMAGE:?Set FRONTEND_IMAGE to the built frontend image}

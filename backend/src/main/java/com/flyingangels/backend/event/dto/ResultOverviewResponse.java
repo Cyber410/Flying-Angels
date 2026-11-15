@@ -16,7 +16,7 @@ public record ResultOverviewResponse(List<Row> content, int page, int size, long
     public record Row(Long resultId,Long athleteId,String firstName,String lastName,String gender,LocalDate dateOfBirth,
                       Integer ageAtMeet,Long meetId,String meetName,LocalDate meetStartDate,Long eventId,String eventName,
                       LocalDate eventDate,Long categoryId,String categoryName,RankingOrder rankingOrder,
-                      String result,BigDecimal score,ResultUnit unit,ResultStatus status,Instant recordedAt) {
+                      String result,BigDecimal score,ResultUnit unit,ResultStatus status,Instant recordedAt,String resultLabel) {
         static Row from(EventResult result) {
             var athlete = result.getAthlete();
             var event = result.getEvent();
@@ -25,7 +25,7 @@ public record ResultOverviewResponse(List<Row> content, int page, int size, long
             return new Row(result.getId(),athlete.getId(),athlete.getFirstName(),athlete.getLastName(),athlete.getGender(),
                     athlete.getDateOfBirth(),AgeRange.ageOn(athlete.getDateOfBirth(),start),meet.getId(),meet.getName(),start,
                     event.getId(),event.getName(),event.getEventDate(),result.getCategory().getId(),result.getCategory().getName(),
-                    event.getRankingOrder(),result.getResult(),result.getScore(),result.getUnit(),result.getStatus(),result.getRecordedAt());
+                    event.getRankingOrder(),result.getResult(),result.getScore(),result.getUnit(),result.getStatus(),result.getRecordedAt(),result.getResultLabel());
         }
     }
 }

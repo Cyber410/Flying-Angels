@@ -27,7 +27,7 @@ import com.flyingangels.backend.meet.MeetRepository;
  * Every table the athlete endpoints read is emptied before each test, so each test sees only the data it
  * inserted itself.
  */
-@SpringBootTest
+@SpringBootTest(properties = "app.security.require-authentication=false")
 @AutoConfigureMockMvc
 public abstract class DatabaseIntegrationTest {
 
@@ -43,6 +43,9 @@ public abstract class DatabaseIntegrationTest {
 	@DynamicPropertySource
 	static void configureDatabase(DynamicPropertyRegistry registry) {
 		registry.add("spring.datasource.url", mysql::getJdbcUrl);
+        registry.add("app.auth.mail-outbox.enabled", () -> "false");
+        registry.add("app.security.login-throttle.cleanup-enabled", () -> "false");
+        registry.add("app.auth.mail-outbox.encryption-key", () -> "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=");
 		registry.add("spring.datasource.username", mysql::getUsername);
 		registry.add("spring.datasource.password", mysql::getPassword);
 	}
@@ -69,10 +72,17 @@ public abstract class DatabaseIntegrationTest {
     @Autowired protected com.flyingangels.backend.note.AthleteNoteRepository noteRepository;
     @Autowired protected com.flyingangels.backend.importing.ImportRowRepository importRowRepository;
     @Autowired protected com.flyingangels.backend.importing.ImportJobRepository importJobRepository;
-	@BeforeEach
+    @Autowired protected com.flyingangels.backend.availability.AvailabilityRequestRepository availabilityRequestRepository;
+    @Autowired protected com.flyingangels.backend.availability.AvailabilityResponseRepository availabilityResponseRepository;
+	@Autowired protected com.flyingangels.backend.auth.mail.InvitationMailRepository invitationMailRepository;
+    @Autowired protected com.flyingangels.backend.auth.throttle.LoginThrottleRepository loginThrottleRepository;
+    @BeforeEach
 	void clearAthleteAndEventData() {
 		// Children before parents, so no foreign key blocks a delete.
+        invitationMailRepository.deleteAllInBatch();
+        loginThrottleRepository.deleteAllInBatch();
         importRowRepository.deleteAllInBatch(); importJobRepository.deleteAllInBatch();
+        availabilityResponseRepository.deleteAllInBatch(); availabilityRequestRepository.deleteAllInBatch();
         noteRepository.deleteAllInBatch(); participationRepository.deleteAllInBatch();
 		eventResultRepository.deleteAllInBatch();
 		eventRepository.deleteAllInBatch();

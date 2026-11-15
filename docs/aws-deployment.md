@@ -37,7 +37,16 @@ Backend container:
 | `SPRING_PROFILES_ACTIVE` | `prod` |
 | `DATABASE_URL` | `jdbc:mysql://YOUR_RDS_ENDPOINT:3306/flying_angels?sslMode=REQUIRED&serverTimezone=UTC` |
 | `DATABASE_USERNAME` | Your configured database user |
-| `APP_ADMIN_USERNAME` | `admin` or your chosen username |
+| `APP_ADMIN_EMAIL` | Staff email used to initialize the first Admin account |
+| `APP_LOGIN_TRUSTED_PROXIES` | `127.0.0.1/32,::1/128` for this same-task Nginx-to-backend topology only; backend port 8080 must remain private |
+| `APP_LOGIN_THROTTLE_ACCOUNT_LIMIT`, `APP_LOGIN_THROTTLE_IP_LIMIT` | Failed-login limits (defaults 5 per account / 100 per source IP) |
+| `APP_LOGIN_THROTTLE_WINDOW_SECONDS`, `APP_LOGIN_THROTTLE_BLOCK_SECONDS` | Observation window and block length (defaults 900 / 900 seconds) |
+| `APP_CORS_ALLOWED_ORIGINS` | Empty for same-origin `/api/` proxy access; otherwise comma-separated exact trusted browser origins |
+| `APP_ACTIVATION_URL` | Externally reachable activation page URL, using HTTPS for real users; required before sending invitations |
+| `APP_MAIL_OUTBOX_KEY` | Secret reference / ValueFrom: a persistent Base64-encoded 32-byte encryption key; required by the prod profile |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_FROM` | Production SMTP provider endpoint, port and verified sender |
+| `SMTP_USERNAME`, `SMTP_PASSWORD` | Secret references for provider SMTP credentials where required |
+| `SMTP_AUTH`, `SMTP_STARTTLS` | Provider-required authentication/TLS settings |
 | `DATABASE_PASSWORD` | Secret reference / ValueFrom: database password secret ARN |
 | `APP_ADMIN_PASSWORD` | Secret reference / ValueFrom: administrator password secret ARN |
 | Logging | `awslogs`, existing group `/ecs/flying-angels`, correct region, stream prefix `backend` |
@@ -70,7 +79,23 @@ Frontend ECS health-check command:
 
 Use interval 10 seconds, timeout 5 seconds, retries 5, start period 30 seconds. Make both containers essential. Check ECS Events and CloudWatch Logs to verify initial startup.
 
-The existing `prod` profile enforces authentication and CSRF protection. The frontend login/CSRF flow and HTTPS still need integration; the deployment pipeline does not implement those features. Do not send Basic credentials over plain HTTP or assume a successful infrastructure/startup check means all authenticated UI flows work. Keep initial access restricted to your IP and use synthetic demonstration data during setup.
+The `prod` profile enforces staff-session authentication and CSRF protection. Authenticate through POST `/api/auth/login` using the initial Admin email/password after retrieving `/api/csrf`; staff accounts and password hashes persist in MySQL. The bootstrap password must have at least 12 characters (at most 72 UTF-8 bytes), and is used only when no staff accounts exist. Change passwords through the Admin-only staff APIs afterward; changing an environment variable does not reset an existing account. This delivery is backend-only: the existing frontend still needs session/CSRF integration before it can use secured endpoints.
+
+Production cookies are Secure by default, so the browser must reach the application over HTTPS. For an IP-restricted, plain-HTTP lab demonstration with synthetic data only, explicitly set `SESSION_COOKIE_SECURE=false`; use HTTPS and leave it true for real athlete data. This code does not create a TLS endpoint, start the database, or scale ECS up. Existing deployments using an `admin` username need `APP_ADMIN_EMAIL` configured before their first release of this version.
+
+Login throttling is enabled by default and persists counters in MySQL across task replacements and instances. Excessive failures return 429 with Retry-After; successful login clears only the account failure count. Explicitly configure the trusted immediate Nginx address as above so source-IP limits use Nginx's overwritten X-Real-IP. An empty allowlist is safe but aggregates all Nginx traffic under the proxy IP. No frontend code or Nginx template changes are needed for this release. See [backend throttling policy and tradeoffs](../backend/README.md#login-throttling).
+
+Invitation email is queued in the same database transaction as account creation and sent by a background worker. Configure and retain `APP_MAIL_OUTBOX_KEY` before deploying this version; missing/invalid keys prevent production startup. Keep the key in Secrets Manager and preserve it across ECS task replacements. SMTP failures are retried; check Admin-only GET `/api/users/{id}/invitation/delivery` and use the existing resend endpoint after resolving terminal failures. SENT means SMTP acceptance, not confirmed inbox delivery. Retain single-use-token handling and account status checks. Neither SES nor any other email provider is provisioned automatically. See [backend delivery settings and limits](../backend/README.md#account-invitations-and-password-setup).
+
+## Container builds and API reverse proxy
+
+The deployment Dockerfiles build from source in separate builder stages. Only the compiled JAR enters the non-root Java 17 JRE backend runtime; only built static assets enter the Nginx runtime. Maven/JDK tooling and Node/npm dependencies stay in the builder stages. `.dockerignore` excludes local artifacts and private environment files. CI tests and publishes the same resulting images.
+
+Nginx already provides the public reverse-proxy layer. `/api/` requests retain their paths and are forwarded to the backend configured by `BACKEND_HOST` and `BACKEND_PORT`; other paths serve the existing frontend. The CI stack exposes only Nginx, and the AWS application security group should expose port 80 (or the configured TLS entry point), not backend port 8080 or MySQL. API routing, deployment destinations, CORS policy and invitation URLs are configuration concerns, with no controller-specific CORS overrides.
+
+The current template assumes Nginx is the public edge: it replaces incoming client-supplied forwarding metadata with its observed client address, host and protocol, clears the standardized `Forwarded` header, hides the Nginx version and applies connection/read/write timeouts. Cookies, CSRF headers, request bodies and backend response headers pass through normally. These forwarding headers are not authentication credentials. Backend CORS and session-bound CSRF checks remain enabled in authenticated mode.
+
+This configuration does not enable Spring to trust arbitrary forwarded headers. If a trusted load balancer or another proxy is added in front of Nginx, configure that explicit trust boundary and original HTTPS/client-address handling before relying on forwarded metadata. The current lab topology has no load balancer; this change does not provision one or enable automatic scaling. An eventual production setup still needs HTTPS and the activation/login frontend integration.
 
 ## One-time GitHub configuration
 
@@ -135,7 +160,7 @@ A new main release does not override a deliberately stopped service or start the
 | Startup/health failure | Inspect ECS Events and CloudWatch Logs; verify database availability, secret values, LabRole permissions and networking. |
 | Rollback detected | Fix the failing release and merge a correction, or explicitly restore a known-good task revision in ECS. |
 
-Enable the ECS circuit breaker with rollback during setup. Rolling deployments can briefly run two tasks. CD does not reset the database or change the existing Hibernate schema strategy; review database-affecting code changes as part of the release.
+Enable the ECS circuit breaker with rollback during setup. Rolling deployments can briefly run two tasks. The backend now runs Flyway migrations and Hibernate validation. Before the first release of this change, snapshot RDS, verify a restored copy, inspect its schema and arrange a reviewed one-time V1 baseline; a populated unversioned database blocks startup by default. Do not release automatically to a populated RDS database before this plan is complete. See [Database migrations](database-migrations.md). Later SQL changes must remain compatible with older tasks during rolling deployment.
 
 ## References
 

@@ -2,11 +2,20 @@
 !deploy/
 !deploy/**
 !backend/
-!backend/target/
-!backend/target/*.jar
+!backend/pom.xml
+!backend/mvnw
+!backend/.mvn/
+!backend/.mvn/**
+!backend/src/
+!backend/src/main/
+!backend/src/main/**
 !frontend/
-!frontend/dist/
-!frontend/dist/**
+!frontend/**
+frontend/node_modules/
+frontend/dist/
+frontend/coverage/
+frontend/.git/
+frontend/*.tsbuildinfo
 
 # Local environment files must not enter repository-root image builds.
 **/.env

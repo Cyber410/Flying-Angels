@@ -1,0 +1,913 @@
+[
+  {
+    "method": "GET",
+    "path": "/api/age-groups",
+    "allowedRoles": [
+      "ADMIN",
+      "COACH"
+    ],
+    "probeUrl": "/api/age-groups",
+    "allowedStatus": 200,
+    "multipart": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/athletes",
+    "allowedRoles": [
+      "ADMIN",
+      "COACH"
+    ],
+    "probeUrl": "/api/athletes",
+    "allowedStatus": 200,
+    "multipart": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/athletes",
+    "allowedRoles": [
+      "ADMIN"
+    ],
+    "probeUrl": "/api/athletes",
+    "allowedStatus": 400,
+    "multipart": false
+  },
+  {
+    "method": "PUT",
+    "path": "/api/athletes/archive",
+    "allowedRoles": [
+      "ADMIN"
+    ],
+    "probeUrl": "/api/athletes/archive",
+    "allowedStatus": 400,
+    "multipart": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/athletes/import",
+    "allowedRoles": [
+      "ADMIN",
+      "COACH"
+    ],
+    "probeUrl": "/api/athletes/import",
+    "allowedStatus": 400,
+    "multipart": true
+  },
+  {
+    "method": "POST",
+    "path": "/api/athletes/import/preview",
+    "allowedRoles": [
+      "ADMIN",
+      "COACH"
+    ],
+    "probeUrl": "/api/athletes/import/preview",
+    "allowedStatus": 400,
+    "multipart": true
+  },
+  {
+    "method": "GET",
+    "path": "/api/athletes/import/{id}",
+    "allowedRoles": [
+      "ADMIN",
+      "COACH"
+    ],
+    "probeUrl": "/api/athletes/import/00000000-0000-0000-0000-000000000000",
+    "allowedStatus": 404,
+    "multipart": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/athletes/import/{id}/commit",
+    "allowedRoles": [
+      "ADMIN",
+      "COACH"
+    ],
+    "probeUrl": "/api/athletes/import/00000000-0000-0000-0000-000000000000/commit",
+    "allowedStatus": 400,
+    "multipart": false
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/athletes/{id}",
+    "allowedRoles": [
+      "ADMIN"
+    ],
+    "probeUrl": "/api/athletes/9000000000000000000",
+    "allowedStatus": 404,
+    "multipart": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/athletes/{id}",
+    "allowedRoles": [
+      "ADMIN",
+      "COACH"
+    ],
+    "probeUrl": "/api/athletes/9000000000000000000",
+    "allowedStatus": 404,
+    "multipart": false
+  },
+  {
+    "method": "PUT",
+    "path": "/api/athletes/{id}",
+    "allowedRoles": [
+      "ADMIN"
+    ],
+    "probeUrl": "/api/athletes/9000000000000000000",
+    "allowedStatus": 400,
+    "multipart": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/athletes/{id}/history",
+    "allowedRoles": [
+      "ADMIN",
+      "COACH"
+    ],
+    "probeUrl": "/api/athletes/9000000000000000000/history",
+    "allowedStatus": 404,
+    "multipart": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/athletes/{id}/notes",
+    "allowedRoles": [
+      "ADMIN",
+      "COACH"
+    ],
+    "probeUrl": "/api/athletes/9000000000000000000/notes",
+    "allowedStatus": 404,
+    "multipart": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/athletes/{id}/notes",
+    "allowedRoles": [
+      "ADMIN",
+      "COACH"
+    ],
+    "probeUrl": "/api/athletes/9000000000000000000/notes",
+    "allowedStatus": 400,
+    "multipart": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/invitations/accept",
+    "allowedRoles": [
+      "ANONYMOUS",
+      "ADMIN",
+      "COACH",
+      "ATHLETE"
+    ],
+    "probeUrl": "/api/auth/invitations/accept",
+    "allowedStatus": 400,
+    "multipart": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/invitations/validate",
+    "allowedRoles": [
+      "ANONYMOUS",
+      "ADMIN",
+      "COACH",
+      "ATHLETE"
+    ],
+    "probeUrl": "/api/auth/invitations/validate",
+    "allowedStatus": 400,
+    "multipart": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/login",
+    "allowedRoles": [
+      "ANONYMOUS",
+      "ADMIN",
+      "COACH",
+      "ATHLETE"
+    ],
+    "probeUrl": "/api/auth/login",
+    "allowedStatus": 400,
+    "multipart": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/auth/me",
+    "allowedRoles": [
+      "ANONYMOUS",
+      "ADMIN",
+      "COACH",
+      "ATHLETE"
+    ],
+    "probeUrl": "/api/auth/me",
+    "allowedStatus": 200,
+    "multipart": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/availability",
+    "allowedRoles": [
+      "ADMIN",
+      "COACH"
+    ],
+    "probeUrl": "/api/availability",
+    "allowedStatus": 200,
+    "multipart": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/availability/{id}",
+    "allowedRoles": [
+      "ADMIN",
+      "COACH"
+    ],
+    "probeUrl": "/api/availability/9000000000000000000",
+    "allowedStatus": 404,
+    "multipart": false
+  },
+  {
+    "method": "PUT",
+    "path": "/api/availability/{id}/response",
+    "allowedRoles": [
+      "ADMIN",
+      "COACH"
+    ],
+    "probeUrl": "/api/availability/9000000000000000000/response",
+    "allowedStatus": 400,
+    "multipart": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/availability/{id}/responses",
+    "allowedRoles": [
+      "ADMIN",
+      "COACH"
+    ],
+    "probeUrl": "/api/availability/9000000000000000000/responses",
+    "allowedStatus": 404,
+    "multipart": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/csrf",
+    "allowedRoles": [
+      "ANONYMOUS",
+      "ADMIN",
+      "COACH",
+      "ATHLETE"
+    ],
+    "probeUrl": "/api/csrf",
+    "allowedStatus": 200,
+    "multipart": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/event-categories",
+    "allowedRoles": [
+      "ADMIN",
+      "COACH"
+    ],
+    "probeUrl": "/api/event-categories",
+    "allowedStatus": 200,
+    "multipart": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/event-categories",
+    "allowedRoles": [
+      "ADMIN",
+      "COACH"
+    ],
+    "probeUrl": "/api/event-categories",
+    "allowedStatus": 400,
+    "multipart": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/events",
+    "allowedRoles": [
+      "ADMIN",
+      "COACH"
+    ],
+    "probeUrl": "/api/events",
+    "allowedStatus": 200,
+    "multipart": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/events",
+    "allowedRoles": [
+      "ADMIN",
+      "COACH"
+    ],
+    "probeUrl": "/api/events",
+    "allowedStatus": 400,
+    "multipart": false
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/events/{id}",
+    "allowedRoles": [
+      "ADMIN",
+      "COACH"
+    ],
+    "probeUrl": "/api/events/9000000000000000000",
+    "allowedStatus": 404,
+    "multipart": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/events/{id}",
+    "allowedRoles": [
+      "ADMIN",
+      "COACH"
+    ],
+    "probeUrl": "/api/events/9000000000000000000",
+    "allowedStatus": 404,
+    "multipart": false
+  },
+  {
+    "method": "PUT",
+    "path": "/api/events/{id}",
+    "allowedRoles": [
+      "ADMIN",
+      "COACH"
+    ],
+    "probeUrl": "/api/events/9000000000000000000",
+    "allowedStatus": 400,
+    "multipart": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/events/{id}/leaderboard",
+    "allowedRoles": [
+      "ADMIN",
+      "COACH"
+    ],
+    "probeUrl": "/api/events/9000000000000000000/leaderboard",
+    "allowedStatus": 404,
+    "multipart": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/events/{id}/note",
+    "allowedRoles": [
+      "ADMIN",
+      "COACH"
+    ],
+    "probeUrl": "/api/events/9000000000000000000/note",
+    "allowedStatus": 404,
+    "multipart": false
+  },
+  {
+    "method": "PUT",
+    "path": "/api/events/{id}/note",
+    "allowedRoles": [
+      "ADMIN",
+      "COACH"
+    ],
+    "probeUrl": "/api/events/9000000000000000000/note",
+    "allowedStatus": 400,
+    "multipart": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/events/{id}/note/migrate-browser-data",
+    "allowedRoles": [
+      "ADMIN",
+      "COACH"
+    ],
+    "probeUrl": "/api/events/9000000000000000000/note/migrate-browser-data",
+    "allowedStatus": 400,
+    "multipart": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/events/{id}/participants",
+    "allowedRoles": [
+      "ADMIN",
+      "COACH"
+    ],
+    "probeUrl": "/api/events/9000000000000000000/participants",
+    "allowedStatus": 404,
+    "multipart": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/events/{id}/participants",
+    "allowedRoles": [
+      "ADMIN",
+      "COACH"
+    ],
+    "probeUrl": "/api/events/9000000000000000000/participants",
+    "allowedStatus": 400,
+    "multipart": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/events/{id}/participants/bulk",
+    "allowedRoles": [
+      "ADMIN",
+      "COACH"
+    ],
+    "probeUrl": "/api/events/9000000000000000000/participants/bulk",
+    "allowedStatus": 400,
+    "multipart": false
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/events/{id}/participants/{athleteId}",
+    "allowedRoles": [
+      "ADMIN",
+      "COACH"
+    ],
+    "probeUrl": "/api/events/9000000000000000000/participants/9000000000000000000",
+    "allowedStatus": 404,
+    "multipart": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/events/{id}/participants/{athleteId}/migrate-browser-data",
+    "allowedRoles": [
+      "ADMIN",
+      "COACH"
+    ],
+    "probeUrl": "/api/events/9000000000000000000/participants/9000000000000000000/migrate-browser-data",
+    "allowedStatus": 400,
+    "multipart": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/events/{id}/participants/{athleteId}/note",
+    "allowedRoles": [
+      "ADMIN",
+      "COACH"
+    ],
+    "probeUrl": "/api/events/9000000000000000000/participants/9000000000000000000/note",
+    "allowedStatus": 404,
+    "multipart": false
+  },
+  {
+    "method": "PUT",
+    "path": "/api/events/{id}/participants/{athleteId}/note",
+    "allowedRoles": [
+      "ADMIN",
+      "COACH"
+    ],
+    "probeUrl": "/api/events/9000000000000000000/participants/9000000000000000000/note",
+    "allowedStatus": 400,
+    "multipart": false
+  },
+  {
+    "method": "PUT",
+    "path": "/api/events/{id}/participants/{athleteId}/result",
+    "allowedRoles": [
+      "ADMIN",
+      "COACH"
+    ],
+    "probeUrl": "/api/events/9000000000000000000/participants/9000000000000000000/result",
+    "allowedStatus": 400,
+    "multipart": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/events/{id}/results",
+    "allowedRoles": [
+      "ADMIN",
+      "COACH"
+    ],
+    "probeUrl": "/api/events/9000000000000000000/results",
+    "allowedStatus": 404,
+    "multipart": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/events/{id}/results",
+    "allowedRoles": [
+      "ADMIN",
+      "COACH"
+    ],
+    "probeUrl": "/api/events/9000000000000000000/results",
+    "allowedStatus": 400,
+    "multipart": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/events/{id}/results/bulk",
+    "allowedRoles": [
+      "ADMIN",
+      "COACH"
+    ],
+    "probeUrl": "/api/events/9000000000000000000/results/bulk",
+    "allowedStatus": 400,
+    "multipart": false
+  },
+  {
+    "method": "PUT",
+    "path": "/api/events/{id}/results/bulk",
+    "allowedRoles": [
+      "ADMIN",
+      "COACH"
+    ],
+    "probeUrl": "/api/events/9000000000000000000/results/bulk",
+    "allowedStatus": 400,
+    "multipart": false
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/events/{id}/results/{resultId}",
+    "allowedRoles": [
+      "ADMIN",
+      "COACH"
+    ],
+    "probeUrl": "/api/events/9000000000000000000/results/9000000000000000000",
+    "allowedStatus": 404,
+    "multipart": false
+  },
+  {
+    "method": "PUT",
+    "path": "/api/events/{id}/results/{resultId}",
+    "allowedRoles": [
+      "ADMIN",
+      "COACH"
+    ],
+    "probeUrl": "/api/events/9000000000000000000/results/9000000000000000000",
+    "allowedStatus": 400,
+    "multipart": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/meets",
+    "allowedRoles": [
+      "ADMIN",
+      "COACH"
+    ],
+    "probeUrl": "/api/meets",
+    "allowedStatus": 200,
+    "multipart": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/meets",
+    "allowedRoles": [
+      "ADMIN"
+    ],
+    "probeUrl": "/api/meets",
+    "allowedStatus": 400,
+    "multipart": false
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/meets/{id}",
+    "allowedRoles": [
+      "ADMIN"
+    ],
+    "probeUrl": "/api/meets/9000000000000000000",
+    "allowedStatus": 404,
+    "multipart": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/meets/{id}",
+    "allowedRoles": [
+      "ADMIN",
+      "COACH"
+    ],
+    "probeUrl": "/api/meets/9000000000000000000",
+    "allowedStatus": 404,
+    "multipart": false
+  },
+  {
+    "method": "PUT",
+    "path": "/api/meets/{id}",
+    "allowedRoles": [
+      "ADMIN"
+    ],
+    "probeUrl": "/api/meets/9000000000000000000",
+    "allowedStatus": 400,
+    "multipart": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/meets/{id}/availability",
+    "allowedRoles": [
+      "ADMIN",
+      "COACH"
+    ],
+    "probeUrl": "/api/meets/9000000000000000000/availability",
+    "allowedStatus": 404,
+    "multipart": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/meets/{id}/events",
+    "allowedRoles": [
+      "ADMIN",
+      "COACH"
+    ],
+    "probeUrl": "/api/meets/9000000000000000000/events",
+    "allowedStatus": 404,
+    "multipart": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/meets/{id}/events/bulk",
+    "allowedRoles": [
+      "ADMIN",
+      "COACH"
+    ],
+    "probeUrl": "/api/meets/9000000000000000000/events/bulk",
+    "allowedStatus": 400,
+    "multipart": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/meets/{id}/events/copy",
+    "allowedRoles": [
+      "ADMIN",
+      "COACH"
+    ],
+    "probeUrl": "/api/meets/9000000000000000000/events/copy",
+    "allowedStatus": 400,
+    "multipart": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/meets/{id}/export",
+    "allowedRoles": [
+      "ADMIN",
+      "COACH"
+    ],
+    "probeUrl": "/api/meets/9000000000000000000/export?type=REGISTRATION",
+    "allowedStatus": 404,
+    "multipart": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/meets/{id}/exports",
+    "allowedRoles": [
+      "ADMIN",
+      "COACH"
+    ],
+    "probeUrl": "/api/meets/9000000000000000000/exports",
+    "allowedStatus": 404,
+    "multipart": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/meets/{meetId}/events/{eventId}",
+    "allowedRoles": [
+      "ADMIN",
+      "COACH"
+    ],
+    "probeUrl": "/api/meets/9000000000000000000/events/9000000000000000000",
+    "allowedStatus": 404,
+    "multipart": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/portal/age-groups",
+    "allowedRoles": [
+      "ATHLETE"
+    ],
+    "probeUrl": "/api/portal/age-groups",
+    "allowedStatus": 200,
+    "multipart": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/portal/availability",
+    "allowedRoles": [
+      "ATHLETE"
+    ],
+    "probeUrl": "/api/portal/availability",
+    "allowedStatus": 200,
+    "multipart": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/portal/availability/{id}",
+    "allowedRoles": [
+      "ATHLETE"
+    ],
+    "probeUrl": "/api/portal/availability/9000000000000000000",
+    "allowedStatus": 404,
+    "multipart": false
+  },
+  {
+    "method": "PUT",
+    "path": "/api/portal/availability/{id}/response",
+    "allowedRoles": [
+      "ATHLETE"
+    ],
+    "probeUrl": "/api/portal/availability/9000000000000000000/response",
+    "allowedStatus": 400,
+    "multipart": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/portal/history",
+    "allowedRoles": [
+      "ATHLETE"
+    ],
+    "probeUrl": "/api/portal/history",
+    "allowedStatus": 200,
+    "multipart": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/portal/meets",
+    "allowedRoles": [
+      "ATHLETE"
+    ],
+    "probeUrl": "/api/portal/meets",
+    "allowedStatus": 200,
+    "multipart": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/portal/meets/{id}",
+    "allowedRoles": [
+      "ATHLETE"
+    ],
+    "probeUrl": "/api/portal/meets/9000000000000000000",
+    "allowedStatus": 404,
+    "multipart": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/portal/profile",
+    "allowedRoles": [
+      "ATHLETE"
+    ],
+    "probeUrl": "/api/portal/profile",
+    "allowedStatus": 200,
+    "multipart": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/portal/rankings",
+    "allowedRoles": [
+      "ATHLETE"
+    ],
+    "probeUrl": "/api/portal/rankings",
+    "allowedStatus": 400,
+    "multipart": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/portal/rankings/categories",
+    "allowedRoles": [
+      "ATHLETE"
+    ],
+    "probeUrl": "/api/portal/rankings/categories",
+    "allowedStatus": 200,
+    "multipart": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/portal/rankings/events",
+    "allowedRoles": [
+      "ATHLETE"
+    ],
+    "probeUrl": "/api/portal/rankings/events",
+    "allowedStatus": 200,
+    "multipart": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/portal/rankings/meets",
+    "allowedRoles": [
+      "ATHLETE"
+    ],
+    "probeUrl": "/api/portal/rankings/meets",
+    "allowedStatus": 200,
+    "multipart": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/rankings",
+    "allowedRoles": [
+      "ADMIN",
+      "COACH"
+    ],
+    "probeUrl": "/api/rankings",
+    "allowedStatus": 400,
+    "multipart": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/rankings/categories",
+    "allowedRoles": [
+      "ADMIN",
+      "COACH"
+    ],
+    "probeUrl": "/api/rankings/categories",
+    "allowedStatus": 200,
+    "multipart": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/rankings/events",
+    "allowedRoles": [
+      "ADMIN",
+      "COACH"
+    ],
+    "probeUrl": "/api/rankings/events",
+    "allowedStatus": 200,
+    "multipart": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/rankings/meets",
+    "allowedRoles": [
+      "ADMIN",
+      "COACH"
+    ],
+    "probeUrl": "/api/rankings/meets",
+    "allowedStatus": 200,
+    "multipart": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/results",
+    "allowedRoles": [
+      "ADMIN",
+      "COACH"
+    ],
+    "probeUrl": "/api/results",
+    "allowedStatus": 200,
+    "multipart": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/users",
+    "allowedRoles": [
+      "ADMIN"
+    ],
+    "probeUrl": "/api/users",
+    "allowedStatus": 200,
+    "multipart": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/users",
+    "allowedRoles": [
+      "ADMIN"
+    ],
+    "probeUrl": "/api/users",
+    "allowedStatus": 400,
+    "multipart": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/users/invitations",
+    "allowedRoles": [
+      "ADMIN"
+    ],
+    "probeUrl": "/api/users/invitations",
+    "allowedStatus": 400,
+    "multipart": false
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/users/{id}",
+    "allowedRoles": [
+      "ADMIN"
+    ],
+    "probeUrl": "/api/users/9000000000000000000",
+    "allowedStatus": 400,
+    "multipart": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/users/{id}/invitation/resend",
+    "allowedRoles": [
+      "ADMIN"
+    ],
+    "probeUrl": "/api/users/9000000000000000000/invitation/resend",
+    "allowedStatus": 404,
+    "multipart": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/users/{id}/invitation/delivery",
+    "allowedRoles": [
+      "ADMIN"
+    ],
+    "probeUrl": "/api/users/9000000000000000000/invitation/delivery",
+    "allowedStatus": 404,
+    "multipart": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/logout",
+    "allowedRoles": [
+      "ANONYMOUS",
+      "ADMIN",
+      "COACH",
+      "ATHLETE"
+    ],
+    "probeUrl": "/api/auth/logout",
+    "allowedStatus": 204,
+    "multipart": false
+  }
+]

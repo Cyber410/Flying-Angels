@@ -8,6 +8,15 @@ import java.util.Optional;
 
 public interface EventResultRepository extends JpaRepository<EventResult, Long>, org.springframework.data.jpa.repository.JpaSpecificationExecutor<EventResult> {
 
+    long countByEventMeetId(Long meetId);
+    @EntityGraph(attributePaths = {"category", "event", "event.meet", "event.category", "athlete"})
+    @org.springframework.data.jpa.repository.Query("""
+        select r from EventResult r where r.event.meet.id = :meetId
+        order by r.event.eventDate, r.event.id, lower(r.athlete.lastName), lower(r.athlete.firstName), r.athlete.id,
+                 case when r.recordedAt is null then 1 else 0 end, r.recordedAt, r.id
+        """)
+    List<EventResult> findForMeetExport(Long meetId);
+
     @Override
     @EntityGraph(attributePaths = {"category", "event", "event.meet", "athlete"})
     org.springframework.data.domain.Page<EventResult> findAll(org.springframework.data.jpa.domain.Specification<EventResult> specification,
@@ -24,6 +33,6 @@ public interface EventResultRepository extends JpaRepository<EventResult, Long>,
 
 	Optional<EventResult> findByIdAndEventId(Long id, Long eventId);
 
-	@EntityGraph(attributePaths = {"category", "event", "event.meet", "athlete"})
+	@EntityGraph(attributePaths = {"category", "event", "event.meet", "event.category", "athlete"})
 	List<EventResult> findByAthleteId(Long athleteId);
 }

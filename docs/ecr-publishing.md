@@ -80,17 +80,19 @@ The run's `verification-<run-id>-<attempt>` artifact contains `published-images.
 ## Verification sequence
 
 1. Install frontend dependencies using the committed lockfile; run lint and type checks.
-2. Build the backend JAR and frontend production assets.
-3. Run backend unit tests (`-Punit-tests`) and frontend unit tests.
-4. Build Linux/amd64 runtime images using `deploy/backend.Dockerfile` and `deploy/frontend.Dockerfile`. Application dependencies are already compiled; these Dockerfiles package the outputs.
+2. Run backend unit tests (`-Punit-tests`), which compile the Java sources.
+3. Run frontend unit tests.
+4. Build Linux/amd64 images from source using the multi-stage `deploy/backend.Dockerfile` and `deploy/frontend.Dockerfile`. The Maven Wrapper builds the JAR in a Java 17 JDK stage; only the JAR is copied into a Java 17 JRE runtime running as UID 10001. A Node stage installs the committed lockfile and builds the frontend; only its production assets are copied into the Nginx runtime. Host-built JARs, node_modules, dist, and private environment files are excluded from the build context. BuildKit cache mounts retain downloaded Maven/npm dependencies on the same builder; a fresh CI runner still downloads its dependencies. CI does not also build standalone host JARs or frontend assets.
 5. Start `deploy/compose.ci.yml` under a unique Compose project name. MySQL uses a temporary in-memory filesystem. Only the frontend is exposed on the runner's loopback port 18080.
 6. Run database integration tests (`-Pintegration-tests`), which also use disposable Testcontainers MySQL databases.
-7. Run `tests/integration/test_deployed_stack.py` against the built images. It checks React routes, athlete create/read/search/update/delete through Nginx, and rejection of invalid athlete data.
+7. Run `tests/integration/test_deployed_stack.py` against the built images. It checks React routes, athlete create/read/search/update/delete through Nginx, rejection of invalid athlete data and untrusted CORS preflights, preservation of JSON API errors, and suppression of the Nginx version header.
+   The main Postman collection checks `/api/auth/me` first. In this explicitly authentication-disabled CI fixture it skips login/CSRF setup; authenticated local runs use the selected environment's Admin credentials.
+
 8. On pushes to `development` or `main`, or an explicitly requested manual publication on either branch, authenticate to AWS, verify both repositories, and push the same images that passed the HTTP tests.
 9. Collect logs, remove the isolated Compose stack, and upload reports even when a step fails.
 10. After this CI workflow finishes successfully for a push to `main`, GitHub triggers the separate CD workflow in `ce.yaml`. Failed CI, PR runs, development pushes and manual publishing do not deploy. See [ECS continuous delivery](aws-deployment.md).
 
-The test stack uses synthetic data and the default development security configuration, bound to loopback. `ProductionSecurityTest` separately checks authorization and CSRF behavior. Publishing alone does not configure the runtime. The deployment job preserves the existing ECS task configuration, including production authentication, database settings and secret references; HTTPS and frontend login/CSRF integration remain separate work. The existing `application-prod.properties` expects `DATABASE_URL`, `DATABASE_USERNAME`, `DATABASE_PASSWORD`, `APP_ADMIN_USERNAME`, and `APP_ADMIN_PASSWORD` when that profile is enabled; supply those through the ECS task and secret references during deployment setup.
+The test stack uses synthetic data and explicitly disables authentication, bound to loopback. `ProductionSecurityTest` and the CORS/security tests separately check authorization, allowed browser origins and CSRF behavior. Publishing alone does not configure the runtime. The deployment job preserves the existing ECS task configuration, including production authentication, database settings and secret references; HTTPS and frontend login/CSRF integration remain separate work. The production profile expects `DATABASE_URL`, `DATABASE_USERNAME`, `DATABASE_PASSWORD`, `APP_ADMIN_EMAIL`, and `APP_ADMIN_PASSWORD`; supply those through the ECS task and secret references during deployment setup. Invitation sending also requires SMTP configuration and an externally reachable `APP_ACTIVATION_URL`.
 
 ## Run the same checks locally
 

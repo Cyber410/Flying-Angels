@@ -18,14 +18,17 @@ public class EventService {
     private final AthleteRepository athleteRepository;
     private final EventParticipationRepository participationRepository;
     private final com.flyingangels.backend.note.AthleteNoteRepository noteRepository;
+    private final com.flyingangels.backend.availability.AvailabilityService availability;
 
     private EventParticipation ensureParticipant(Event event, Long athleteId) {
+        availability.lockMeet(event.getMeet().getId());
         var existing = participationRepository.findByEventIdAndAthleteId(event.getId(), athleteId);
         if (existing.isPresent()) return existing.get();
         Athlete athlete = athleteRepository.findById(athleteId).orElseThrow(() -> new AthleteService.AthleteNotFoundException(athleteId));
         if (athlete.isArchived()) throw new IllegalArgumentException("Restore this athlete before adding them to an event");
         EventParticipation participant = participationRepository.save(new EventParticipation(event, athlete));
         event.getParticipations().add(participant);
+        availability.assignmentAdded(event, athlete);
         return participant;
     }
 
@@ -63,9 +66,10 @@ public class EventService {
                 continue;
             }
             var matching = resultRepository.findByEventIdAndAthleteId(eventId, athleteId).stream()
-                    .filter(result -> result.getClientId() == null && result.getScore() != null && result.getScore().compareTo(attempt.score()) == 0).findFirst();
+                    .filter(result -> result.getClientId() == null && result.getScore() != null && result.getScore().compareTo(attempt.score()) == 0
+                            && Objects.equals(result.getResultLabel(), EventResult.normalizeResultLabel(attempt.resultLabel()))).findFirst();
             if (matching.isPresent()) matching.get().setClientId(attempt.clientId());
-            else addResult(eventId, new EventResultRequest(athleteId, attempt.result(), attempt.score(), null, attempt.clientId()));
+            else addResult(eventId, new EventResultRequest(athleteId, attempt.result(), attempt.score(), null, attempt.clientId(), attempt.resultLabel()));
         }
         return participant;
     }
@@ -115,17 +119,27 @@ public class EventService {
     @Transactional
     public Event update(Long id,EventRequest request) {
         Event event=get(id); Meet meet=meet(request.meetId()); validateDate(meet,request.eventDate());
+        availability.lockMeet(event.getMeet().getId());
         var category=categoryService.resolve(request.categoryId(),request.categoryName(),request.rankingOrder());
         if (eventRepository.existsByMeetIdAndCategoryIdAndIdNot(meet.getId(),category.getId(),id)) throw new DuplicateEventException();
         if (!event.getResults().isEmpty() && (!category.getId().equals(event.getCategory().getId()) || !meet.getId().equals(event.getMeet().getId())))
             throw new IllegalArgumentException("An event with results cannot change meet or category");
+        if (!meet.getId().equals(event.getMeet().getId()) && !event.getParticipations().isEmpty())
+            throw new IllegalArgumentException("Remove athlete assignments before moving an event to another meet");
+        if (!Objects.equals(event.getEventDate(), request.eventDate()) || !Objects.equals(event.getCategory().getId(), category.getId())
+                || !Objects.equals(event.getLocation(), request.location())) availability.proposalChangedForEvent(event);
         event.updateFrom(request,category,meet); return eventRepository.save(event);
     }
     @Transactional
-    public void delete(Long id) { var event=get(id); noteRepository.detachEvent(id); eventRepository.delete(event); }
+    public void delete(Long id) {
+        var event=get(id); availability.lockMeet(event.getMeet().getId());
+        event.getParticipations().forEach(p -> availability.assignmentRemoved(event.getMeet().getId(), p.getAthlete().getId()));
+        noteRepository.detachEvent(id); eventRepository.delete(event);
+    }
     @Transactional
     public EventParticipation assignParticipant(Long eventId,EventParticipantRequest request) {
         Event event=get(eventId); Athlete athlete=athlete(request.athleteId());
+        availability.lockMeet(event.getMeet().getId());
         if (participationRepository.existsByEventIdAndAthleteId(eventId,athlete.getId())) throw new DuplicateResultException(eventId,athlete.getId());
         return ensureParticipant(event,athlete.getId());
     }
@@ -133,6 +147,7 @@ public class EventService {
     public List<EventParticipation> assignBatch(Long eventId,List<Long> athleteIds) {
         if (new HashSet<>(athleteIds).size()!=athleteIds.size()) throw new IllegalArgumentException("Repeated athlete IDs");
         Event event=get(eventId);
+        availability.lockMeet(event.getMeet().getId());
         for (Long athleteId : athleteIds) {
             if (participationRepository.existsByEventIdAndAthleteId(eventId,athleteId))
                 throw new DuplicateResultException(eventId,athleteId);
@@ -144,13 +159,16 @@ public class EventService {
     @Transactional
     public void removeParticipant(Long eventId,Long athleteId) {
         Event event=get(eventId);
+        availability.lockMeet(event.getMeet().getId());
         var p=participationRepository.findByEventIdAndAthleteId(eventId,athleteId).orElseThrow(()->new ParticipantNotFoundException());
         event.getResults().removeIf(r->r.getAthlete().getId().equals(athleteId));
         p.getEvent().getParticipations().remove(p);
         participationRepository.delete(p);
+        availability.assignmentRemoved(event.getMeet().getId(), athleteId);
     }
     @Transactional
     public EventResult addResult(Long eventId,EventResultRequest request) {
+        String label = EventResult.normalizeResultLabel(request.resultLabel());
         Event event=get(eventId);
         if (request.clientId() != null && !request.clientId().isBlank()) {
             var existing = resultRepository.findByClientId(request.clientId());
@@ -164,6 +182,7 @@ public class EventService {
         Athlete athlete=ensureParticipant(event,request.athleteId()).getAthlete();
         var measurement=measurement(event,request);
         var result=new EventResult(event,event.getCategory(),athlete,request.result(),measurement.score());
+        result.setResultLabel(label);
         result.setClientId(request.clientId()==null || request.clientId().isBlank()?null:request.clientId());
         result.setMeasurement(measurement.unit(),measurement.status()); event.addResult(result);
         return resultRepository.save(result);
@@ -188,28 +207,32 @@ public class EventService {
             var result = resultRepository.findByIdAndEventId(request.resultId(),eventId)
                     .orElseThrow(() -> new EventResultNotFoundException(request.resultId(),eventId));
             var value = measurement(event,new EventResultRequest(result.getAthlete().getId(),request.result(),request.score(),request.unit()));
-            corrections.add(new ResultCorrection(result,request,value));
+            corrections.add(new ResultCorrection(result,request,value,EventResult.normalizeResultLabel(request.resultLabel())));
         }
         for (var correction : corrections) {
             var result = correction.result();
             result.update(result.getAthlete(),correction.request().result(),correction.measurement().score());
             result.setMeasurement(correction.measurement().unit(),correction.measurement().status());
+            if (correction.request().resultLabel() != null) result.setResultLabel(correction.label());
         }
         return resultRepository.saveAll(corrections.stream().map(ResultCorrection::result).toList());
     }
-    private record ResultCorrection(EventResult result,ResultUpdateRequest request,ResultValues.Measurement measurement) {}
+    private record ResultCorrection(EventResult result,ResultUpdateRequest request,ResultValues.Measurement measurement,String label) {}
     /** Legacy endpoint now appends an attempt; explicit result-ID PUT remains the correction operation. */
     @Transactional
     public EventResult recordParticipantResult(Long eventId,Long athleteId,ParticipantResultRequest request) {
         if (!participationRepository.existsByEventIdAndAthleteId(eventId,athleteId)) throw new ParticipantNotFoundException();
-        return addResult(eventId,new EventResultRequest(athleteId,request.result(),request.score(),request.unit()));
+        return addResult(eventId,new EventResultRequest(athleteId,request.result(),request.score(),request.unit(),null,request.resultLabel()));
     }
     @Transactional
     public EventResult updateResult(Long eventId,Long resultId,EventResultRequest request) {
+        String label = EventResult.normalizeResultLabel(request.resultLabel());
         var result=resultRepository.findByIdAndEventId(resultId,eventId).orElseThrow(()->new EventResultNotFoundException(resultId,eventId));
         var m=measurement(result.getEvent(),request); var athlete=athlete(request.athleteId());
         if (!participationRepository.existsByEventIdAndAthleteId(eventId,athlete.getId())) assignParticipant(eventId,new EventParticipantRequest(athlete.getId()));
-        result.update(athlete,request.result(),m.score()); result.setMeasurement(m.unit(),m.status()); return resultRepository.save(result);
+        result.update(athlete,request.result(),m.score()); result.setMeasurement(m.unit(),m.status());
+        if (request.resultLabel() != null) result.setResultLabel(label);
+        return resultRepository.save(result);
     }
     @Transactional
     public void deleteResult(Long eventId,Long resultId) {

@@ -15,6 +15,8 @@ public class AthleteService {
     private final com.flyingangels.backend.event.EventResultRepository resultRepository;
     private final com.flyingangels.backend.event.EventParticipationRepository participationRepository;
     private final com.flyingangels.backend.note.AthleteNoteRepository noteRepository;
+    private final com.flyingangels.backend.availability.AvailabilityService availability;
+    private final com.flyingangels.backend.auth.StaffUserRepository users;
 
 	@Transactional(readOnly = true)
 	public List<Athlete> search(String search, String gender, String team) {
@@ -107,6 +109,11 @@ public class AthleteService {
 	@Transactional
 	public void delete(Long id) {
 		Athlete athlete = get(id);
+		availability.deleteForAthlete(id);
+        users.findByAthleteId(id).ifPresent(user -> {
+            user.update(user.getEmail(), user.getName(), user.getRole(), false, null);
+            user.linkAthlete(null); user.cancelInvitation();
+        });
 		noteRepository.deleteByAthleteId(id);
         resultRepository.deleteByAthleteId(id);
         participationRepository.deleteByAthleteId(id);

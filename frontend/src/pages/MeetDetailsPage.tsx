@@ -6,6 +6,7 @@ import Header from "../components/header";
 import MeetEventPanel from "../components/MeetEventPanel";
 import MeetFormDialog from "../components/MeetFormDialog";
 import EventSelectionDialog from "../components/EventSelectionDialog";
+import MeetExportDialog from "../components/MeetExportDialog";
 import { getMeetById, updateMeet } from "../services/meetService";
 import { sampleMeetProfile } from "../data/sampleMeet";
 import type { MeetProfile, MeetRequest } from "../types/meet";
@@ -36,7 +37,7 @@ function MeetDetailsContent({ meetId, sample }: { meetId: number; sample: boolea
   const [isLoading, setIsLoading] = useState(!sample);
   const [error, setError] = useState("");
   const [revision, setRevision] = useState(0);
-  const [dialog, setDialog] = useState<"edit" | "add" | "copy" | null>(null);
+  const [dialog, setDialog] = useState<"edit" | "add" | "copy" | "export" | null>(null);
   const [feedback, setFeedback] = useState("");
 
   // Fetch live meet details; the sample route stays read-only.
@@ -110,7 +111,10 @@ function MeetDetailsContent({ meetId, sample }: { meetId: number; sample: boolea
                   <a className="meet-website-link" href={profile.meet.externalUrl} target="_blank" rel="noopener noreferrer">Meet website ↗</a>
                 )}
               </div>
-              <button className="meets-button" type="button" disabled={sample} onClick={() => setDialog("edit")}>Edit Meet</button>
+              <div className="meet-details-actions">
+                <button className="meets-button" type="button" disabled={sample} onClick={() => setDialog("export")}>Export</button>
+                <button className="meets-button" type="button" disabled={sample} onClick={() => setDialog("edit")}>Edit Meet</button>
+              </div>
             </section>
             <p className="meets-feedback" role="status">{feedback}</p>
             <section className="meet-events-section" aria-labelledby="meet-events-heading">
@@ -128,6 +132,13 @@ function MeetDetailsContent({ meetId, sample }: { meetId: number; sample: boolea
             </section>
 
             {dialog === "edit" && !sample && <MeetFormDialog meet={profile.meet} onSave={saveMeet} onClose={() => setDialog(null)} />}
+            {dialog === "export" && !sample && (
+              <MeetExportDialog
+                meet={profile.meet}
+                onExported={(message) => { setFeedback(message); setDialog(null); }}
+                onClose={() => setDialog(null)}
+              />
+            )}
             {(dialog === "add" || dialog === "copy") && !sample && (
               <EventSelectionDialog mode={dialog} meet={profile.meet} existingEvents={profile.events} onCreated={addEvents} onClose={() => setDialog(null)} />
             )}

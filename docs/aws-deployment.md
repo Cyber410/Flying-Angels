@@ -27,7 +27,7 @@ Reuse the existing RDS database, ECR repositories, ECS cluster/service, log grou
 5. **Listeners and DNS:** attach the ACM certificate to an HTTPS/443 ALB listener forwarding to the target group. Set HTTP/80 to redirect to HTTPS/443. At Name.com, add CNAME host `app`, answer the ALB DNS name (no `https://` or path), with the default TTL. Existing SendGrid records remain unchanged.
 6. **ECS task definition:** create a revision of the existing Linux/X86_64 Fargate task with the two containers below. Retain the existing 0.5 vCPU / 2 GiB allocation, logging, and **LabRole** for both task and execution roles. Verify the execution role can retrieve all four existing secrets. Keep the persistent outbox encryption key unchanged.
 7. **ECS service:** attach the task revision and ALB target group to the existing rolling-update service, enable the deployment circuit breaker/rollback, and set health-check grace period to 120 seconds. Keep desired count zero until the database is ready. With no NAT Gateway, retain a public subnet and assigned public IP for the task's outbound ECR/Secrets Manager/SendGrid access; the task security group still permits inbound HTTP only from the ALB.
-8. **Database and release:** complete the database adoption procedure below, release through main, then set desired count to one and verify the public browser flows. Start with one task because login sessions are currently held in that backend's memory. Restarts require sign-in again; multiple simultaneous serving tasks need session-affinity/shared-session planning.
+8. **Database and release:** configure the one-time database baseline below, release the revised images through main, then set desired count to one and verify the public browser flows. Start with one task because login sessions are currently held in that backend's memory. Restarts require sign-in again; multiple simultaneous serving tasks need session-affinity/shared-session planning.
 
 | Security group | Inbound rule | Purpose |
 | --- | --- | --- |
@@ -123,11 +123,11 @@ New UI invitations use `/api/users/pending-invitations`: the invitation and encr
 
 ### Existing RDS database: complete before the first release
 
-Current images package V1 (16 initial tables), V2 (verified account enrollment/outbox changes), and V3 (password recovery). Fresh databases run all three. Databases already at a valid V1 run V2 and V3 automatically. The old populated RDS database has not yet been inspected, so its adoption remains a release prerequisite.
+The first Flyway release now matches the existing RDS schema: V1 is the ten tables supplied on 2026-11-18, V2 adds the missing Sprint 3 schema, V3 adds verified account enrollment and V4 adds password recovery. The owner reports no existing application data and has a snapshot. No manual conversion SQL is needed.
 
-Keep application writers stopped. Take a recoverable RDS backup, inspect the schema/history and verify the upgrade on a separate copy before changing live data. If RDS has old tables but no Flyway history, first bring it to the actual V1 schema with a reviewed conversion, then perform the one-time V1 baseline; V2 and V3 can follow automatically. `SPRING_FLYWAY_BASELINE_ON_MIGRATE=true` alone skips V1 SQL and cannot supply missing V1 tables/columns. Restore it to false after adoption. Keep Hibernate `ddl-auto=validate`.
+Keep the service stopped until the updated images are ready. For its first updated backend startup, add `SPRING_FLYWAY_BASELINE_ON_MIGRATE=true` and `SPRING_FLYWAY_BASELINE_VERSION=1`; retain target `latest` and Hibernate `validate`. Flyway skips the existing V1 tables, records the baseline, and executes V2 through V4. Verify BASELINE 1 plus successful SQL 2, 3 and 4, then remove the temporary baseline override or set it to false. See [database migration details](database-migrations.md#first-startup-against-the-reviewed-rds-database).
 
-The historical conversion in `backend/src/test/resources/database/upgrade-existing-to-v1.sql` is a test fixture for commit `671a9ae`, not verified production SQL and not packaged in the backend image. Do not execute it blindly or reset/delete the RDS database. See [database migration details](database-migrations.md).
+Do not apply these instructions to local databases with the earlier unreleased Flyway checksums/history; those need a separate transition. No RDS changes or local data resets have been executed by this workspace.
 
 ### Public verification
 
@@ -219,7 +219,7 @@ A new main release does not override a deliberately stopped service or start the
 | Email link opens the wrong host | Check APP_ACTIVATION_URL in the task revision attached to the service; newly issued links use the updated URL. |
 | Rollback detected | Fix the failing release and merge a correction, or explicitly restore a known-good task revision in ECS. |
 
-Enable the ECS circuit breaker with rollback during setup. Rolling deployments can briefly run two tasks. The backend now runs Flyway migrations and Hibernate validation. Before the first release of this change, snapshot RDS, verify a restored copy, inspect its schema and arrange a reviewed one-time V1 baseline; a populated unversioned database blocks startup by default. Do not release automatically to a populated RDS database before this plan is complete. See [Database migrations](database-migrations.md). Later SQL changes must remain compatible with older tasks during rolling deployment.
+Enable the ECS circuit breaker with rollback during setup. Rolling deployments can briefly run two tasks. The backend now runs Flyway migrations and Hibernate validation. For the reviewed ten-table RDS schema, retain the snapshot and configure the one-time V1 baseline before starting the updated image. A schema without Flyway history blocks startup by default, even when its tables contain no rows. See [Database migrations](database-migrations.md). Later SQL changes must remain compatible with older tasks during rolling deployment.
 
 ## References
 

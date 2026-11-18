@@ -1,15 +1,6 @@
--- Historical test fixture only; executed against disposable migration-test databases.
--- DRAFT: previous committed code -> current V1 application schema.
--- Reference source commit: 671a9aec091a20a914d4ec2fd0e2f568a8dd4a46
--- This is NOT a verified description of the live RDS schema.
--- Confirm the RDS schema-only export matches the reference before applying.
--- Test on a restored copy and take a recoverable backup before any live upgrade.
--- Run with application writers stopped and a client that stops on the first error.
--- MySQL DDL may commit statement by statement; do not assume transaction rollback.
--- Deliberately outside db/migration: this is a one-time existing-database upgrade,
--- not a second Flyway migration and not a script for fresh databases.
--- No existing records are deleted; new nullable fields preserve existing values.
--- Record the V1 baseline only after the upgrade and schema review succeed.
+-- Adds Sprint 3 functionality to the existing V1 application schema.
+-- Flyway runs this after creating V1 on a fresh database or baselining the
+-- reviewed, unversioned ten-table database at version 1. Preserves existing rows.
 
 ALTER TABLE `meets` ADD COLUMN `start_time` time DEFAULT NULL;
 

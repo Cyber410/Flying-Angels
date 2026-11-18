@@ -1,12 +1,32 @@
 # Postman pack verification
 
+## 2026-11-18: V1 matches the existing RDS schema
+
+At the owner's request, V1 now matches all ten supplied RDS table definitions,
+including column order. V2 applies the missing Sprint 3 schema automatically;
+enrollment and password recovery move to V3 and V4. The manual conversion scripts
+were removed. The reviewed unversioned RDS schema needs only the standard
+one-startup baseline at version 1, followed by Flyway migrations 2 through 4.
+
+The clean backend suite passed **376 tests: 374 passed, 2 existing skips, zero
+failures/errors**, using the repository's Docker API setting `-Dapi.version=1.44`.
+All seven migration tests passed, covering fresh databases, direct legacy
+baselining, versioned upgrades, preservation of records in all ten legacy tables,
+repeat startup and migration protections. Hibernate startup validation also passed.
+No Postman collections, real email sends or AWS database writes were run for this
+change. Retained local databases were not reset or modified. Log:
+`/private/tmp/fa-rds-version-layout-tests.log`.
+
+The historical migration entries below describe earlier layouts and are
+superseded by [the current migration walkthrough](../database-migrations.md).
+
 ## 2026-11-13: Draft existing-database upgrade
 
 Generated the previous committed backend's actual ten-table Hibernate schema from `671a9ae` in disposable MySQL 8.4. Compared it with V1 and prepared `deploy/sql/upgrade-existing-to-v1.sql.draft`: six tables, two nullable columns and one rankings index. The script is outside automatic migration resources and is not approved for live RDS until its real schema export is compared.
 
 The targeted `DatabaseMigrationIntegrationTest` run passed all **5 tests**, including an added populated previous-schema upgrade case. Existing athlete, meet, category, event, assignment, result and note fields survived the SQL upgrade and V1 baseline. Log: `/tmp/fa-upgrade-to-v1-tests.log`. The earlier full-suite run predates this added test; the full suite and Postman collections were not rerun for this draft-only change.
 
-No AWS credentials, endpoint or schema export were available in the workspace; no RDS queries or changes were performed. The current fresh-database V1 and local running stacks remain unchanged. See [Existing deployment upgrade](../database-migrations.md#existing-deployment-missing-the-current-changes).
+No AWS credentials, endpoint or schema export were available in the workspace; no RDS queries or changes were performed. The current fresh-database V1 and local running stacks remain unchanged. This historical draft is superseded by the [current RDS adoption layout](../database-migrations.md#first-startup-against-the-reviewed-rds-database).
 
 ## 2026-11-13: Local backup and restore rehearsal
 

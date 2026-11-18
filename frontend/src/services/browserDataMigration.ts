@@ -1,3 +1,4 @@
+import { apiFetch } from "./apiClient";
 // Read the retired browser stores only for explicit, retry-safe migration.
 import type { EventParticipant, MeetEvent, ResultAttempt } from "../types/event";
 import { getEvents, readEventNote, migrateEventNote } from "./eventService";
@@ -12,6 +13,7 @@ export type LegacyEntry = {
 };
 const legacyPattern = /^flying-angels:(pending-event-assignments:|event-attempts:|event-note:live:)/;
 
+// Read the retired storage keys without modifying their contents.
 export function legacySnapshot(): Record<string,string> {
   const data: Record<string,string> = {};
   for (let index=0; index<localStorage.length; index++) {
@@ -21,16 +23,19 @@ export function legacySnapshot(): Record<string,string> {
   return data;
 }
 
+// Check whether any recoverable records remain in the retired stores.
 export function hasLegacyBrowserData(): boolean {
   try { return Object.keys(legacySnapshot()).length > 0; } catch { return false; }
 }
 
+// Match retired records to current athletes and events before migration.
 export async function reviewLegacyBrowserData(): Promise<LegacyEntry[]> {
   const snapshots=legacySnapshot();
   const [events,athletes]=await Promise.all([getEvents(),getAthletes("all")]);
-  const eventById=new Map(events.map(event=>[event.id,event]));
-  const athleteById=new Map(athletes.map(athlete=>[athlete.id,athlete]));
+  const eventById=new Map(events.map(/* Index each event by its ID. */ event=>[event.id,event]));
+  const athleteById=new Map(athletes.map(/* Index each athlete by its ID. */ athlete=>[athlete.id,athlete]));
   const entries=new Map<string,LegacyEntry>();
+  // Find or create the recovery entry for an event and optional athlete.
   function entryFor(eventId:number,athleteId?:number) {
     const id=`${eventId}:${athleteId ?? "event"}`;
     let entry=entries.get(id);
@@ -70,6 +75,7 @@ export async function reviewLegacyBrowserData(): Promise<LegacyEntry[]> {
   return [...entries.values()];
 }
 
+// Save one recovery entry safely before clearing its unchanged local records.
 export async function migrateLegacyEntry(entry:LegacyEntry):Promise<void> {
   if (entry.error) throw new Error(entry.error);
   if (entry.athleteId === undefined) {
@@ -77,13 +83,13 @@ export async function migrateLegacyEntry(entry:LegacyEntry):Promise<void> {
     if (existing && existing !== entry.note?.trim()) throw new Error("A different shared event note already exists. The saved note is preserved for manual review.");
     if (entry.note?.trim()) await migrateEventNote(entry.eventId,entry.note.trim());
   } else {
-    const attempts=await Promise.all(entry.attempts.map(async attempt=>{
+    const attempts=await Promise.all(entry.attempts.map(/* Build attempts from each attempt. */ async attempt=>{
       const bytes=new TextEncoder().encode(`legacy:${entry.eventId}:${entry.athleteId}:${attempt.id}`);
       const digest=await crypto.subtle.digest("SHA-256",bytes);
-      const clientId="legacy:"+[...new Uint8Array(digest)].map(value=>value.toString(16).padStart(2,"0")).join("");
+      const clientId="legacy:"+[...new Uint8Array(digest)].map(/* Build client id from each value. */ value=>value.toString(16).padStart(2,"0")).join("");
       return {clientId,result:attempt.result,score:attempt.score};
     }));
-    const response=await fetch(`/api/events/${entry.eventId}/participants/${entry.athleteId}/migrate-browser-data`,{
+    const response=await apiFetch(`/api/events/${entry.eventId}/participants/${entry.athleteId}/migrate-browser-data`,{
       method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({note:entry.note?.trim() || null,attempts}),
     });
     await checkResponse(response,"The saved records could not be added. They have been retained for retry.");
@@ -94,7 +100,7 @@ export async function migrateLegacyEntry(entry:LegacyEntry):Promise<void> {
       const currentRaw=localStorage.getItem(key);
       if (!currentRaw) continue;
       const current: {version:number;athletes:{id:number}[]}=JSON.parse(currentRaw);
-      current.athletes=current.athletes.filter(athlete=>athlete.id!==entry.athleteId);
+      current.athletes=current.athletes.filter(/* Exclude entries that do not belong in this result or selection. */ athlete=>athlete.id!==entry.athleteId);
       if (current.athletes.length) localStorage.setItem(key,JSON.stringify(current));else localStorage.removeItem(key);
     } else if (localStorage.getItem(key) === raw) localStorage.removeItem(key);
   }

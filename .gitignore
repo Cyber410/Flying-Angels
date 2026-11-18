@@ -2,3 +2,7 @@
 .env
 .env.*
 !.env.example
+
+# Local diagnostics and spreadsheet editor lock files are not project sources.
+/.tmp/
+~$*.xlsx

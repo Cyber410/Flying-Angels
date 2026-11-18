@@ -4,6 +4,7 @@ import type { BrowserEventAssignment, MeetEvent } from "../types/event";
 
 type StoredAthlete = Pick<Athlete, "id" | "firstName" | "lastName">;
 
+// Build the retired assignment-storage key for an event.
 function storageKey(eventId: number) {
   if (!Number.isSafeInteger(eventId) || eventId < 1) {
     throw new Error("Saved assignments require an existing event.");
@@ -11,6 +12,7 @@ function storageKey(eventId: number) {
   return `flying-angels:pending-event-assignments:${eventId}`;
 }
 
+// Check that a saved assignment contains the expected athlete fields.
 function isStoredAthlete(value: unknown): value is StoredAthlete {
   return typeof value === "object" && value !== null &&
     "id" in value && typeof value.id === "number" && Number.isSafeInteger(value.id) && value.id > 0 &&
@@ -18,6 +20,7 @@ function isStoredAthlete(value: unknown): value is StoredAthlete {
     "lastName" in value && typeof value.lastName === "string";
 }
 
+// Read and validate retired assignments without writing replacement data.
 function readStoredAthletes(eventId: number): StoredAthlete[] {
   let raw: string | null;
   try {
@@ -43,6 +46,7 @@ function readStoredAthletes(eventId: number): StoredAthlete[] {
   return data.athletes;
 }
 
+// Convert a saved athlete into the event-participation shape.
 function toAssignment(event: MeetEvent, athlete: StoredAthlete): BrowserEventAssignment {
   return {
     resultId: null, athleteId: athlete.id,
@@ -54,5 +58,5 @@ function toAssignment(event: MeetEvent, athlete: StoredAthlete): BrowserEventAss
 
 // Reads pending assignments without inventing result values.
 export function getBrowserAssignments(event: MeetEvent): BrowserEventAssignment[] {
-  return readStoredAthletes(event.id).map((athlete) => toAssignment(event, athlete));
+  return readStoredAthletes(event.id).map(/* Convert each athlete into the required display or request data. */ (athlete) => toAssignment(event, athlete));
 }

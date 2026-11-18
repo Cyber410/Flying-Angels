@@ -1,3 +1,4 @@
+import { apiFetch } from "./apiClient";
 // Adapts the shared import module to the upload, review, and summary screens.
 import type { ImportPreview, ImportRow, ImportSummary } from "../types/athleteImport";
 import { checkResponse } from "./apiResponse";
@@ -15,6 +16,7 @@ type ApiRow = {
 type ApiPreview = { importId: string; rows: ApiRow[] };
 type ApiSummary = ApiPreview & { imported: number; updated: number; skipped: number; failed: number };
 
+// Translate a backend import row into the preview screen data shape.
 function previewRow(row: ApiRow): ImportRow {
   const eligible = ["NEW", "UPDATE", "VALID"].includes(row.status);
   const duplicate = ["UNCHANGED", "DUPLICATE"].includes(row.status);
@@ -30,35 +32,36 @@ function previewRow(row: ApiRow): ImportRow {
   };
 }
 
+// Upload a file for validation and map the persisted preview response.
 export async function previewAthleteImport(file: File, signal?: AbortSignal): Promise<ImportPreview> {
   const body = new FormData();
   body.append("file", file);
-  const response = await fetch("/api/athletes/import/preview", { method: "POST", body, signal });
+  const response = await apiFetch("/api/athletes/import/preview", { method: "POST", body, signal });
   await checkResponse(response, "The file could not be previewed. Check its format and try again.");
   const data: ApiPreview = await response.json();
   const rows = data.rows.map(previewRow);
   return {
     filename: file.name, importId: data.importId, rows,
-    validCount: rows.filter(row => row.status === "VALID").length,
-    duplicateCount: rows.filter(row => row.status === "DUPLICATE").length,
-    errorCount: rows.filter(row => row.status === "ERROR").length,
+    validCount: rows.filter(/* Keep rows with VALID status. */ row => row.status === "VALID").length,
+    duplicateCount: rows.filter(/* Keep rows with DUPLICATE status. */ row => row.status === "DUPLICATE").length,
+    errorCount: rows.filter(/* Keep rows with ERROR status. */ row => row.status === "ERROR").length,
   };
 }
 
 // Confirmation references the persisted preview and submits only reviewed row numbers.
 export async function confirmAthleteImport(importId: string, rows: number[]): Promise<ImportSummary> {
-  const response = await fetch(`/api/athletes/import/${encodeURIComponent(importId)}/commit`, {
+  const response = await apiFetch(`/api/athletes/import/${encodeURIComponent(importId)}/commit`, {
     method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ rowNumbers: rows }),
   });
   await checkResponse(response, "The import could not be confirmed. Review the preview before retrying.");
   const data: ApiSummary = await response.json();
   return {
     importedCount: data.imported, updatedCount: data.updated,
-    seedResultCount: data.rows.filter(row => row.status === "IMPORTED").reduce((sum, row) => sum + (row.athlete.events?.length ?? 0), 0),
-    duplicateCount: data.rows.filter(row => ["UNCHANGED", "DUPLICATE"].includes(row.status)).length,
-    invalidCount: data.rows.filter(row => ["FAILED", "INVALID", "AMBIGUOUS"].includes(row.status)).length,
-    notSelectedCount: data.rows.filter(row => row.status === "SKIPPED").length,
-    rows: data.rows.map(row => ({
+    seedResultCount: data.rows.filter(/* Keep rows with IMPORTED status. */ row => row.status === "IMPORTED").reduce(/* Accumulate the combined result from the current entries. */ (sum, row) => sum + (row.athlete.events?.length ?? 0), 0),
+    duplicateCount: data.rows.filter(/* Keep entries that satisfy the current filter conditions. */ row => ["UNCHANGED", "DUPLICATE"].includes(row.status)).length,
+    invalidCount: data.rows.filter(/* Keep entries that satisfy the current filter conditions. */ row => ["FAILED", "INVALID", "AMBIGUOUS"].includes(row.status)).length,
+    notSelectedCount: data.rows.filter(/* Keep rows with SKIPPED status. */ row => row.status === "SKIPPED").length,
+    rows: data.rows.map(/* Trim each value before comparing or saving it. */ row => ({
       rowNumber: row.rowNumber, name: `${row.athlete.firstName} ${row.athlete.lastName}`.trim(),
       status: row.status === "IMPORTED" ? "IMPORTED" : row.status === "UPDATED" ? "UPDATED" : row.status === "SKIPPED" ? "NOT_SELECTED" : ["UNCHANGED", "DUPLICATE"].includes(row.status) ? "DUPLICATE" : "ERROR",
       message: row.explanation ?? row.status,

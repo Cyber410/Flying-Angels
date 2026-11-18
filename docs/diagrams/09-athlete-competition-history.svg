@@ -1,0 +1,108 @@
+<?xml version='1.0' encoding='utf-8'?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1900" height="1350" viewBox="0 0 1900 1350" role="img">
+  <title>Athlete Competition History &amp; Performance Progression — code design</title>
+  <desc>Actors: Admin / Coach. E means existing; P means proposed. SUNNY: search directory -&gt; open profile -&gt; select history/event -&gt; inspect all attempts, personal best and chronological progression. RAINY: preserve empty assigned events; exclude DNS/DNF/DQ/FOUL/UNPARSED from PB; show a single point without implying a trend. CONSISTENCY: Meet Details and Athlete Profile read the same result records; timed events use ASC and measured events use configured order. DESIGN NOTE: competition PB/trends use linked meet results; historical imports remain visible separately; chart semantics are documented.</desc>
+  <rect width="1900" height="1350" fill="#ffffff" />
+  <rect x="32" y="24" width="1836" height="86" rx="8" fill="#17263f" stroke="#17263f" />
+  <text x="52" y="61" fill="#ffffff" font-family="Arial, Helvetica, sans-serif" font-size="28" font-weight="700">Athlete Competition History &amp; Performance Progression</text>
+  <text x="52" y="91" fill="#dae5f7" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">Code design  /  Admin / Coach</text>
+  <rect x="32" y="120" width="1836" height="38" rx="8" fill="#ffffff" stroke="#ffffff" />
+  <text x="44" y="146" fill="#53617b" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400">E = existing source   |   P = proposed component/contract   |   EXTEND = existing layer + planned changes   |   dashed arrow = response mapping</text>
+  <rect x="32" y="176" width="450" height="295" rx="8" fill="#f7f9fc" stroke="#dce2ec" />
+  <text x="48" y="204" fill="#53617b" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700">FRONTEND  /  REACT + TYPESCRIPT</text>
+  <rect x="514" y="176" width="820" height="295" rx="8" fill="#f7f9fc" stroke="#dce2ec" />
+  <text x="530" y="204" fill="#53617b" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700">HTTP API  /  TARGET CONTRACT</text>
+  <rect x="32" y="510" width="1302" height="625" rx="8" fill="#f7f9fc" stroke="#dce2ec" />
+  <text x="48" y="538" fill="#53617b" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700">BACKEND  /  SPRING BOOT + JPA</text>
+  <rect x="1366" y="510" width="502" height="625" rx="8" fill="#f7f9fc" stroke="#dce2ec" />
+  <text x="1382" y="538" fill="#53617b" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700">DATA MODEL  /  MYSQL</text>
+  <rect x="1366" y="176" width="502" height="295" rx="8" fill="#f7f9fc" stroke="#dce2ec" />
+  <text x="1382" y="204" fill="#53617b" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700">STATUS  /  DESIGN SCOPE</text>
+  <rect x="1382" y="222" width="470" height="232" rx="8" fill="#ffffff" stroke="#c7d0df" />
+  <text x="1400" y="252" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="700">Sprint 3 target design</text>
+  <text x="1400" y="278" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">Checked against repository source.</text>
+  <text x="1400" y="304" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">Purple: proposed layer.</text>
+  <text x="1400" y="330" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">Amber: extend existing code.</text>
+  <text x="1400" y="356" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">Green: reusable existing model.</text>
+  <text x="1400" y="382" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">Routes and new class names are proposed.</text>
+  <text x="1400" y="408" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">E: existing code. P: proposed Sprint 3 work.</text>
+  <rect x="48" y="222" width="418" height="232" rx="8" fill="#fff8e8" stroke="#966719" />
+  <text x="66" y="248" fill="#966719" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="700">FRONTEND  /  EXTEND</text>
+  <text x="66" y="277" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700">AthleteProfilePage /</text>
+  <text x="66" y="300" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700">AthleteMeetHistory</text>
+  <text x="66" y="328" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[E] Existing profile and meet-history</text>
+  <text x="66" y="349" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">component</text>
+  <text x="66" y="370" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[P] Event filter, all-meet personal best and</text>
+  <text x="66" y="391" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">chart</text>
+  <text x="66" y="412" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[P] Heat / Final / Attempt labels beside</text>
+  <text x="66" y="433" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">results</text>
+  <rect x="530" y="222" width="788" height="232" rx="8" fill="#fff8e8" stroke="#966719" />
+  <text x="548" y="248" fill="#966719" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="700">HTTP API  /  EXTEND</text>
+  <text x="548" y="277" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700">Athlete profile and consolidated history routes</text>
+  <text x="548" y="305" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[E] GET /api/athletes/{id} -&gt; profile + results + participations</text>
+  <text x="548" y="326" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[P] GET /api/athletes/{id}/history?categoryId=...</text>
+  <text x="548" y="347" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[P] Extend existing result create/update DTOs with resultLabel</text>
+  <text x="548" y="368" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[P] ADMIN / COACH; portal uses a separate scoped projection</text>
+  <rect x="48" y="558" width="556" height="250" rx="8" fill="#fff8e8" stroke="#966719" />
+  <text x="66" y="584" fill="#966719" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="700">CONTROLLER  /  EXTEND</text>
+  <text x="66" y="613" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700">AthleteController / AthleteHistoryController</text>
+  <text x="66" y="641" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[E] AthleteController.profile() loads the profile</text>
+  <text x="66" y="662" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[P] AthleteHistoryController.history() validates filter</text>
+  <text x="66" y="683" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[P] EventController preserves optional resultLabel</text>
+  <text x="66" y="704" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[P] Authorize history before fetching athlete data</text>
+  <rect x="636" y="558" width="682" height="250" rx="8" fill="#fff8e8" stroke="#966719" />
+  <text x="654" y="584" fill="#966719" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="700">SERVICE  /  EXTEND</text>
+  <text x="654" y="613" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700">AthleteService / AthleteHistoryService</text>
+  <text x="654" y="641" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[E] profile() combines results and participations</text>
+  <text x="654" y="662" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[P] Group assignments by meet and event definition</text>
+  <text x="654" y="683" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[P] PerformanceSummaryService: best valid score + trend</text>
+  <text x="654" y="704" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[P] Sort by event date; keep every attempt and label</text>
+  <text x="654" y="725" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[P] Share ResultValues + category unit / rankingOrder</text>
+  <rect x="636" y="850" width="682" height="267" rx="8" fill="#fff8e8" stroke="#966719" />
+  <text x="654" y="876" fill="#966719" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="700">REPOSITORY  /  EXTEND</text>
+  <text x="654" y="905" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700">Participation / result / athlete repositories</text>
+  <text x="654" y="933" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[E] findByAthleteId() for assignments and results</text>
+  <text x="654" y="954" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[P] Fetch meet/category context; optional category filter</text>
+  <text x="654" y="975" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[P] Preserve assigned events with zero result records</text>
+  <text x="654" y="996" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[P] DTO mapping uses canonical result IDs; no new copy</text>
+  <rect x="1382" y="558" width="470" height="559" rx="8" fill="#fff8e8" stroke="#966719" />
+  <text x="1400" y="584" fill="#966719" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="700">ENTITY / DATABASE  /  EXTEND</text>
+  <text x="1400" y="613" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700">EventParticipation / EventResult</text>
+  <text x="1400" y="641" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[E] Participation: unique event + athlete</text>
+  <text x="1400" y="662" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">assignment</text>
+  <text x="1400" y="683" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[E] Result: many attempts for the same</text>
+  <text x="1400" y="704" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">athlete/event</text>
+  <text x="1400" y="725" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[E] Event -&gt; Meet + EventCategory</text>
+  <text x="1400" y="746" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[E] score, unit, status, recordedAt, eventDate</text>
+  <text x="1400" y="767" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[P] EventResult.resultLabel: Heat 1 / Final /</text>
+  <text x="1400" y="788" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">Attempt 2</text>
+  <text x="1400" y="809" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[P] Extend result DTOs and frontend ResultAttempt</text>
+  <text x="1400" y="830" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[E] Imported results with no meet stay separate</text>
+  <rect x="48" y="850" width="556" height="267" rx="8" fill="#f3f0ff" stroke="#7050a3" />
+  <text x="66" y="876" fill="#7050a3" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="700">RESPONSE / UI STATE  /  PROPOSED</text>
+  <text x="66" y="905" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700">AthleteHistoryResponse</text>
+  <text x="66" y="933" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[P] meets[].events[].attempts[] + resultLabel</text>
+  <text x="66" y="954" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[P] per-category personalBest + chronological points</text>
+  <text x="66" y="975" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">No assignments -&gt; no competition history</text>
+  <text x="66" y="996" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">Assigned / no attempts -&gt; results unavailable</text>
+  <text x="66" y="1017" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">No valid score -&gt; no PB; one point -&gt; no trend line</text>
+  <polyline points="466,338 530,338" fill="none" stroke="#53617b" stroke-width="1.8" />
+  <path d="M521.0,334.0 L530,338 L521.0,342.0" fill="none" stroke="#53617b" stroke-width="1.8" />
+  <polyline points="924,454 924,490 326,490 326,558" fill="none" stroke="#53617b" stroke-width="1.8" />
+  <path d="M330.0,549.0 L326,558 L322.0,549.0" fill="none" stroke="#53617b" stroke-width="1.8" />
+  <polyline points="604,683 636,683" fill="none" stroke="#53617b" stroke-width="1.8" />
+  <path d="M627.0,679.0 L636,683 L627.0,687.0" fill="none" stroke="#53617b" stroke-width="1.8" />
+  <polyline points="977,808 977,850" fill="none" stroke="#53617b" stroke-width="1.8" />
+  <path d="M981.0,841.0 L977,850 L973.0,841.0" fill="none" stroke="#53617b" stroke-width="1.8" />
+  <polyline points="1318,983 1350,983 1350,837 1382,837" fill="none" stroke="#53617b" stroke-width="1.8" />
+  <path d="M1373.0,833.0 L1382,837 L1373.0,841.0" fill="none" stroke="#53617b" stroke-width="1.8" />
+  <polyline points="326,808 326,850" fill="none" stroke="#53617b" stroke-width="1.8" stroke-dasharray="7 5" />
+  <path d="M330.0,841.0 L326,850 L322.0,841.0" fill="none" stroke="#53617b" stroke-width="1.8" />
+  <rect x="32" y="1170" width="1836" height="156" rx="8" fill="#f7f9fc" stroke="#dce2ec" />
+  <text x="48" y="1198" fill="#53617b" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700">BEHAVIOR  /  SUNNY-DAY, RAINY-DAY AND DESIGN NOTES</text>
+  <rect x="44" y="1208" width="1810" height="106" rx="8" fill="#f7f9fc" stroke="#f7f9fc" />
+  <text x="50" y="1227" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400">SUNNY: search directory -&gt; open profile -&gt; select history/event -&gt; inspect all attempts, personal best and chronological progression.</text>
+  <text x="50" y="1247" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400">RAINY: preserve empty assigned events; exclude DNS/DNF/DQ/FOUL/UNPARSED from PB; show a single point without implying a trend.</text>
+  <text x="50" y="1267" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400">CONSISTENCY: Meet Details and Athlete Profile read the same result records; timed events use ASC and measured events use configured order.</text>
+  <text x="50" y="1287" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400">DESIGN NOTE: competition PB/trends use linked meet results; historical imports remain visible separately; chart semantics are documented.</text>
+</svg>

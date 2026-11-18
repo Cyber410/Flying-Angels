@@ -23,6 +23,42 @@ import java.time.Instant;
 
 @RestControllerAdvice
 public class ApiExceptionHandler {
+    @ExceptionHandler(com.flyingangels.backend.auth.throttle.LoginThrottleService.ThrottledException.class)
+    ResponseEntity<ApiErrorResponse> loginThrottled(com.flyingangels.backend.auth.throttle.LoginThrottleService.ThrottledException exception,
+                                                  HttpServletRequest request) {
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .header(org.springframework.http.HttpHeaders.RETRY_AFTER, Long.toString(exception.retryAfterSeconds()))
+                .cacheControl(org.springframework.http.CacheControl.noStore())
+                .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                .body(new ApiErrorResponse(Instant.now(), 429, "AUTHENTICATION_THROTTLED", exception.getMessage(), request.getRequestURI()));
+    }
+    @ExceptionHandler(org.springframework.web.servlet.resource.NoResourceFoundException.class)
+    ResponseEntity<ApiErrorResponse> endpointNotFound(Exception exception, HttpServletRequest request) {
+        return error(HttpStatus.NOT_FOUND, "ENDPOINT_NOT_FOUND", "Endpoint not found", request);
+    }
+    @ExceptionHandler(com.flyingangels.backend.meet.MeetExportService.ExportGenerationException.class)
+    ResponseEntity<ApiErrorResponse> exportFailure(Exception exception, HttpServletRequest request) {
+        return error(HttpStatus.SERVICE_UNAVAILABLE, "EXPORT_FAILED", exception.getMessage(), request);
+    }
+
+    @ExceptionHandler(com.flyingangels.backend.meet.MeetExportService.EmptyMeetExportException.class)
+    ResponseEntity<ApiErrorResponse> emptyMeetExport(com.flyingangels.backend.meet.MeetExportService.EmptyMeetExportException exception,
+                                                    HttpServletRequest request) {
+        return error(HttpStatus.CONFLICT, exception.code(), exception.getMessage(), request);
+    }
+
+    @ExceptionHandler(org.springframework.security.core.AuthenticationException.class)
+    ResponseEntity<ApiErrorResponse> authenticationFailed(Exception exception, HttpServletRequest request) {
+        return error(HttpStatus.UNAUTHORIZED, "INVALID_CREDENTIALS", "Email or password is incorrect", request);
+    }
+    @ExceptionHandler(org.springframework.security.access.AccessDeniedException.class)
+    ResponseEntity<ApiErrorResponse> accessDenied(Exception exception, HttpServletRequest request) {
+        return error(HttpStatus.FORBIDDEN, "ACCESS_DENIED", "You do not have permission to perform this action", request);
+    }
+    @ExceptionHandler(org.springframework.web.server.ResponseStatusException.class)
+    ResponseEntity<ApiErrorResponse> statusFailure(org.springframework.web.server.ResponseStatusException exception, HttpServletRequest request) {
+        return error(HttpStatus.valueOf(exception.getStatusCode().value()), "REQUEST_REJECTED", exception.getReason(), request);
+    }
 
 	@ExceptionHandler(org.springframework.orm.ObjectOptimisticLockingFailureException.class)
 	ResponseEntity<ApiErrorResponse> changedData(Exception exception, HttpServletRequest request) {
@@ -108,6 +144,7 @@ public class ApiExceptionHandler {
 	private ResponseEntity<ApiErrorResponse> error(HttpStatus status, String code, String message,
 			HttpServletRequest request) {
 		return ResponseEntity.status(status)
+				.contentType(org.springframework.http.MediaType.APPLICATION_JSON)
 				.body(new ApiErrorResponse(Instant.now(), status.value(), code, message, request.getRequestURI()));
 	}
 }

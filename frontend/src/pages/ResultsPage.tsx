@@ -8,14 +8,16 @@ import type { ResultsOverview } from "../types/results";
 import "./MeetsListPage.css";
 import "./ResultsPage.css";
 
+// Read the sample-mode query parameter and open the results view.
 export default function ResultsPage() {
   const [params] = useSearchParams();
   const sample = params.get("sample") === "1";
   return <ResultsOverviewContent key={sample ? "sample" : "live"} sample={sample} />;
 }
 
+// Load result data and manage filters, attempt views, and pagination.
 function ResultsOverviewContent({ sample }: { sample: boolean }) {
-  const [data, setData] = useState<ResultsOverview | null>(() => sample ? getSampleResultsOverview() : null);
+  const [data, setData] = useState<ResultsOverview | null>(/* Compute the initial state when this component mounts. */ () => sample ? getSampleResultsOverview() : null);
   const [isLoading, setIsLoading] = useState(!sample);
   const [error, setError] = useState("");
   const [revision, setRevision] = useState(0);
@@ -29,44 +31,44 @@ function ResultsOverviewContent({ sample }: { sample: boolean }) {
   const [pageSize, setPageSize] = useState(10);
 
   // Fetch shared results; abort work when the user leaves this view.
-  useEffect(() => {
+  useEffect(/* Synchronize this view with its dependencies and clean up pending work. */ () => {
     if (sample) return;
     const controller = new AbortController();
     let ignore = false;
-    getResultsOverview(controller.signal).then((overview) => {
+    getResultsOverview(controller.signal).then(/* Apply the successful request result to the current operation. */ (overview) => {
       if (!ignore) setData(overview);
-    }).catch((error: unknown) => {
+    }).catch(/* Report the request failure without discarding the current view. */ (error: unknown) => {
       if (!ignore) setError(error instanceof Error ? error.message : "Unable to load results.");
-    }).finally(() => {
+    }).finally(/* Clear the busy state after the request completes. */ () => {
       if (!ignore) setIsLoading(false);
     });
-    return () => { ignore = true; controller.abort(); };
+    return /* Stop pending work and release this effect when it is cleaned up. */ () => { ignore = true; controller.abort(); };
   }, [sample, revision]);
 
   // Apply filters before slicing the visible page.
   const rows = (view === "best" ? data?.sharedResults : data?.allAttempts) ?? [];
   const query = search.trim().toLowerCase();
-  const filtered = rows.filter((row) =>
+  const filtered = rows.filter(/* Keep entries matching the current search text. */ (row) =>
     (!query || `${row.firstName} ${row.lastName}`.toLowerCase().includes(query)) &&
     (!categoryId || String(row.categoryId) === categoryId) &&
     (!meetId || String(row.meetId) === meetId) &&
     (!ageGroup || row.ageGroup === ageGroup) &&
     (!gender || row.gender === gender)
   );
-  const categories = [...new Map((data?.events ?? []).map((event) =>
+  const categories = [...new Map((data?.events ?? []).map(/* Index each event by its ID. */ (event) =>
     [event.category.id, { id: event.category.id, name: event.category.name }] as const
-  )).values()].sort((a, b) => a.name.localeCompare(b.name));
-  const meets = [...new Map((data?.events ?? []).map((event) =>
+  )).values()].sort(/* Order entries using the displayed date, name, or performance values. */ (a, b) => a.name.localeCompare(b.name));
+  const meets = [...new Map((data?.events ?? []).map(/* Build meets from each event. */ (event) =>
     [event.meetId, { id: event.meetId, name: event.meetName }] as const
-  )).values()].sort((a, b) => a.name.localeCompare(b.name));
-  const genders = [...new Set((data?.sharedResults ?? []).map((row) => row.gender))].sort();
+  )).values()].sort(/* Order entries using the displayed date, name, or performance values. */ (a, b) => a.name.localeCompare(b.name));
+  const genders = [...new Set((data?.sharedResults ?? []).map(/* Build genders from each row. */ (row) => row.gender))].sort();
   const hasFilters = Boolean(search || categoryId || meetId || ageGroup || gender || view !== "best");
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const currentPage = Math.min(page, totalPages);
   const startIndex = (currentPage - 1) * pageSize;
   const visibleRows = filtered.slice(startIndex, startIndex + pageSize);
-  const athleteCount = new Set(filtered.map((row) => row.athleteId)).size;
-  const meetCount = new Set(filtered.map((row) => row.meetId)).size;
+  const athleteCount = new Set(filtered.map(/* Build athlete count from each row. */ (row) => row.athleteId)).size;
+  const meetCount = new Set(filtered.map(/* Build meet count from each row. */ (row) => row.meetId)).size;
 
   // Resets filter fields and returns pagination to its first page.
   function clearFilters() {
@@ -83,7 +85,7 @@ function ResultsOverviewContent({ sample }: { sample: boolean }) {
   function refresh() {
     setError("");
     setIsLoading(true);
-    setRevision((value) => value + 1);
+    setRevision(/* Derive the next revision value from its current state. */ (value) => value + 1);
   }
 
   return (
@@ -108,13 +110,13 @@ function ResultsOverviewContent({ sample }: { sample: boolean }) {
               aria-label="Search athlete names"
               placeholder="Search athlete names..."
               value={search}
-              onChange={(change) => { setSearch(change.target.value); setPage(1); }}
+              onChange={/* Update the search value from this control. */ (change) => { setSearch(change.target.value); setPage(1); }}
             />
             <label className="results-view-label">
               Result view
               <select
                 value={view}
-                onChange={(change) => { setView(change.target.value as "best" | "attempts"); setPage(1); }}
+                onChange={/* Update the view value from this control. */ (change) => { setView(change.target.value as "best" | "attempts"); setPage(1); }}
               >
                 <option value="best">Shared best results</option>
                 <option value="attempts">All attempts</option>
@@ -125,32 +127,32 @@ function ResultsOverviewContent({ sample }: { sample: boolean }) {
           <div className="results-filters">
             <label>
               Event
-              <select value={categoryId} onChange={(change) => { setCategoryId(change.target.value); setPage(1); }}>
+              <select value={categoryId} onChange={/* Update the category id value from this control. */ (change) => { setCategoryId(change.target.value); setPage(1); }}>
                 <option value="">All events</option>
-                {categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
+                {categories.map(/* Render each category in the list. */ (category) => <option key={category.id} value={category.id}>{category.name}</option>)}
               </select>
             </label>
             <label>
               Meet
-              <select value={meetId} onChange={(change) => { setMeetId(change.target.value); setPage(1); }}>
+              <select value={meetId} onChange={/* Update the meet id value from this control. */ (change) => { setMeetId(change.target.value); setPage(1); }}>
                 <option value="">All meets</option>
-                {meets.map((meet) => <option key={meet.id} value={meet.id}>{meet.name}</option>)}
+                {meets.map(/* Render each meet in the list. */ (meet) => <option key={meet.id} value={meet.id}>{meet.name}</option>)}
               </select>
             </label>
             <label>
               Age Group
-              <select value={ageGroup} onChange={(change) => { setAgeGroup(change.target.value); setPage(1); }}>
+              <select value={ageGroup} onChange={/* Update the age group value from this control. */ (change) => { setAgeGroup(change.target.value); setPage(1); }}>
                 <option value="">All age groups</option>
-                {AGE_GROUPS.map((group) => <option key={group} value={group}>{group}</option>)}
+                {AGE_GROUPS.map(/* Render each group in the list. */ (group) => <option key={group} value={group}>{group}</option>)}
                 <option value="Under 5">Under 5</option>
                 <option value="Not provided">Not provided</option>
               </select>
             </label>
             <label>
               Gender
-              <select value={gender} onChange={(change) => { setGender(change.target.value); setPage(1); }}>
+              <select value={gender} onChange={/* Update the gender value from this control. */ (change) => { setGender(change.target.value); setPage(1); }}>
                 <option value="">All genders</option>
-                {genders.map((item) => <option key={item} value={item}>{item}</option>)}
+                {genders.map(/* Render each item in the list. */ (item) => <option key={item} value={item}>{item}</option>)}
               </select>
             </label>
             <button className="meets-button results-clear-button" type="button" disabled={!hasFilters} onClick={clearFilters}>Clear Filters</button>
@@ -172,11 +174,11 @@ function ResultsOverviewContent({ sample }: { sample: boolean }) {
             <>
               {data && (data.warnings.length > 0 || data.failedEvents.length > 0) && (
                 <div className="results-warning" role="status">
-                  {data.warnings.map((warning) => <p key={warning}>{warning}</p>)}
+                  {data.warnings.map(/* Render each warning in the list. */ (warning) => <p key={warning}>{warning}</p>)}
                   {data.failedEvents.length > 0 && (
                     <details>
                       <summary>Results unavailable for {data.failedEvents.length} event{data.failedEvents.length === 1 ? "" : "s"}. Refresh to retry.</summary>
-                      <ul>{data.failedEvents.map((event) => <li key={event.eventId}>{event.eventName} · {event.meetName}: {event.message}</li>)}</ul>
+                      <ul>{data.failedEvents.map(/* Render each event in the list. */ (event) => <li key={event.eventId}>{event.eventName} · {event.meetName}: {event.message}</li>)}</ul>
                     </details>
                   )}
                 </div>
@@ -194,7 +196,7 @@ function ResultsOverviewContent({ sample }: { sample: boolean }) {
                     </tr>
                   </thead>
                   <tbody>
-                    {visibleRows.map((row) => (
+                    {visibleRows.map(/* Render each row in the list. */ (row) => (
                       <tr key={row.id}>
                         <th scope="row">
                           {sample ? `${row.firstName} ${row.lastName}` : <Link to={`/athletes/${row.athleteId}`}>{row.firstName} {row.lastName}</Link>}
@@ -228,15 +230,15 @@ function ResultsOverviewContent({ sample }: { sample: boolean }) {
               <div className="meets-footer">
                 <label className="meets-page-size">
                   Show
-                  <select aria-label="Results per page" value={pageSize} onChange={(change) => { setPageSize(Number(change.target.value)); setPage(1); }}>
+                  <select aria-label="Results per page" value={pageSize} onChange={/* Update the page size value from this control. */ (change) => { setPageSize(Number(change.target.value)); setPage(1); }}>
                     <option value={10}>10</option><option value={25}>25</option><option value={50}>50</option>
                   </select>
                 </label>
                 <p aria-live="polite">{filtered.length ? startIndex + 1 : 0}–{Math.min(startIndex + pageSize, filtered.length)} of {filtered.length} results</p>
                 <nav className="meets-pagination" aria-label="Results pagination">
-                  <button className="meets-button" type="button" aria-label="Previous page" disabled={currentPage === 1} onClick={() => setPage(currentPage - 1)}>‹</button>
+                  <button className="meets-button" type="button" aria-label="Previous page" disabled={currentPage === 1} onClick={/* Show the previous page of matching records. */ () => setPage(currentPage - 1)}>‹</button>
                   <span>Page {currentPage} of {totalPages}</span>
-                  <button className="meets-button" type="button" aria-label="Next page" disabled={currentPage === totalPages} onClick={() => setPage(currentPage + 1)}>›</button>
+                  <button className="meets-button" type="button" aria-label="Next page" disabled={currentPage === totalPages} onClick={/* Show the next page of matching records. */ () => setPage(currentPage + 1)}>›</button>
                 </nav>
               </div>
             </>

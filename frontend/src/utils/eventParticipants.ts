@@ -2,12 +2,14 @@
 import type { EventParticipant, EventProfile, ResultAttempt } from "../types/event";
 import { bestResultAttempt } from "./eventResult";
 
+// Return saved attempts or adapt a single legacy result into an attempt.
 export function participantAttempts(participant: EventParticipant): ResultAttempt[] {
   if (participant.attempts) return participant.attempts;
   return participant.resultId !== null && participant.result !== null && participant.score !== null
     ? [{ id: String(participant.resultId), result: participant.result, score: participant.score }] : [];
 }
 
+// Group every attempt under its participant and choose the best result.
 export function eventParticipants(profile: EventProfile): EventParticipant[] {
   const byAthlete = new Map<number, EventParticipant>();
   for (const participant of profile.participants ?? []) {
@@ -26,7 +28,7 @@ export function eventParticipants(profile: EventProfile): EventParticipant[] {
       participant.attempts = [...(participant.attempts ?? []), attempt];
     }
   }
-  return [...byAthlete.values()].map(participant => {
+  return [...byAthlete.values()].map(/* Convert each participant into the required display or request data. */ participant => {
     const best = bestResultAttempt(participant.attempts ?? [], profile.event.rankingOrder);
     return best ? { ...participant, resultId: Number(best.id), result: best.result, score: best.score } : participant;
   });

@@ -4,15 +4,15 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { describe, expect, it } from "vitest";
 import Header from "./header";
 
-describe("shared navigation", () => {
-  it.each(["/", "/athletes/7"])("keeps Athletes active at %s", (path) => {
+describe("shared navigation", /* Group the shared navigation checks. */ () => {
+  it.each(["/", "/athletes/7"])("keeps Athletes active at %s", /* Verify the same behaviour for each supplied test case. */ (path) => {
     render(<MemoryRouter initialEntries={[path]}><Header /></MemoryRouter>);
     expect(screen.getByRole("link", { name: "Athletes" })).toHaveAttribute("aria-current", "page");
     expect(screen.getByRole("link", { name: "FLYING ANGELS" })).toHaveAttribute("href", "/");
     expect(screen.queryByText("FA")).not.toBeInTheDocument();
   });
 
-  it("navigates between Meets, Results, and the athlete homepage", async () => {
+  it("navigates between Meets, Results, and the athlete homepage", /* Verify that navigates between Meets, Results, and the athlete homepage. */ async () => {
     const user = userEvent.setup();
     render(
       <MemoryRouter>
@@ -34,7 +34,7 @@ describe("shared navigation", () => {
     expect(screen.getByText("Athlete homepage")).toBeInTheDocument();
   });
 
-  it("links to the active Import page", () => {
+  it("links to the active Import page", /* Verify that links to the active Import page. */ () => {
     render(<MemoryRouter initialEntries={["/import"]}><Header /></MemoryRouter>);
     const link = screen.getByRole("link", { name: "Import" });
     expect(link).toHaveAttribute("href", "/import");

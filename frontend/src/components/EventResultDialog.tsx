@@ -16,12 +16,13 @@ type Props = {
   onClose: () => void;
 };
 
+// Enter or correct an attempt using the event-specific unit controls.
 export default function EventResultDialog({ event, participant, attempts, editingAttempt, onSaved, onClose }: Props) {
   const id = useId();
   const baseUnit = eventResultUnit(event);
   const units = resultEntryUnits(event);
-  const [entry, setEntry] = useState(() => resultEntryForAttempt(event, editingAttempt));
-  const [attemptId] = useState(() => editingAttempt?.id ?? crypto.randomUUID());
+  const [entry, setEntry] = useState(/* Compute the initial state when this component mounts. */ () => resultEntryForAttempt(event, editingAttempt));
+  const [attemptId] = useState(/* Compute the initial state when this component mounts. */ () => editingAttempt?.id ?? crypto.randomUUID());
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState("");
   const preview = parseResultEntry(entry, event);
@@ -34,13 +35,13 @@ export default function EventResultDialog({ event, participant, attempts, editin
 
   // Updates one result-entry field and clears the previous validation error.
   function updateValue(field: "value" | "hours" | "minutes" | "seconds", value: string) {
-    setEntry((current) => ({ ...current, [field]: value }));
+    setEntry(/* Derive the next entry value from its current state. */ (current) => ({ ...current, [field]: value }));
     setError("");
   }
 
   // Converts valid input before switching the result unit.
   function changeUnit(unit: ResultEntryUnit) {
-    const hasValue = [entry.value, entry.hours, entry.minutes, entry.seconds].some((value) => value.trim());
+    const hasValue = [entry.value, entry.hours, entry.minutes, entry.seconds].some(/* Check whether any value matches the required condition. */ (value) => value.trim());
     if (hasValue && !preview) {
       setError("Enter a valid result before changing units, or clear the fields to start again.");
       return;
@@ -49,6 +50,7 @@ export default function EventResultDialog({ event, participant, attempts, editin
     setError("");
   }
 
+  // Validate and save a new attempt or correct the selected saved result.
   async function handleSubmit(submit: FormEvent<HTMLFormElement>) {
     submit.preventDefault();
     if (isSaving) return;
@@ -68,8 +70,8 @@ export default function EventResultDialog({ event, participant, attempts, editin
         : await createParticipantResult(event.id, participant.athleteId, parsed.result, parsed.score, attemptId);
       const attempt: ResultAttempt = { id: String(saved.resultId), result: saved.result!, score: saved.score! };
       const nextAttempts = editingAttempt
-        ? attempts.map(item => item.id === editingAttempt.id ? attempt : item)
-        : [...attempts.filter(item => item.id !== attempt.id), attempt];
+        ? attempts.map(/* Build next attempts from each item. */ item => item.id === editingAttempt.id ? attempt : item)
+        : [...attempts.filter(/* Exclude entries that do not belong in this result or selection. */ item => item.id !== attempt.id), attempt];
       const best = bestResultAttempt(nextAttempts, event.rankingOrder)!;
       onSaved({ ...saved, resultId: Number(best.id), result: best.result, score: best.score }, nextAttempts);
       onClose();
@@ -89,29 +91,29 @@ export default function EventResultDialog({ event, participant, attempts, editin
                 {entry.unit === "h-min-sec" && (
                   <label className="meet-form-field" htmlFor={`${id}-hours`}>
                     Hours
-                    <input id={`${id}-hours`} inputMode="numeric" placeholder="0" value={entry.hours} maxLength={8} autoFocus onChange={(change) => updateValue("hours", change.target.value)} />
+                    <input id={`${id}-hours`} inputMode="numeric" placeholder="0" value={entry.hours} maxLength={8} autoFocus onChange={/* Apply the changed control value to the current selection. */ (change) => updateValue("hours", change.target.value)} />
                   </label>
                 )}
                 <label className="meet-form-field" htmlFor={`${id}-minutes`}>
                   Minutes
-                  <input id={`${id}-minutes`} inputMode="numeric" placeholder="0" value={entry.minutes} maxLength={8} autoFocus={entry.unit === "min-sec"} onChange={(change) => updateValue("minutes", change.target.value)} />
+                  <input id={`${id}-minutes`} inputMode="numeric" placeholder="0" value={entry.minutes} maxLength={8} autoFocus={entry.unit === "min-sec"} onChange={/* Apply the changed control value to the current selection. */ (change) => updateValue("minutes", change.target.value)} />
                 </label>
                 <label className="meet-form-field" htmlFor={`${id}-seconds`}>
                   Seconds
-                  <input id={`${id}-seconds`} inputMode="decimal" placeholder="00.00" value={entry.seconds} maxLength={14} onChange={(change) => updateValue("seconds", change.target.value)} />
+                  <input id={`${id}-seconds`} inputMode="decimal" placeholder="00.00" value={entry.seconds} maxLength={14} onChange={/* Apply the changed control value to the current selection. */ (change) => updateValue("seconds", change.target.value)} />
                 </label>
               </div>
             </fieldset>
           ) : (
             <label className="meet-form-field" htmlFor={id}>
               {baseUnit === "s" ? "Time" : "Distance / height"}
-              <input id={id} value={entry.value} inputMode="decimal" placeholder={entry.unit === "min" ? "1.5" : entry.unit === "cm" ? "520" : baseUnit === "m" ? "5.20" : "12.45"} maxLength={48} required autoFocus disabled={isSaving} aria-describedby={`${id}-help`} onChange={(change) => updateValue("value", change.target.value)} />
+              <input id={id} value={entry.value} inputMode="decimal" placeholder={entry.unit === "min" ? "1.5" : entry.unit === "cm" ? "520" : baseUnit === "m" ? "5.20" : "12.45"} maxLength={48} required autoFocus disabled={isSaving} aria-describedby={`${id}-help`} onChange={/* Apply the changed control value to the current selection. */ (change) => updateValue("value", change.target.value)} />
             </label>
           )}
           <label className="meet-form-field" htmlFor={`${id}-unit`}>
             Unit
-            <select id={`${id}-unit`} value={entry.unit} disabled={isSaving} onChange={(change) => changeUnit(change.target.value as ResultEntryUnit)}>
-              {units.map((unit) => <option key={unit.value} value={unit.value}>{unit.label}</option>)}
+            <select id={`${id}-unit`} value={entry.unit} disabled={isSaving} onChange={/* Apply the changed control value to the current selection. */ (change) => changeUnit(change.target.value as ResultEntryUnit)}>
+              {units.map(/* Render each unit in the list. */ (unit) => <option key={unit.value} value={unit.value}>{unit.label}</option>)}
             </select>
           </label>
         </div>

@@ -83,7 +83,7 @@ public class AthleteImportService {
             String status = row.status(), explanation = row.explanation();
             if (status.equals("IMPORTED")) imported++;
             else if (status.equals("UPDATED")) updated++;
-            else if (selected.contains(row.rowNumber()) && Set.of("FAILED", "INVALID", "AMBIGUOUS").contains(status)) failed++;
+            else if (selected.contains(row.rowNumber()) && Set.of("FAILED", "INVALID", "AMBIGUOUS", "ADMIN_REQUIRED").contains(status)) failed++;
             else if (!selected.contains(row.rowNumber()) && ImportRowWriter.eligible(status)) { status = "SKIPPED"; explanation = "Excluded from this commit"; }
             outcomes.add(new ImportPreviewResponse.Row(row.rowNumber(), status, explanation, row.athleteId(), row.athlete(), row.externalId(), row.repeatedOfRowNumber()));
         }

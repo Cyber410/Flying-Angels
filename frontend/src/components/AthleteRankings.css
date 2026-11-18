@@ -1,0 +1,10 @@
+/* Match the profile's compact filters and distinguish the athlete's own result. */
+.ranking-filters { display: flex; flex-wrap: wrap; gap: 18px; margin: 0 0 24px; }
+.ranking-filters label { display: grid; gap: 8px; flex: 1 1 240px; font-size: 13px; font-weight: 500; }
+.ranking-filters select { width: 100%; padding: 10px; font: inherit; color: var(--text); background: var(--surface); border: 1px solid var(--border); border-radius: 5px; }
+/* Keep reset actions aligned with the inputs when filters wrap on small screens. */
+.ranking-filters > button { align-self: flex-end; min-height: 38px; }
+.ranking-own-row { background: var(--orange-soft); }
+.ranking-own-row th { border-left: 3px solid var(--orange); }
+.ranking-pagination { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; margin: 18px 0; color: var(--text-secondary); font-size: 12px; }
+.ranking-pagination > div { display: flex; gap: 8px; }

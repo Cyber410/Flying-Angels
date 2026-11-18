@@ -11,6 +11,7 @@ vi.mock("../services/meetService");
 const fall: Meet = {
   id: 1, name: "Fall Invitational", meetDate: "2026-10-24",
   location: "Toronto, ON", externalUrl: null, eventCount: 3,
+  availabilitySummary: { total: 12, available: 6, awaitingResponse: 5, unavailable: 1 },
 };
 const summer: Meet = {
   id: 2, name: "Summer Championships", meetDate: "2026-08-15",
@@ -24,37 +25,69 @@ const spring: Meet = {
 // jsdom does not implement the browser's modal display/focus behavior.
 const originalShowModal = Object.getOwnPropertyDescriptor(HTMLDialogElement.prototype, "showModal");
 const originalClose = Object.getOwnPropertyDescriptor(HTMLDialogElement.prototype, "close");
-beforeAll(() => {
+beforeAll(/* Install the shared dialog mock before the test group runs. */ () => {
   Object.defineProperty(HTMLDialogElement.prototype, "showModal", {
-    configurable: true, value: function (this: HTMLDialogElement) { this.open = true; },
+    configurable: true, value: /* Mark the test dialog as open without a native browser. */ function (this: HTMLDialogElement) { this.open = true; },
   });
   Object.defineProperty(HTMLDialogElement.prototype, "close", {
-    configurable: true, value: function (this: HTMLDialogElement) { this.open = false; },
+    configurable: true, value: /* Mark the test dialog as closed without a native browser. */ function (this: HTMLDialogElement) { this.open = false; },
   });
 });
-afterAll(() => {
+afterAll(/* Restore the original dialog methods after the test group finishes. */ () => {
   if (originalShowModal) Object.defineProperty(HTMLDialogElement.prototype, "showModal", originalShowModal);
   else Reflect.deleteProperty(HTMLDialogElement.prototype, "showModal");
   if (originalClose) Object.defineProperty(HTMLDialogElement.prototype, "close", originalClose);
   else Reflect.deleteProperty(HTMLDialogElement.prototype, "close");
 });
 
-beforeEach(() => {
+beforeEach(/* Reset test state and mocks before each test. */ () => {
   vi.resetAllMocks();
   vi.mocked(getMeets).mockResolvedValue([spring, fall, summer]);
 });
 
+// Render the page with the router context required by the test.
 function renderPage() {
   return render(<MemoryRouter initialEntries={["/meets"]}><MeetsListPage /></MemoryRouter>);
 }
 
+// Render the meet list and wait for the initial request to finish.
 async function loadedPage() {
   renderPage();
   await screen.findByRole("rowheader", { name: fall.name });
 }
 
-describe("Meets List", () => {
-  it("includes a weekend meet when the filter matches its second day", async () => {
+describe("Meets List", /* Group the Meets List checks. */ () => {
+  it("shows availability counts and links directly to the selected meet's responses", /* Verify the scheduling summary uses the backend's nomination counts. */ async () => {
+    await loadedPage();
+    const summary = screen.getByLabelText(`Availability for ${fall.name}`);
+    expect(summary).toHaveTextContent("6 Available5 Awaiting1 Unavailable");
+    expect(screen.getByRole("link", { name: `Manage availability for ${fall.name}` })).toHaveAttribute("href", "/availability?meetId=1");
+    expect(screen.getByText("12 athletes nominated")).toBeInTheDocument();
+  });
+
+  it("switches schedule scopes using the API and sorts past meets most recent first", /* Verify scope changes never rely on browser date assumptions. */ async () => {
+    const user = userEvent.setup(); await loadedPage();
+    expect(getMeets).toHaveBeenCalledWith(undefined, "UPCOMING");
+    vi.mocked(getMeets).mockResolvedValueOnce([summer,fall]);
+    await user.click(within(screen.getByRole("group", { name: "Meet schedule" })).getByRole("button", { name: "Past" }));
+    await screen.findByRole("rowheader", { name: fall.name });
+    expect(getMeets).toHaveBeenLastCalledWith(undefined, "PAST");
+    expect(screen.getAllByRole("rowheader").map(/* Read the displayed chronological meet order. */ row => row.textContent)).toEqual([fall.name,summer.name]);
+    expect(screen.getByRole("button", { name: "Past" })).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("reloads response counts after meet edits invalidate confirmations", /* Verify that a successful edit does not retain stale summary totals. */ async () => {
+    const user = userEvent.setup(); await loadedPage();
+    const revised = { ...fall, location: "New stadium", availabilitySummary: { total: 12, available: 0, awaitingResponse: 12, unavailable: 0 } };
+    vi.mocked(updateMeet).mockResolvedValue(revised); vi.mocked(getMeets).mockResolvedValue([revised]);
+    await user.click(screen.getByRole("button", { name: `Edit ${fall.name}` }));
+    const location = screen.getByLabelText("Location (optional)"); await user.clear(location); await user.type(location, "New stadium");
+    await user.click(screen.getByRole("button", { name: "Save Changes" }));
+    await screen.findByText("New stadium");
+    expect(screen.getByLabelText(`Availability for ${fall.name}`)).toHaveTextContent("0 Available12 Awaiting0 Unavailable");
+  });
+
+  it("includes a weekend meet when the filter matches its second day", /* Verify that includes a weekend meet when the filter matches its second day. */ async () => {
     vi.mocked(getMeets).mockResolvedValue([{...fall,endDate:"2026-10-25"}]);
     await loadedPage();
     fireEvent.change(screen.getByLabelText("From date"),{target:{value:"2026-10-25"}});
@@ -62,9 +95,10 @@ describe("Meets List", () => {
     expect(screen.getByRole("rowheader",{name:fall.name})).toBeInTheDocument();
     expect(screen.getByText("Oct 24, 2026 – Oct 25, 2026")).toBeInTheDocument();
   });
-  it("creates a multi-day meet with its selected end date", async () => {
+  it("creates a multi-day meet with its selected end date", /* Verify that creates a multi-day meet with its selected end date. */ async () => {
     const user=userEvent.setup();await loadedPage();
     vi.mocked(createMeet).mockResolvedValue({...fall,id:4,name:"Weekend Meet",endDate:"2026-10-25"});
+    vi.mocked(getMeets).mockResolvedValue([spring,fall,summer,{...fall,id:4,name:"Weekend Meet",endDate:"2026-10-25"}]);
     await user.click(screen.getByRole("button",{name:"+ New Meet"}));
     await user.type(screen.getByLabelText("Meet name"),"Weekend Meet");
     fireEvent.change(screen.getByLabelText("Start date"),{target:{value:"2026-10-24"}});
@@ -73,12 +107,12 @@ describe("Meets List", () => {
     await screen.findByRole("rowheader",{name:"Weekend Meet"});
     expect(createMeet).toHaveBeenCalledWith(expect.objectContaining({meetDate:"2026-10-24",endDate:"2026-10-25"}));
   });
-  it("shows loading then renders real fields in date-descending order", async () => {
+  it("shows loading then renders the earliest upcoming meet first", /* Verify the upcoming schedule's chronological ordering and real fields. */ async () => {
     renderPage();
     expect(screen.getByText("Loading meets...")).toBeInTheDocument();
     await screen.findByRole("rowheader", { name: fall.name });
-    expect(screen.getAllByRole("rowheader").map((cell) => cell.textContent)).toEqual([
-      fall.name, summer.name, spring.name,
+    expect(screen.getAllByRole("rowheader").map(/* Convert each cell into the required display or request data. */ (cell) => cell.textContent)).toEqual([
+      spring.name, summer.name, fall.name,
     ]);
     const row = screen.getByRole("rowheader", { name: fall.name }).closest("tr")!;
     expect(within(row).getByText("Oct 24, 2026")).toBeInTheDocument();
@@ -87,7 +121,7 @@ describe("Meets List", () => {
     expect(screen.queryByRole("columnheader", { name: "Status" })).not.toBeInTheDocument();
   });
 
-  it("searches names and locations without additional API calls", async () => {
+  it("searches names and locations without additional API calls", /* Verify that searches names and locations without additional API calls. */ async () => {
     const user = userEvent.setup();
     await loadedPage();
     const search = screen.getByRole("searchbox", { name: "Search meets" });
@@ -100,7 +134,7 @@ describe("Meets List", () => {
     expect(getMeets).toHaveBeenCalledTimes(1);
   });
 
-  it("combines inclusive date bounds and search, and clears all filters", async () => {
+  it("combines inclusive date bounds and search, and clears all filters", /* Verify that combines inclusive date bounds and search, and clears all filters. */ async () => {
     const user = userEvent.setup();
     await loadedPage();
     fireEvent.change(screen.getByLabelText("From date"), { target: { value: "2026-08-15" } });
@@ -114,7 +148,7 @@ describe("Meets List", () => {
     expect(screen.getByLabelText("To date")).toHaveValue("");
   });
 
-  it("explains an inverted date range", async () => {
+  it("explains an inverted date range", /* Verify that explains an inverted date range. */ async () => {
     await loadedPage();
     fireEvent.change(screen.getByLabelText("From date"), { target: { value: "2026-10-24" } });
     fireEvent.change(screen.getByLabelText("To date"), { target: { value: "2026-08-15" } });
@@ -122,9 +156,9 @@ describe("Meets List", () => {
     expect(screen.queryAllByRole("rowheader")).toHaveLength(0);
   });
 
-  it("paginates and resets to the first page after filtering or changing page size", async () => {
+  it("paginates and resets to the first page after filtering or changing page size", /* Verify that paginates and resets to the first page after filtering or changing page size. */ async () => {
     const user = userEvent.setup();
-    vi.mocked(getMeets).mockResolvedValue(Array.from({ length: 12 }, (_, index) => ({
+    vi.mocked(getMeets).mockResolvedValue(Array.from({ length: 12 }, /* Build each generated item from its index. */ (_, index) => ({
       ...fall, id: index + 1, name: `Meet ${String(index + 1).padStart(2, "0")}`,
     })));
     renderPage();
@@ -143,17 +177,19 @@ describe("Meets List", () => {
     expect(screen.getByRole("button", { name: "Next page" })).toBeDisabled();
   });
 
-  it("distinguishes an empty list from no search matches", async () => {
+  it("distinguishes an empty list from no search matches", /* Verify that distinguishes an empty list from no search matches. */ async () => {
     const user = userEvent.setup();
     vi.mocked(getMeets).mockResolvedValue([]);
     renderPage();
+    await screen.findByText("No upcoming meets to display.");
+    await user.click(screen.getByRole("button", { name: "View all meets" }));
     await screen.findByText("No meets yet. Create your first meet to get started.");
     await user.type(screen.getByRole("searchbox"), "missing");
     expect(screen.getByText("No meets match your search or date range.")).toBeInTheDocument();
     expect(screen.getByText("0–0 of 0 meets")).toBeInTheDocument();
   });
 
-  it("allows a failed load to be retried", async () => {
+  it("allows a failed load to be retried", /* Verify that allows a failed load to be retried. */ async () => {
     const user = userEvent.setup();
     vi.mocked(getMeets).mockRejectedValueOnce(new Error("Unable to load meets."));
     renderPage();
@@ -163,11 +199,12 @@ describe("Meets List", () => {
     expect(getMeets).toHaveBeenCalledTimes(2);
   });
 
-  it("creates a meet with trimmed fields and null optional values", async () => {
+  it("creates a meet with trimmed fields and null optional values", /* Verify that creates a meet with trimmed fields and null optional values. */ async () => {
     const user = userEvent.setup();
     const created = { ...fall, id: 4, name: "Winter Open", meetDate: "2026-12-01", location: null, eventCount: 0 };
     vi.mocked(createMeet).mockResolvedValue(created);
     await loadedPage();
+    vi.mocked(getMeets).mockResolvedValue([spring,fall,summer,created]);
     await user.click(screen.getByRole("button", { name: "+ New Meet" }));
     const dialog = screen.getByRole("dialog", { name: "New Meet" });
     await user.type(within(dialog).getByLabelText("Meet name"), "  Winter Open  ");
@@ -180,7 +217,7 @@ describe("Meets List", () => {
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
-  it("retains form values and displays a failed save without adding a row", async () => {
+  it("retains form values and displays a failed save without adding a row", /* Verify that retains form values and displays a failed save without adding a row. */ async () => {
     const user = userEvent.setup();
     vi.mocked(createMeet).mockRejectedValue(new Error("Meet date is required"));
     await loadedPage();
@@ -193,7 +230,7 @@ describe("Meets List", () => {
     expect(screen.getAllByRole("rowheader")).toHaveLength(3);
   });
 
-  it("rejects a whitespace-only name without making an API request", async () => {
+  it("rejects a whitespace-only name without making an API request", /* Verify that rejects a whitespace-only name without making an API request. */ async () => {
     const user = userEvent.setup();
     await loadedPage();
     await user.click(screen.getByRole("button", { name: "+ New Meet" }));
@@ -204,10 +241,11 @@ describe("Meets List", () => {
     expect(createMeet).not.toHaveBeenCalled();
   });
 
-  it("prefills and saves edits to the correct meet", async () => {
+  it("prefills and saves edits to the correct meet", /* Verify that prefills and saves edits to the correct meet. */ async () => {
     const user = userEvent.setup();
     vi.mocked(updateMeet).mockResolvedValue({ ...summer, name: "Summer Open" });
     await loadedPage();
+    vi.mocked(getMeets).mockResolvedValue([spring,fall,{...summer,name:"Summer Open"}]);
     await user.click(screen.getByRole("button", { name: `Edit ${summer.name}` }));
     expect(screen.getByLabelText("Start date")).toHaveValue(summer.meetDate);
     expect(screen.getByLabelText("Website (optional)")).toHaveValue(summer.externalUrl);
@@ -222,10 +260,10 @@ describe("Meets List", () => {
     expect(screen.getByRole("rowheader", { name: fall.name })).toBeInTheDocument();
   });
 
-  it("requires deletion confirmation, supports cancel, and clamps the last page", async () => {
+  it("requires deletion confirmation, supports cancel, and clamps the last page", /* Verify that requires deletion confirmation, supports cancel, and clamps the last page. */ async () => {
     const user = userEvent.setup();
     vi.mocked(deleteMeet).mockResolvedValue(undefined);
-    vi.mocked(getMeets).mockResolvedValue(Array.from({ length: 11 }, (_, index) => ({
+    vi.mocked(getMeets).mockResolvedValue(Array.from({ length: 11 }, /* Build each generated item from its index. */ (_, index) => ({
       ...fall, id: index + 1, name: `Meet ${String(index + 1).padStart(2, "0")}`,
     })));
     renderPage();
@@ -237,13 +275,13 @@ describe("Meets List", () => {
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Delete Meet 11" }));
     await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Delete Meet" }));
-    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    await waitFor(/* Wait until the expected asynchronous UI update is visible. */ () => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
     expect(deleteMeet).toHaveBeenCalledWith(11);
     expect(screen.getByText("Page 1 of 1")).toBeInTheDocument();
     expect(screen.getAllByRole("rowheader")).toHaveLength(10);
   });
 
-  it("keeps the meet and dialog when deletion fails", async () => {
+  it("keeps the meet and dialog when deletion fails", /* Verify that keeps the meet and dialog when deletion fails. */ async () => {
     const user = userEvent.setup();
     vi.mocked(deleteMeet).mockRejectedValue(new Error("Unable to delete meet."));
     await loadedPage();
@@ -253,10 +291,10 @@ describe("Meets List", () => {
     expect(screen.getByRole("rowheader", { name: fall.name })).toBeInTheDocument();
   });
 
-  it("blocks duplicate submissions and dismissal while saving", async () => {
+  it("blocks duplicate submissions and dismissal while saving", /* Verify that blocks duplicate submissions and dismissal while saving. */ async () => {
     const user = userEvent.setup();
     let finishSave!: (meet: Meet) => void;
-    vi.mocked(createMeet).mockReturnValue(new Promise((resolve) => { finishSave = resolve; }));
+    vi.mocked(createMeet).mockReturnValue(new Promise(/* Expose the completion callback so the test can control when saving finishes. */ (resolve) => { finishSave = resolve; }));
     await loadedPage();
     await user.click(screen.getByRole("button", { name: "+ New Meet" }));
     await user.type(screen.getByLabelText("Meet name"), "Winter Open");
@@ -267,6 +305,7 @@ describe("Meets List", () => {
     expect(screen.getByRole("button", { name: "Close dialog" })).toBeDisabled();
     fireEvent(screen.getByRole("dialog"), new Event("cancel", { cancelable: true }));
     expect(screen.getByRole("dialog")).toBeInTheDocument();
+    vi.mocked(getMeets).mockResolvedValue([spring,fall,summer,{ ...fall, id: 4, name: "Winter Open" }]);
     finishSave({ ...fall, id: 4, name: "Winter Open" });
     await screen.findByRole("rowheader", { name: "Winter Open" });
     expect(createMeet).toHaveBeenCalledTimes(1);

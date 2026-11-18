@@ -45,6 +45,7 @@ import com.flyingangels.backend.event.RankingOrder;
  */
 @WebMvcTest(AthleteController.class)
 @Import(SecurityConfig.class)
+@org.springframework.test.context.TestPropertySource(properties = "app.security.require-authentication=false")
 class AthleteControllerWebMvcTest {
 
 	@Autowired

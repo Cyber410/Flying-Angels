@@ -1,5 +1,75 @@
 # Postman pack verification
 
+## 2026-11-18: V1 matches the existing RDS schema
+
+At the owner's request, V1 now matches all ten supplied RDS table definitions,
+including column order. V2 applies the missing Sprint 3 schema automatically;
+enrollment and password recovery move to V3 and V4. The manual conversion scripts
+were removed. The reviewed unversioned RDS schema needs only the standard
+one-startup baseline at version 1, followed by Flyway migrations 2 through 4.
+
+The clean backend suite passed **376 tests: 374 passed, 2 existing skips, zero
+failures/errors**, using the repository's Docker API setting `-Dapi.version=1.44`.
+All seven migration tests passed, covering fresh databases, direct legacy
+baselining, versioned upgrades, preservation of records in all ten legacy tables,
+repeat startup and migration protections. Hibernate startup validation also passed.
+No Postman collections, real email sends or AWS database writes were run for this
+change. Retained local databases were not reset or modified. Log:
+`/private/tmp/fa-rds-version-layout-tests.log`.
+
+The historical migration entries below describe earlier layouts and are
+superseded by [the current migration walkthrough](../database-migrations.md).
+
+## 2026-11-13: Draft existing-database upgrade
+
+Generated the previous committed backend's actual ten-table Hibernate schema from `671a9ae` in disposable MySQL 8.4. Compared it with V1 and prepared `deploy/sql/upgrade-existing-to-v1.sql.draft`: six tables, two nullable columns and one rankings index. The script is outside automatic migration resources and is not approved for live RDS until its real schema export is compared.
+
+The targeted `DatabaseMigrationIntegrationTest` run passed all **5 tests**, including an added populated previous-schema upgrade case. Existing athlete, meet, category, event, assignment, result and note fields survived the SQL upgrade and V1 baseline. Log: `/tmp/fa-upgrade-to-v1-tests.log`. The earlier full-suite run predates this added test; the full suite and Postman collections were not rerun for this draft-only change.
+
+No AWS credentials, endpoint or schema export were available in the workspace; no RDS queries or changes were performed. The current fresh-database V1 and local running stacks remain unchanged. This historical draft is superseded by the [current RDS adoption layout](../database-migrations.md#first-startup-against-the-reviewed-rds-database).
+
+## 2026-11-13: Local backup and restore rehearsal
+
+Restored the existing fa-postman database into the separate fa-restore-rehearsal project. The complete schema/data exports matched byte-for-byte before backend startup. Flyway retained V1 history and Hibernate validation passed. API checks confirmed Admin login, 9 athletes, 9 performances, 2 notes and 37 restored accounts.
+
+The source had 28 SENT emails and no pending messages. A synthetic invitation created only in the restored copy was backed up and restored with its encrypted payload intact. With the retained outbox key, the worker delivered it once to a separate local Mailpit inbox and its activation token validated. Delivery was disabled again afterward. No synthetic restore account exists in the source; its record counts are unchanged.
+
+Both local stacks remain healthy for inspection. Restored API: http://127.0.0.1:18081; restored Mailpit: http://127.0.0.1:18026. Original API remains http://localhost:18080. No AWS or frontend changes. Steps and disposable Compose configuration are in [Local backup and restore](../local-backup-restore.md).
+
+## 2026-11-13: Consolidated V1 with standard Flyway
+
+The project owner requested one initial migration and removal of the custom migration strategy and schema verifier. V1 now contains all 16 application tables; there are no schema snapshots or custom adoption flags. This supersedes the three-version draft below.
+
+| Check | Result |
+| --- | --- |
+| Clean backend JUnit build | 373 tests: 371 passed, 2 existing skips, no failures or errors |
+| Migration integration tests, included above | 4 passed: fresh V1, explicit populated-schema baseline/restart, refusal without a baseline, checksum validation and disabled clean |
+| All four authenticated Postman collections | 1,024 assertions, no failures |
+| Backend image | Built successfully using the existing multi-stage Dockerfile |
+| Existing local database | Backed up; its only history row was an experimental V3 BASELINE, adjusted to V1; before/after application-data exports were byte-for-byte identical |
+| Local stack | Healthy; standard baseline-on-migrate is false and baseline version is 1 |
+
+No executed SQL migration history was rewritten, no application tables were recreated, and no RDS changes were made. Frontend source is unchanged. Logs: `/tmp/flying-angels-single-v1-tests.log`, `/tmp/flying-angels-single-v1-build.log` and `/tmp/fa-single-v1-newman.log`. See [Database migrations](../database-migrations.md).
+
+## 2026-11-13: Earlier three-version draft (superseded)
+
+Tested the uncommitted backend working tree locally. No RDS resources or external email providers were used; frontend source was unchanged.
+
+| Check | Result |
+| --- | --- |
+| Full backend JUnit suite | 384 tests: 382 passed, 2 existing skips, no failures or errors |
+| Migration integration tests, included above | 15 passed: fresh initialization, populated V1/V2/V3 adoption, record preservation, drift rejection, repeat startup, targets, checksum validation and disabled clean |
+| All four authenticated Postman collections | 711 ordered requests plus polling subrequests; 1,024 assertions, no failures |
+| Existing deployed-stack Python tests | 6 passed against a separate fresh Docker stack on localhost:18081 |
+| Backend image | Built successfully with the existing multi-stage Dockerfile |
+| Existing `fa-postman` database | Private backup taken; verified V3 baseline recorded; before/after data-only SQL exports were byte-for-byte identical |
+| Normal restart | Adoption reset to false; existing local stack healthy on localhost:18080 |
+| Fresh Docker database | History contains successful SQL versions 1, 2 and 3; Hibernate validation passed |
+
+The extra fresh CI stack was removed after verification. The existing authenticated Postman stack and its MySQL container were retained. The migration strategy now supersedes the historical Hibernate-update entries below; see [Database migrations](../database-migrations.md) for settings and rollout steps.
+
+Local execution logs are `/tmp/flying-angels-flyway-full-tests.log`, `/tmp/flying-angels-flyway-migration-tests.log`, `/tmp/fa-flyway-newman.log`, and `/tmp/fa-flyway-deployed-stack-tests.log`. They describe this working tree, not a published release or live AWS deployment.
+
 ## 2026-10-30: Sprint 2 import, participation and result contracts
 
 Tested the **uncommitted working tree on `fix/meet-result`, based on `cfe4ca4`**. This record covers the implementation described in [Sprint 2 API contracts](../sprint2-api-updates.md) and [ADR-0010](../adr/0010-sprint2-import-and-result-contracts.md); it does not claim that a new commit or deployment has been published.
@@ -19,7 +89,7 @@ The separate security Postman collection was **not rerun** in this update. The d
 
 ## 2026-10-26: Hibernate-managed schema
 
-The backend passed **92 JUnit tests** after removing Flyway dependencies, baseline configuration, SQL migration files and the legacy-upgrade test. Startup verification checks that Hibernate creates all current tables and the note-order index on empty MySQL, with no migration-history table. Business, import and security tests continue to use disposable databases. The Postman API contracts and 122 functional/8 security request counts are unchanged by this schema-initialization change. Earlier migration-related results below are historical; they do not describe the current setup.
+The backend passed **92 JUnit tests** after removing Flyway dependencies, baseline configuration, SQL migration files and the legacy-upgrade test. Startup verification checks that Hibernate creates all current tables and the note-order index on empty MySQL, with no migration-history table. Business, import and security tests continue to use disposable databases. The Postman API contracts and 122 functional/8 security request counts are unchanged by this schema-initialization change. This 2026-10-26 setup is historical. It is superseded by the 2026-11-13 Flyway migration implementation in [Database migrations](../database-migrations.md).
 
 ## 2026-10-15: Name/DOB and identifier-confirmation update
 

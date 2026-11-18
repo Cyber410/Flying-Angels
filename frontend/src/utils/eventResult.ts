@@ -15,14 +15,17 @@ const NUMBER = /^(?:\d+(?:\.\d{0,10})?|\.\d{1,10})$/;
 const WHOLE_NUMBER = /^\d+$/;
 const SCALAR = /^((?:\d+(?:\.\d{0,10})?|\.\d{1,10}))\s*(seconds?|secs?|s|minutes?|mins?|min|centimetres?|centimeters?|cm|metres?|meters?|m)?$/i;
 
+// Create blank input fields for the requested result-entry unit.
 function emptyEntry(unit: ResultEntryUnit): ResultEntry {
   return { unit, value: "", hours: "", minutes: "", seconds: "" };
 }
 
+// Format a number without unnecessary trailing decimal zeros.
 function numericText(value: number) {
   return value.toFixed(10).replace(/\.?0+$/, "");
 }
 
+// Read a numeric result and its optional time or distance suffix.
 function scalarParts(value: string, defaultUnit: "s" | "min" | "m" | "cm") {
   const match = value.trim().match(SCALAR);
   if (!match) return null;
@@ -56,6 +59,7 @@ export function resultEntryUnits(event: MeetEvent): { value: ResultEntryUnit; la
   ];
 }
 
+// Choose a convenient initial unit for the event distance or discipline.
 function suggestedEntryUnit(event: MeetEvent): ResultEntryUnit {
   if (eventResultUnit(event) === "m") return "m";
   const name = `${event.category.name} ${event.name}`;
@@ -85,6 +89,7 @@ export function resultEntryForAttempt(event: MeetEvent, attempt?: ResultAttempt)
   return { ...emptyEntry(base), value: numericText(attempt.score) };
 }
 
+// Validate result text and score against the supported storage bounds.
 function scoredResult(result: string, score: number): Omit<ResultAttempt, "id"> | null {
   // Match the existing DECIMAL(12,4) storage and 50-character result field.
   if (!Number.isFinite(score) || score < 0 || score >= 100_000_000) return null;
@@ -98,7 +103,7 @@ export function parseResultEntry(entry: ResultEntry, event: MeetEvent): Omit<Res
   const timeEvent = eventResultUnit(event) === "s";
   if (entry.unit === "s" && timeEvent && entry.value.includes(":")) return parseEventResult(entry.value, event);
   if (entry.unit === "min-sec" || entry.unit === "h-min-sec") {
-    if (!timeEvent || ![entry.hours, entry.minutes, entry.seconds].some((value) => value.trim())) return null;
+    if (!timeEvent || ![entry.hours, entry.minutes, entry.seconds].some(/* Check whether any value matches the required condition. */ (value) => value.trim())) return null;
     const hours = entry.unit === "h-min-sec" ? entry.hours.trim() || "0" : "0";
     const minutes = entry.minutes.trim() || "0";
     const seconds = entry.seconds.trim() || "0";
@@ -157,7 +162,7 @@ export function convertResultEntry(entry: ResultEntry, unit: ResultEntryUnit, ev
 
 // Selects the lowest timed score or highest field score as configured.
 export function bestResultAttempt(attempts: ResultAttempt[], order: RankingOrder): ResultAttempt | undefined {
-  return attempts.reduce<ResultAttempt | undefined>((best, attempt) => {
+  return attempts.reduce<ResultAttempt | undefined>(/* Accumulate the combined result from the current entries. */ (best, attempt) => {
     if (!best) return attempt;
     return (order === "ASC" ? attempt.score < best.score : attempt.score > best.score) ? attempt : best;
   }, undefined);

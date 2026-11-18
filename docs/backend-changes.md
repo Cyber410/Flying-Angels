@@ -1,3 +1,5 @@
+> Database update (2026-11-13): [Flyway migrations and Hibernate validation](database-migrations.md) supersede the historical Hibernate-update setup below.
+
 # Backend changes and rationale
 
 For the complete project documentation, including structure, design, API reference, setup, and operations, read [backend/README.md](../backend/README.md).

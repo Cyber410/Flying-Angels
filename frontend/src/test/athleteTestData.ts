@@ -13,6 +13,7 @@ export function dateOfBirthForAge(age: number): string {
   return `${year}-${month}-01`;
 }
 
+// Build a reusable athlete-result fixture with optional overrides.
 export function buildEvent(
   overrides: Partial<AthleteEvent> = {}
 ): AthleteEvent {
@@ -29,6 +30,7 @@ export function buildEvent(
   };
 }
 
+// Build a reusable athlete fixture with optional overrides.
 export function buildAthlete(
   overrides: Partial<Athlete> = {}
 ): Athlete {
@@ -72,7 +74,7 @@ export function directoryAthletes(): Athlete[] {
 
 /** `count` athletes named "Runner 1", "Runner 2", ... for pagination tests. */
 export function manyAthletes(count: number): Athlete[] {
-  return Array.from({ length: count }, (_, index) =>
+  return Array.from({ length: count }, /* Build each generated item from its index. */ (_, index) =>
     buildAthlete({
       id: index + 1,
       firstName: "Runner",

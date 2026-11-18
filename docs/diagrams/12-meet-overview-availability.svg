@@ -1,0 +1,105 @@
+<?xml version='1.0' encoding='utf-8'?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1900" height="1350" viewBox="0 0 1900 1350" role="img">
+  <title>Meet Overview &amp; Centralized Availability Management — code design</title>
+  <desc>Actors: Admin / Coach. E means existing; P means proposed. SUNNY: Upcoming -&gt; meet summary -&gt; Meet Details -&gt; switch Past / All -&gt; Availability -&gt; filter meet/status -&gt; follow up. RAINY: distinguish no upcoming meets, no search matches, no assigned-athlete requests and all responses received. CONSISTENCY: meet badges and the central table share one status calculation; adding events does not inflate athlete response counts. DESIGN NOTE: use application-local asOf; end date before asOf means Past; otherwise Upcoming, including in-progress meets.</desc>
+  <rect width="1900" height="1350" fill="#ffffff" />
+  <rect x="32" y="24" width="1836" height="86" rx="8" fill="#17263f" stroke="#17263f" />
+  <text x="52" y="61" fill="#ffffff" font-family="Arial, Helvetica, sans-serif" font-size="28" font-weight="700">Meet Overview &amp; Centralized Availability Management</text>
+  <text x="52" y="91" fill="#dae5f7" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">Code design  /  Admin / Coach</text>
+  <rect x="32" y="120" width="1836" height="38" rx="8" fill="#ffffff" stroke="#ffffff" />
+  <text x="44" y="146" fill="#53617b" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400">E = existing source   |   P = proposed component/contract   |   EXTEND = existing layer + planned changes   |   dashed arrow = response mapping</text>
+  <rect x="32" y="176" width="450" height="295" rx="8" fill="#f7f9fc" stroke="#dce2ec" />
+  <text x="48" y="204" fill="#53617b" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700">FRONTEND  /  REACT + TYPESCRIPT</text>
+  <rect x="514" y="176" width="820" height="295" rx="8" fill="#f7f9fc" stroke="#dce2ec" />
+  <text x="530" y="204" fill="#53617b" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700">HTTP API  /  TARGET CONTRACT</text>
+  <rect x="32" y="510" width="1302" height="625" rx="8" fill="#f7f9fc" stroke="#dce2ec" />
+  <text x="48" y="538" fill="#53617b" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700">BACKEND  /  SPRING BOOT + JPA</text>
+  <rect x="1366" y="510" width="502" height="625" rx="8" fill="#f7f9fc" stroke="#dce2ec" />
+  <text x="1382" y="538" fill="#53617b" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700">DATA MODEL  /  MYSQL</text>
+  <rect x="1366" y="176" width="502" height="295" rx="8" fill="#f7f9fc" stroke="#dce2ec" />
+  <text x="1382" y="204" fill="#53617b" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700">STATUS  /  DESIGN SCOPE</text>
+  <rect x="1382" y="222" width="470" height="232" rx="8" fill="#ffffff" stroke="#c7d0df" />
+  <text x="1400" y="252" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="700">Sprint 3 target design</text>
+  <text x="1400" y="278" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">Checked against repository source.</text>
+  <text x="1400" y="304" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">Purple: proposed layer.</text>
+  <text x="1400" y="330" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">Amber: extend existing code.</text>
+  <text x="1400" y="356" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">Green: reusable existing model.</text>
+  <text x="1400" y="382" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">Routes and new class names are proposed.</text>
+  <text x="1400" y="408" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">E: existing code. P: proposed Sprint 3 work.</text>
+  <rect x="48" y="222" width="418" height="232" rx="8" fill="#fff8e8" stroke="#966719" />
+  <text x="66" y="248" fill="#966719" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="700">FRONTEND  /  EXTEND</text>
+  <text x="66" y="277" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700">MeetsListPage / AvailabilityPage</text>
+  <text x="66" y="305" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[E] Meet search, dates, pagination and</text>
+  <text x="66" y="326" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">details links</text>
+  <text x="66" y="347" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[P] Upcoming / Past / All; availability</text>
+  <text x="66" y="368" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">count badges</text>
+  <text x="66" y="389" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[P] Central request table; meet + status</text>
+  <text x="66" y="410" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">filters</text>
+  <rect x="530" y="222" width="788" height="232" rx="8" fill="#fff8e8" stroke="#966719" />
+  <text x="548" y="248" fill="#966719" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="700">HTTP API  /  EXTEND</text>
+  <text x="548" y="277" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700">Meet views and availability search routes</text>
+  <text x="548" y="305" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[P] Extend GET /api/meets?view=upcoming|past|all&amp;search=...&amp;asOf=...</text>
+  <text x="548" y="326" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[P] GET /api/availability?meetId=...&amp;status=...&amp;page=...&amp;size=...</text>
+  <text x="548" y="347" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[E] GET /api/meets/{id} and /api/meets/{id}/events</text>
+  <text x="548" y="368" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[P] ADMIN / COACH read; basic meet writes stay ADMIN-only</text>
+  <rect x="48" y="558" width="556" height="250" rx="8" fill="#fff8e8" stroke="#966719" />
+  <text x="66" y="584" fill="#966719" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="700">CONTROLLER  /  EXTEND</text>
+  <text x="66" y="613" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700">MeetController / AvailabilityController</text>
+  <text x="66" y="641" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[E] MeetController.list() and get()</text>
+  <text x="66" y="662" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[P] Validate view, date, paging and status filters</text>
+  <text x="66" y="683" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[P] Return meet summaries + paged request details</text>
+  <text x="66" y="704" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[P] Staff-only access; no portal-wide request listing</text>
+  <rect x="636" y="558" width="682" height="250" rx="8" fill="#fff8e8" stroke="#966719" />
+  <text x="654" y="584" fill="#966719" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="700">SERVICE  /  EXTEND</text>
+  <text x="654" y="613" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700">MeetService / AvailabilityQueryService</text>
+  <text x="654" y="641" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[P] Upcoming includes active multi-day meets</text>
+  <text x="654" y="662" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[P] Upcoming: start ASC; Past: end DESC</text>
+  <text x="654" y="683" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[P] All: start DESC (proposed ordering)</text>
+  <text x="654" y="704" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[P] Count each active athlete/meet request once</text>
+  <text x="654" y="725" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[P] Reuse effective-status logic from AvailabilityService</text>
+  <rect x="636" y="850" width="682" height="267" rx="8" fill="#fff8e8" stroke="#966719" />
+  <text x="654" y="876" fill="#966719" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="700">REPOSITORY  /  EXTEND</text>
+  <text x="654" y="905" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700">MeetRepository / AvailabilityRequestRepository</text>
+  <text x="654" y="933" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[E] MeetRepository currently lists newest meetDate first</text>
+  <text x="654" y="954" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[P] Query date views / search + paged availability</text>
+  <text x="654" y="975" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[P] Group counts by meet, not event participation count</text>
+  <text x="654" y="996" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[P] Fetch athlete and meet context for follow-up table</text>
+  <rect x="1382" y="558" width="470" height="559" rx="8" fill="#fff8e8" stroke="#966719" />
+  <text x="1400" y="584" fill="#966719" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="700">ENTITY / DATABASE  /  EXTEND</text>
+  <text x="1400" y="613" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700">Meet + AvailabilityRequest + Response</text>
+  <text x="1400" y="641" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[E] Meet: startDate, endDate, meetDate</text>
+  <text x="1400" y="662" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">compatibility</text>
+  <text x="1400" y="683" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[E] Athlete + Event + EventParticipation</text>
+  <text x="1400" y="704" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[P] AvailabilityRequest: athlete/meet + revision</text>
+  <text x="1400" y="725" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[P] Response: answer + covered revision + audit</text>
+  <text x="1400" y="746" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">Derived counts: awaiting / available / unavailable</text>
+  <text x="1400" y="767" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">Only requests with active assignments count</text>
+  <text x="1400" y="788" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">Same athlete in three events counts once per meet</text>
+  <rect x="48" y="850" width="556" height="267" rx="8" fill="#fff8e8" stroke="#966719" />
+  <text x="66" y="876" fill="#966719" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="700">RESPONSE / UI STATE  /  EXTEND</text>
+  <text x="66" y="905" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700">MeetResponse / AvailabilityPageResponse</text>
+  <text x="66" y="933" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[P] MeetResponse.availabilitySummary</text>
+  <text x="66" y="954" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[P] Request: athlete, meet, proposed events, status</text>
+  <text x="66" y="975" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[P] Open request / record reply / manually share link</text>
+  <text x="66" y="996" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">No meets / no matches / no requests -&gt; distinct empties</text>
+  <text x="66" y="1017" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">Awaiting filter empty -&gt; no outstanding responses</text>
+  <polyline points="466,338 530,338" fill="none" stroke="#53617b" stroke-width="1.8" />
+  <path d="M521.0,334.0 L530,338 L521.0,342.0" fill="none" stroke="#53617b" stroke-width="1.8" />
+  <polyline points="924,454 924,490 326,490 326,558" fill="none" stroke="#53617b" stroke-width="1.8" />
+  <path d="M330.0,549.0 L326,558 L322.0,549.0" fill="none" stroke="#53617b" stroke-width="1.8" />
+  <polyline points="604,683 636,683" fill="none" stroke="#53617b" stroke-width="1.8" />
+  <path d="M627.0,679.0 L636,683 L627.0,687.0" fill="none" stroke="#53617b" stroke-width="1.8" />
+  <polyline points="977,808 977,850" fill="none" stroke="#53617b" stroke-width="1.8" />
+  <path d="M981.0,841.0 L977,850 L973.0,841.0" fill="none" stroke="#53617b" stroke-width="1.8" />
+  <polyline points="1318,983 1350,983 1350,837 1382,837" fill="none" stroke="#53617b" stroke-width="1.8" />
+  <path d="M1373.0,833.0 L1382,837 L1373.0,841.0" fill="none" stroke="#53617b" stroke-width="1.8" />
+  <polyline points="326,808 326,850" fill="none" stroke="#53617b" stroke-width="1.8" stroke-dasharray="7 5" />
+  <path d="M330.0,841.0 L326,850 L322.0,841.0" fill="none" stroke="#53617b" stroke-width="1.8" />
+  <rect x="32" y="1170" width="1836" height="156" rx="8" fill="#f7f9fc" stroke="#dce2ec" />
+  <text x="48" y="1198" fill="#53617b" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700">BEHAVIOR  /  SUNNY-DAY, RAINY-DAY AND DESIGN NOTES</text>
+  <rect x="44" y="1208" width="1810" height="106" rx="8" fill="#f7f9fc" stroke="#f7f9fc" />
+  <text x="50" y="1227" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400">SUNNY: Upcoming -&gt; meet summary -&gt; Meet Details -&gt; switch Past / All -&gt; Availability -&gt; filter meet/status -&gt; follow up.</text>
+  <text x="50" y="1247" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400">RAINY: distinguish no upcoming meets, no search matches, no assigned-athlete requests and all responses received.</text>
+  <text x="50" y="1267" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400">CONSISTENCY: meet badges and the central table share one status calculation; adding events does not inflate athlete response counts.</text>
+  <text x="50" y="1287" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400">DESIGN NOTE: use application-local asOf; end date before asOf means Past; otherwise Upcoming, including in-progress meets.</text>
+</svg>

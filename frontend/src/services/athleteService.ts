@@ -1,3 +1,4 @@
+import { apiFetch } from "./apiClient";
 // Athlete CRUD and archive requests shared by directory, profile, and history views.
 import type {
   Athlete,
@@ -9,7 +10,7 @@ const API_URL = "/api/athletes";
 
 // Active athletes are the default; history screens can explicitly request everyone.
 export async function getAthletes(archive?: "active" | "archived" | "all"): Promise<Athlete[]> {
-  const response = await fetch(archive ? `${API_URL}?archive=${archive}` : API_URL);
+  const response = await apiFetch(archive ? `${API_URL}?archive=${archive}` : API_URL);
 
   if (!response.ok) {
     throw new Error("Unable to load athletes.");
@@ -20,7 +21,7 @@ export async function getAthletes(archive?: "active" | "archived" | "all"): Prom
 
 // Archive/restore the entire selection together without deleting athlete history.
 export async function setAthletesArchived(athleteIds: number[], archived: boolean): Promise<Athlete[]> {
-  const response = await fetch(`${API_URL}/archive`, {
+  const response = await apiFetch(`${API_URL}/archive`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ athleteIds, archived }),
@@ -33,7 +34,7 @@ export async function setAthletesArchived(athleteIds: number[], archived: boolea
 export async function getAthleteById(
   id: number
 ): Promise<Athlete> {
-  const response = await fetch(`${API_URL}/${id}`);
+  const response = await apiFetch(`${API_URL}/${id}`);
 
   if (!response.ok) {
     throw new Error("Unable to load athlete.");
@@ -46,7 +47,7 @@ export async function getAthleteById(
 export async function createAthlete(
   athlete: AthleteRequest
 ): Promise<Athlete> {
-  const response = await fetch(API_URL, {
+  const response = await apiFetch(API_URL, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -66,7 +67,7 @@ export async function updateAthlete(
   id: number,
   athlete: AthleteRequest
 ): Promise<Athlete> {
-  const response = await fetch(`${API_URL}/${id}`, {
+  const response = await apiFetch(`${API_URL}/${id}`, {
     method: "PUT",
     headers: {
       "Content-Type": "application/json",
@@ -85,7 +86,7 @@ export async function updateAthlete(
 export async function deleteAthlete(
   id: number
 ): Promise<void> {
-  const response = await fetch(`${API_URL}/${id}`, {
+  const response = await apiFetch(`${API_URL}/${id}`, {
     method: "DELETE",
   });
 

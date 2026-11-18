@@ -8,6 +8,7 @@ const meet = {
   location: "Toronto, ON", externalUrl: null, eventCount: 3,
 };
 
+// Build a fictional event definition for the explicit sample meet.
 function sampleEvent(id: number, name: string, participantCount: number, field = false): MeetEvent {
   return {
     id, name, participantCount, eventDate: meet.meetDate, location: meet.location,

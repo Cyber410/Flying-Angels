@@ -1,5 +1,19 @@
 # Sprint 3 implementation notes
 
+## CI rankings test-context repair
+
+Reproduced the CI unit profile: 82 tests, zero assertion failures, four errors
+loading RankingsSecurityTest. Its WebMvc slice did not provide the new
+PortalRankingScope controller dependency. Added that mock and aligned the
+existing portal catalogue expectations with the athlete-scoped service, keeping
+the forged-principal, anonymous, role, and session checks. The valid ranking
+request now includes its meet/event while still proving a caller-supplied
+athlete ID is ignored. Production code and access rules were unchanged.
+
+The existing backend unit profile subsequently passed all 82 tests with zero
+failures/errors. Email delivery was disabled. No new backend test cases or
+suites were added; database integration tests were not run in this follow-up.
+
 
 ## Concise Sprint 3 browser coverage
 

@@ -9,8 +9,9 @@ RUN npm run build
 
 FROM nginx:stable-alpine AS runtime
 
-ENV BACKEND_HOST=backend BACKEND_PORT=8080
+ENV BACKEND_HOST=backend BACKEND_PORT=8080 NGINX_TRUSTED_PROXY_CIDRS=""
 COPY --from=build /build/dist/ /usr/share/nginx/html/
+COPY --chmod=755 deploy/19-trusted-proxies.sh /docker-entrypoint.d/19-trusted-proxies.sh
 COPY deploy/nginx.conf.template /etc/nginx/templates/default.conf.template
 EXPOSE 80
 

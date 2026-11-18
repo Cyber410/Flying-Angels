@@ -39,7 +39,7 @@ This is environment-variable configuration. It does not provide Docker Secrets: 
 
 ## Database upgrades
 
-New databases initialize through one Flyway V1 containing all 16 application tables. Existing unversioned databases require a backup, schema review and explicit one-time baseline; see [Database migrations](database-migrations.md). Root Compose forwards `SPRING_FLYWAY_BASELINE_ON_MIGRATE` (false), `SPRING_FLYWAY_BASELINE_VERSION` (1) and `SPRING_FLYWAY_TARGET` (`latest`). Keep baseline-on-migrate false after initial setup. Lowering the target does not reverse schema changes. Hibernate remains in validate mode.
+New databases initialize through Flyway V1 (initial schema), V2 (verified account enrollment) and V3 (password recovery). Existing V1 databases receive V2 and V3 automatically. Older unversioned databases require a backup, schema review, any missing V1 changes and explicit one-time baseline; see [Database migrations](database-migrations.md). Root Compose forwards `SPRING_FLYWAY_BASELINE_ON_MIGRATE` (false), `SPRING_FLYWAY_BASELINE_VERSION` (1) and `SPRING_FLYWAY_TARGET` (`latest`). Keep baseline-on-migrate false after initial setup. Lowering the target does not reverse schema changes. Hibernate remains in validate mode.
 
 ## Current networking
 

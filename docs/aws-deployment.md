@@ -12,20 +12,51 @@ Create AWS infrastructure once. After that, merge application changes into `main
 The workflows are separate:
 
 - `.github/workflows/ci.yml` — **CI and ECR publishing**: build, test, container verification and image publishing.
-- `.github/workflows/ce.yaml` — **CD - Deploy to ECS**: deploy the exact successful main CI release to the existing service.
+- `.github/workflows/cd.yaml` — **CD - Deploy to ECS**: deploy the exact successful main CI release to the existing service.
 
 Keep the required PR status check **Build, test and verify containers**. CD uses a `workflow_run` completion trigger and accepts only successful CI runs from a push to `main` in this same repository. It does not run for failed checks, PRs, development pushes or manual publishing.
 
 ## One-time AWS setup
 
-Your existing RDS MySQL database, password secret and ECR repositories are reused. In the same region/account, finish the following once:
+Reuse the existing RDS database, ECR repositories, ECS cluster/service, log group and Secrets Manager secrets in **us-east-1**. Keep `AWS_DEPLOY_ENABLED=false` and the service desired count at zero while preparing the database and public entry point. This guide uses **https://app.flyingangels.live** for the browser application and same-origin API.
 
-1. **Networking:** use the same VPC as RDS. Create an application security group allowing HTTP/80 from your public IP/32, and configure the database's security group to allow MySQL/3306 from the application group. The ECS task needs a public subnet with an internet-gateway route and an assigned public IP for this low-cost setup without a NAT Gateway.
-2. **Logs:** create `/ecs/flying-angels` in CloudWatch Logs with seven-day retention.
-3. **Application administrator password:** store a separate plaintext password in Secrets Manager, e.g. `flying-angels/admin-password`. The database secret must also contain only the database password, not an entire JSON object.
-4. **Cluster:** create an ECS Fargate cluster, e.g. `flying-angels-lab`.
-5. **Task definition:** create a Linux/X86_64 task, e.g. family `flying-angels-app`, with 0.5 vCPU and 2 GiB memory. Select existing **LabRole** for both task and execution roles. Add the two containers below using the already published image digests from GitHub's run summary.
-6. **Service:** create an existing rolling-update **ECS** service, e.g. `flying-angels-app`, using this task definition and the networking above. Enable the deployment circuit breaker and rollback. Start with one desired task for initial verification while RDS is available. No load balancer is required for this initial IP-restricted setup.
+1. **Certificate:** in ACM, request a public, non-exportable certificate for `app.flyingangels.live` in us-east-1. Choose DNS validation. Add ACM's generated CNAME at Name.com and wait for Issued. Keep the existing SendGrid CNAME/TXT records. There is no need to move DNS to Route 53 or buy another domain/certificate.
+2. **Public load balancer:** create an internet-facing Application Load Balancer in the same VPC as RDS. Select two public subnets in different Availability Zones with internet-gateway routes. Record their IPv4 CIDRs from VPC/EC2 Subnets; these become `NGINX_TRUSTED_PROXY_CIDRS` below. Choose an IPv4 ALB for this initial setup.
+3. **Security groups:** use the separate groups and rules in the table below. Remove direct public/My-IP HTTP access from the ECS application group after attaching the ALB. Keep port 8080 private and RDS inaccessible from the internet.
+4. **Target group:** create an HTTP target group with target type **IP**, port **80**, the application VPC, and health check path **/login**, success code **200**. ECS registers task IPs; do not manually register the task's public IP. Use this target group for the `frontend` container's port 80.
+5. **Listeners and DNS:** attach the ACM certificate to an HTTPS/443 ALB listener forwarding to the target group. Set HTTP/80 to redirect to HTTPS/443. At Name.com, add CNAME host `app`, answer the ALB DNS name (no `https://` or path), with the default TTL. Existing SendGrid records remain unchanged.
+6. **ECS task definition:** create a revision of the existing Linux/X86_64 Fargate task with the two containers below. Retain the existing 0.5 vCPU / 2 GiB allocation, logging, and **LabRole** for both task and execution roles. Verify the execution role can retrieve all four existing secrets. Keep the persistent outbox encryption key unchanged.
+7. **ECS service:** attach the task revision and ALB target group to the existing rolling-update service, enable the deployment circuit breaker/rollback, and set health-check grace period to 120 seconds. Keep desired count zero until the database is ready. With no NAT Gateway, retain a public subnet and assigned public IP for the task's outbound ECR/Secrets Manager/SendGrid access; the task security group still permits inbound HTTP only from the ALB.
+8. **Database and release:** complete the database adoption procedure below, release through main, then set desired count to one and verify the public browser flows. Start with one task because login sessions are currently held in that backend's memory. Restarts require sign-in again; multiple simultaneous serving tasks need session-affinity/shared-session planning.
+
+| Security group | Inbound rule | Purpose |
+| --- | --- | --- |
+| ALB | TCP 443 and 80 from `0.0.0.0/0` | Public HTTPS and HTTP-to-HTTPS redirect |
+| ECS application | TCP 80 from **the ALB security group only** | ALB to Nginx; no direct public application access |
+| RDS | TCP 3306 from **the ECS application security group only** | Backend to existing MySQL |
+
+Allow the ALB outbound TCP/80 to the ECS application group. Retain task outbound connectivity for MySQL/3306, SMTP/587, DNS and AWS APIs/HTTPS. Neither port 8080 nor 3306 needs a public inbound rule.
+
+### Attach the load balancer to the existing service
+
+AWS does not support changing an existing service's load-balancer configuration through the ECS console. For the existing ECS rolling deployment controller, use CloudShell/AWS CLI. Define these non-secret variables using the actual existing resource names and the newly created ARNs:
+
+```sh
+export AWS_REGION=us-east-1
+export ECS_CLUSTER=YOUR_EXISTING_CLUSTER
+export ECS_SERVICE=YOUR_EXISTING_SERVICE
+export TASK_DEFINITION_ARN=YOUR_NEW_TASK_REVISION_ARN
+export TARGET_GROUP_ARN=YOUR_NEW_TARGET_GROUP_ARN
+
+aws ecs update-service --region "$AWS_REGION" \
+  --cluster "$ECS_CLUSTER" --service "$ECS_SERVICE" \
+  --task-definition "$TASK_DEFINITION_ARN" \
+  --load-balancers "targetGroupArn=$TARGET_GROUP_ARN,containerName=frontend,containerPort=80" \
+  --health-check-grace-period-seconds 120 --desired-count 0 \
+  --query 'service.{TaskDefinition:taskDefinition,DesiredCount:desiredCount,LoadBalancers:loadBalancers}'
+```
+
+This replaces the service's load-balancer list with this target group. Use it for the previously discussed service without an existing load balancer. If the service has other target groups, review its existing configuration first. The command preserves a stopped service while attaching the configuration that CD will copy. Merely registering a task revision does not make it the service's active configuration.
 
 Backend container:
 
@@ -41,12 +72,14 @@ Backend container:
 | `APP_LOGIN_TRUSTED_PROXIES` | `127.0.0.1/32,::1/128` for this same-task Nginx-to-backend topology only; backend port 8080 must remain private |
 | `APP_LOGIN_THROTTLE_ACCOUNT_LIMIT`, `APP_LOGIN_THROTTLE_IP_LIMIT` | Failed-login limits (defaults 5 per account / 100 per source IP) |
 | `APP_LOGIN_THROTTLE_WINDOW_SECONDS`, `APP_LOGIN_THROTTLE_BLOCK_SECONDS` | Observation window and block length (defaults 900 / 900 seconds) |
-| `APP_CORS_ALLOWED_ORIGINS` | Empty for same-origin `/api/` proxy access; otherwise comma-separated exact trusted browser origins |
-| `APP_ACTIVATION_URL` | Externally reachable activation page URL, using HTTPS for real users; required before sending invitations |
+| `APP_CORS_ALLOWED_ORIGINS` | Empty for the same-origin frontend and `/api/`; do not use `*` |
+| `SESSION_COOKIE_SECURE` | `true`; browser access uses HTTPS through the ALB |
+| `APP_ACTIVATION_URL` | `https://app.flyingangels.live/activate` |
 | `APP_MAIL_OUTBOX_KEY` | Secret reference / ValueFrom: a persistent Base64-encoded 32-byte encryption key; required by the prod profile |
-| `SMTP_HOST`, `SMTP_PORT`, `SMTP_FROM` | Production SMTP provider endpoint, port and verified sender |
-| `SMTP_USERNAME`, `SMTP_PASSWORD` | Secret references for provider SMTP credentials where required |
-| `SMTP_AUTH`, `SMTP_STARTTLS` | Provider-required authentication/TLS settings |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_FROM` | `smtp.sendgrid.net`, `587`, `noreply@flyingangels.live` |
+| `SMTP_USERNAME` | Plain value `apikey` (the literal word) |
+| `SMTP_PASSWORD` | ValueFrom: full ARN of the existing plaintext SendGrid API-key secret |
+| `SMTP_AUTH`, `SMTP_STARTTLS` | Both `true` |
 | `DATABASE_PASSWORD` | Secret reference / ValueFrom: database password secret ARN |
 | `APP_ADMIN_PASSWORD` | Secret reference / ValueFrom: administrator password secret ARN |
 | Logging | `awslogs`, existing group `/ecs/flying-angels`, correct region, stream prefix `backend` |
@@ -68,6 +101,7 @@ Frontend container:
 | Port | 80 |
 | `BACKEND_HOST` | `127.0.0.1` |
 | `BACKEND_PORT` | `8080` |
+| `NGINX_TRUSTED_PROXY_CIDRS` | Comma-separated actual IPv4 CIDRs of the two **ALB subnets**, e.g. `ALB_SUBNET_1_CIDR,ALB_SUBNET_2_CIDR`; replace both placeholders. Never use `0.0.0.0/0`, and do not copy an example VPC range. |
 | Startup dependency | backend is HEALTHY |
 | Logging | Same log group, stream prefix `frontend` |
 
@@ -79,13 +113,34 @@ Frontend ECS health-check command:
 
 Use interval 10 seconds, timeout 5 seconds, retries 5, start period 30 seconds. Make both containers essential. Check ECS Events and CloudWatch Logs to verify initial startup.
 
-The `prod` profile enforces staff-session authentication and CSRF protection. Authenticate through POST `/api/auth/login` using the initial Admin email/password after retrieving `/api/csrf`; staff accounts and password hashes persist in MySQL. The bootstrap password must have at least 12 characters (at most 72 UTF-8 bytes), and is used only when no staff accounts exist. Change passwords through the Admin-only staff APIs afterward; changing an environment variable does not reset an existing account. This delivery is backend-only: the existing frontend still needs session/CSRF integration before it can use secured endpoints.
+The `prod` profile enforces session authentication and CSRF protection. The frontend now includes `/login`, `/activate`, `/forgot-password`, role-protected navigation, and the cookie/CSRF API client. The initial Admin is created only when `staff_users` is empty. Set `APP_ADMIN_EMAIL` to an actual email, replacing the earlier `APP_ADMIN_USERNAME=admin`; the password must have at least 12 characters (at most 72 UTF-8 bytes). It is BCrypt-hashed in MySQL. Later environment changes do not reset existing account credentials.
 
-Production cookies are Secure by default, so the browser must reach the application over HTTPS. For an IP-restricted, plain-HTTP lab demonstration with synthetic data only, explicitly set `SESSION_COOKIE_SECURE=false`; use HTTPS and leave it true for real athlete data. This code does not create a TLS endpoint, start the database, or scale ECS up. Existing deployments using an `admin` username need `APP_ADMIN_EMAIL` configured before their first release of this version.
+Production cookies are Secure by default. Keep them Secure for this public deployment; TLS terminates at the ALB, and its private HTTP hop to Nginx does not require disabling cookie security. The containers do not provision an ALB/certificate, start RDS, or scale ECS up.
 
-Login throttling is enabled by default and persists counters in MySQL across task replacements and instances. Excessive failures return 429 with Retry-After; successful login clears only the account failure count. Explicitly configure the trusted immediate Nginx address as above so source-IP limits use Nginx's overwritten X-Real-IP. An empty allowlist is safe but aggregates all Nginx traffic under the proxy IP. No frontend code or Nginx template changes are needed for this release. See [backend throttling policy and tradeoffs](../backend/README.md#login-throttling).
+Login throttling persists counters in MySQL across task replacements. Excessive failures return 429 with Retry-After; successful login clears only the account failure count. Configure backend `APP_LOGIN_TRUSTED_PROXIES` for same-task Nginx and frontend `NGINX_TRUSTED_PROXY_CIDRS` for the ALB subnets. Otherwise requests may share a proxy address and trigger each other's IP limits. See [backend throttling policy and tradeoffs](../backend/README.md#login-throttling).
 
-Invitation email is queued in the same database transaction as account creation and sent by a background worker. Configure and retain `APP_MAIL_OUTBOX_KEY` before deploying this version; missing/invalid keys prevent production startup. Keep the key in Secrets Manager and preserve it across ECS task replacements. SMTP failures are retried; check Admin-only GET `/api/users/{id}/invitation/delivery` and use the existing resend endpoint after resolving terminal failures. SENT means SMTP acceptance, not confirmed inbox delivery. Retain single-use-token handling and account status checks. Neither SES nor any other email provider is provisioned automatically. See [backend delivery settings and limits](../backend/README.md#account-invitations-and-password-setup).
+New UI invitations use `/api/users/pending-invitations`: the invitation and encrypted email job commit together, and account creation follows email-code verification and password setup on `/activate`. The pending-invitations API lists invitation state; use the actual inbox and SendGrid Activity to confirm new enrollment-email delivery. The existing `/api/users/{id}/invitation/delivery` endpoint is scoped to legacy user-linked invitation jobs, not the new pending invitation IDs. Password recovery uses an emailed code and `/forgot-password`. All use the existing SendGrid SMTP settings and retained `APP_MAIL_OUTBOX_KEY`. Missing/invalid encryption keys prevent production startup. SENT means SMTP acceptance, not confirmed inbox delivery. No provider is provisioned automatically.
+
+### Existing RDS database: complete before the first release
+
+Current images package V1 (16 initial tables), V2 (verified account enrollment/outbox changes), and V3 (password recovery). Fresh databases run all three. Databases already at a valid V1 run V2 and V3 automatically. The old populated RDS database has not yet been inspected, so its adoption remains a release prerequisite.
+
+Keep application writers stopped. Take a recoverable RDS backup, inspect the schema/history and verify the upgrade on a separate copy before changing live data. If RDS has old tables but no Flyway history, first bring it to the actual V1 schema with a reviewed conversion, then perform the one-time V1 baseline; V2 and V3 can follow automatically. `SPRING_FLYWAY_BASELINE_ON_MIGRATE=true` alone skips V1 SQL and cannot supply missing V1 tables/columns. Restore it to false after adoption. Keep Hibernate `ddl-auto=validate`.
+
+The historical conversion in `backend/src/test/resources/database/upgrade-existing-to-v1.sql` is a test fixture for commit `671a9ae`, not verified production SQL and not packaged in the backend image. Do not execute it blindly or reset/delete the RDS database. See [database migration details](database-migrations.md).
+
+### Public verification
+
+After RDS is ready and the new service has one healthy task, confirm:
+
+1. `https://app.flyingangels.live/login` loads from another network, and HTTP redirects to HTTPS.
+2. Admin login works with a Secure/HttpOnly session cookie, and normal authorized writes pass CSRF validation.
+3. Existing athletes, meets, results and notes are retained.
+4. Invite one controlled real recipient; the email link opens `/activate`, the code verifies, password setup succeeds, and the new account can sign in with its role restrictions.
+5. Password recovery delivers its code and replaces the password; the previous session becomes invalid.
+6. Unknown/unauthorized API calls return JSON errors, and ports 8080/3306 are inaccessible publicly.
+
+The automated test suites use synthetic records and email addresses. Do not point full Postman collections at a real SendGrid-backed deployment.
 
 ## Container builds and API reverse proxy
 
@@ -93,9 +148,9 @@ The deployment Dockerfiles build from source in separate builder stages. Only th
 
 Nginx already provides the public reverse-proxy layer. `/api/` requests retain their paths and are forwarded to the backend configured by `BACKEND_HOST` and `BACKEND_PORT`; other paths serve the existing frontend. The CI stack exposes only Nginx, and the AWS application security group should expose port 80 (or the configured TLS entry point), not backend port 8080 or MySQL. API routing, deployment destinations, CORS policy and invitation URLs are configuration concerns, with no controller-specific CORS overrides.
 
-The current template assumes Nginx is the public edge: it replaces incoming client-supplied forwarding metadata with its observed client address, host and protocol, clears the standardized `Forwarded` header, hides the Nginx version and applies connection/read/write timeouts. Cookies, CSRF headers, request bodies and backend response headers pass through normally. These forwarding headers are not authentication credentials. Backend CORS and session-bound CSRF checks remain enabled in authenticated mode.
+`deploy/19-trusted-proxies.sh` generates Nginx's real-IP allowlist from `NGINX_TRUSTED_PROXY_CIDRS` at container startup. Its default is empty: direct-client forwarding headers remain untrusted. With ALB subnet CIDRs configured, Nginx uses the final client address appended by the single ALB to X-Forwarded-For, then supplies a single resolved X-Real-IP/X-Forwarded-For value to Spring. Recursive traversal is disabled so even a client inside an ALB subnet cannot make Nginx select an earlier forged address. It accepts only `http`/`https` protocol values from a trusted original socket peer, reconstructs the forwarded host from Host, and clears standardized Forwarded metadata. Invalid CIDRs fail startup, and all-address trust is rejected.
 
-This configuration does not enable Spring to trust arbitrary forwarded headers. If a trusted load balancer or another proxy is added in front of Nginx, configure that explicit trust boundary and original HTTPS/client-address handling before relying on forwarded metadata. The current lab topology has no load balancer; this change does not provision one or enable automatic scaling. An eventual production setup still needs HTTPS and the activation/login frontend integration.
+The task security group accepting port 80 only from the ALB is part of this trust boundary; do not use the allowlist as a substitute for that rule. Keep the ALB X-Forwarded-For processing mode at **append**. Spring continues to trust only same-task Nginx for client-address resolution. Its generic forwarded-header strategy remains disabled. Cookies, CSRF headers, request bodies and backend responses pass normally. `tests/integration/test_nginx_proxy.py` exercises the built image with trusted and untrusted peers; CI runs it before the full stack checks.
 
 ## One-time GitHub configuration
 
@@ -124,7 +179,7 @@ Learner Lab credentials expire. Refresh all three GitHub secrets from the active
 
 1. Merge feature work into `development`. CI verifies and publishes it without deploying.
 2. At the sprint release milestone, open a PR from `development` into `main`.
-3. Merge it after reviews and required checks pass. PR merging remains a team action; CD does not enable GitHub auto-merge.
+3. After the database and public setup above are ready, set `AWS_DEPLOY_ENABLED=true` and merge after reviews and required checks pass. PR merging remains a team action; CD does not enable GitHub auto-merge.
 4. The resulting `main` push builds, tests and publishes both images.
 5. After CI succeeds, the separate **CD - Deploy to ECS** workflow downloads `published-images.json` from that exact CI run and attempt. It verifies that the metadata commit matches the successful CI commit and both images use digest references. It then authenticates, reads the existing service task definition, replaces only the `backend` and `frontend` images, registers a revision and updates the service.
 6. The job waits for service stability and checks that the expected revision is still the primary completed deployment. A rollback to a previous revision is reported as a failed release rather than a successful new deployment.
@@ -143,6 +198,7 @@ These are operational controls, separate from releasing code:
 - Keep the existing resources and data. RDS storage, images, secrets and retained logs still incur charges while compute is stopped.
 - RDS automatically restarts after seven days stopped; monitor it and the lab budget. Ending a lab session is not a complete shutdown mechanism.
 - The task public IP can change on restart or deployment. Find it under ECS → running task → Networking.
+- Public users use the application domain and ALB DNS routing rather than the task public IP. An ALB continues charging while it exists even with zero ECS tasks. Delete the demo ALB when no longer needed (and recreate listeners/DNS as necessary for a later demo); do not delete RDS or email-authentication DNS records as part of compute shutdown.
 
 A new main release does not override a deliberately stopped service or start the database. For an actual live release verification, have RDS available and desired task count one.
 
@@ -150,7 +206,7 @@ A new main release does not override a deliberately stopped service or start the
 
 | Failure | Action |
 | --- | --- |
-| Deployment skipped or absent | Check that `ce.yaml` exists on the default branch, CI completed successfully for a same-repository push to `main`, and `AWS_DEPLOY_ENABLED=true`. PR/development/manual runs do not deploy. |
+| Deployment skipped or absent | Check that `.github/workflows/cd.yaml` exists on the default branch, CI completed successfully for a same-repository push to `main`, and `AWS_DEPLOY_ENABLED=true`. PR/development/manual runs do not deploy. |
 | Missing variable | Configure the name reported by the deployment settings step. |
 | Expired credentials | Refresh all three AWS secrets, then rerun the failed CD workflow. It reuses the exact CI release artifact while it remains available. |
 | Release artifact expired/missing | The release metadata is retained for seven days. Rerun the original main CI run to publish and upload a new attempt, which triggers CD after success. |
@@ -158,6 +214,9 @@ A new main release does not override a deliberately stopped service or start the
 | Container name mismatch | The existing task must contain exactly one `backend` and one `frontend` container. |
 | Unsupported deployment controller | Use the ECS rolling controller. This workflow does not configure CodeDeploy blue/green or external deployment controllers. |
 | Startup/health failure | Inspect ECS Events and CloudWatch Logs; verify database availability, secret values, LabRole permissions and networking. |
+| ALB returns 503 | Verify target group type IP, frontend port 80, task/subnet Availability Zones, health check /login, and security-group rules. |
+| Users share an IP limit | Check the ALB subnet CIDRs in frontend NGINX_TRUSTED_PROXY_CIDRS and backend loopback APP_LOGIN_TRUSTED_PROXIES. |
+| Email link opens the wrong host | Check APP_ACTIVATION_URL in the task revision attached to the service; newly issued links use the updated URL. |
 | Rollback detected | Fix the failing release and merge a correction, or explicitly restore a known-good task revision in ECS. |
 
 Enable the ECS circuit breaker with rollback during setup. Rolling deployments can briefly run two tasks. The backend now runs Flyway migrations and Hibernate validation. Before the first release of this change, snapshot RDS, verify a restored copy, inspect its schema and arrange a reviewed one-time V1 baseline; a populated unversioned database blocks startup by default. Do not release automatically to a populated RDS database before this plan is complete. See [Database migrations](database-migrations.md). Later SQL changes must remain compatible with older tasks during rolling deployment.

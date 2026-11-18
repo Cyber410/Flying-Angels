@@ -1,3 +1,11 @@
+# The startup script defines trusted_edge_proxy using the original socket peer.
+# Accept a single protocol value from a trusted ALB; ignore direct-client claims.
+map "$trusted_edge_proxy:$http_x_forwarded_proto" $client_scheme {
+    default $scheme;
+    "1:https" https;
+    "1:http" http;
+}
+
 server {
     listen 80;
     server_name _;
@@ -17,10 +25,11 @@ server {
         proxy_set_header Connection "";
         proxy_set_header Host $http_host;
         proxy_set_header X-Real-IP $remote_addr;
-        # Nginx is the public edge in this deployment: replace client-supplied proxy metadata.
+        # real_ip resolves ALB-appended XFF only when its socket peer is trusted.
+        # Pass one resolved address, never a client-controlled chain, to Spring.
         proxy_set_header X-Forwarded-For $remote_addr;
         proxy_set_header X-Forwarded-Host $http_host;
-        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Proto $client_scheme;
         proxy_set_header Forwarded "";
         proxy_connect_timeout 5s;
         proxy_send_timeout 60s;

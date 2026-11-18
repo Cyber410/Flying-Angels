@@ -10,6 +10,7 @@ type Props = {
   onSaved: (text: string) => void; onClose: () => void;
 };
 
+// Load and edit the note for an event or one athlete performance.
 export default function EventNotesDialog({ event, participant, sample, onSaved, onClose }: Props) {
   const id = useId();
   const [note, setNote] = useState("");
@@ -19,15 +20,16 @@ export default function EventNotesDialog({ event, participant, sample, onSaved, 
   const [saveError, setSaveError] = useState("");
   const [revision, setRevision] = useState(0);
 
-  useEffect(() => {
+  useEffect(/* Synchronize this view with its dependencies and clean up pending work. */ () => {
     if (sample) return;
     let ignore = false;
-    readEventNote(event.id, participant?.athleteId).then(text => { if (!ignore) setNote(text); })
-      .catch(error => { if (!ignore) setLoadError(error instanceof Error ? error.message : "Unable to load note."); })
-      .finally(() => { if (!ignore) setIsLoading(false); });
-    return () => { ignore = true; };
+    readEventNote(event.id, participant?.athleteId).then(/* Apply the successful request result to the current operation. */ text => { if (!ignore) setNote(text); })
+      .catch(/* Report the request failure without discarding the current view. */ error => { if (!ignore) setLoadError(error instanceof Error ? error.message : "Unable to load note."); })
+      .finally(/* Clear the busy state after the request completes. */ () => { if (!ignore) setIsLoading(false); });
+    return /* Stop pending work and release this effect when it is cleaned up. */ () => { ignore = true; };
   }, [event.id, participant?.athleteId, sample, revision]);
 
+  // Save the edited note and report the confirmed text to the parent.
   async function saveNote(submit: FormEvent<HTMLFormElement>) {
     submit.preventDefault();
     if (isSaving || isLoading || loadError || sample) return;
@@ -42,8 +44,8 @@ export default function EventNotesDialog({ event, participant, sample, onSaved, 
       {participant && <p className="meet-dialog-message">{participant.firstName} {participant.lastName}</p>}
       <p className="meet-form-help">{sample ? "This is a read-only sample." : "Notes are saved to the academy database and available to your team."}</p>
       {isLoading && <p role="status">Loading note…</p>}
-      {loadError && <div><p className="meet-dialog-error" role="alert">{loadError}</p><button className="meets-button" type="button" onClick={() => { setLoadError(""); setIsLoading(true); setRevision(value => value + 1); }}>Try again</button></div>}
-      <label className="meet-form-field" htmlFor={id}>Note<textarea id={id} rows={6} maxLength={2000} value={note} disabled={sample || isLoading || isSaving || Boolean(loadError)} onChange={change => setNote(change.target.value)} /></label>
+      {loadError && <div><p className="meet-dialog-error" role="alert">{loadError}</p><button className="meets-button" type="button" onClick={/* Retry loading the data for this view. */ () => { setLoadError(""); setIsLoading(true); setRevision(/* Derive the next revision value from its current state. */ value => value + 1); }}>Try again</button></div>}
+      <label className="meet-form-field" htmlFor={id}>Note<textarea id={id} rows={6} maxLength={2000} value={note} disabled={sample || isLoading || isSaving || Boolean(loadError)} onChange={/* Update the note value from this control. */ change => setNote(change.target.value)} /></label>
       <p className="meet-form-help">Clear the note and save to remove it.</p>
       {saveError && <p className="meet-dialog-error" role="alert">{saveError}</p>}
       <div className="meet-dialog-actions"><button className="meets-button" type="button" disabled={isSaving} onClick={onClose}>Cancel</button><button className="meets-button meets-button-primary" type="submit" disabled={sample || isLoading || isSaving || Boolean(loadError)}>{isSaving ? "Saving…" : "Save Note"}</button></div>

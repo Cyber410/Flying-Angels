@@ -14,12 +14,14 @@ public class InvitationMailOutbox {
     private final InvitationMailRepository mail;
     private final StaffUserRepository users;
     private final UserInvitationRepository invitations;
+    private final AccountInvitationRepository enrollments;
     private final InvitationMailCipher cipher;
     private final InvitationMailSettings settings;
     private final Clock clock;
 
     public record Claim(Long id, String claimId) {}
-    public record Dispatch(String email, String name, String activationUrl, Instant expiresAt) {
+    public record Dispatch(String email, String name, String activationUrl, Instant expiresAt, String verificationCode) {
+        public Dispatch(String email,String name,String activationUrl,Instant expiresAt) { this(email,name,activationUrl,expiresAt,null); }
         @Override public String toString() { return "Dispatch[REDACTED]"; }
     }
     public record DeliveryStatus(Long id, Long userId, Long invitationId, InvitationMail.Status status,
@@ -37,6 +39,19 @@ public class InvitationMailOutbox {
     public void cancelForUser(Long userId) {
         mail.findByUserIdAndStatusInOrderByIdAsc(userId, List.of(InvitationMail.Status.PENDING, InvitationMail.Status.PROCESSING))
                 .forEach(message -> message.cancel(clock.instant()));
+    }
+
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void enqueueEnrollment(AccountInvitation invitation,String activationUrl,String code) {
+        cancelEnrollment(invitation.getId());
+        mail.save(InvitationMail.enrollment(invitation.getId(),
+                cipher.encrypt(activationUrl+"\n"+code,-invitation.getId(),invitation.getId()),clock.instant()));
+    }
+
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void cancelEnrollment(Long id) {
+        mail.findByEnrollmentIdAndStatusInOrderByIdAsc(id,List.of(InvitationMail.Status.PENDING,InvitationMail.Status.PROCESSING))
+                .forEach(message->message.cancel(clock.instant()));
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -60,6 +75,12 @@ public class InvitationMailOutbox {
             var now = clock.instant();
             if (!message.ownedBy(claim.claimId()) || !message.getClaimedUntil().isAfter(now)) return Optional.empty();
             if (!validInvitation(message, now)) { message.cancel(now); return Optional.empty(); }
+            if(message.getEnrollmentId()!=null) {
+                var invitation=enrollments.findById(message.getEnrollmentId()).orElseThrow();
+                String[] payload=cipher.decrypt(message.getEncryptedPayload(),-invitation.getId(),invitation.getId()).split("\n",2);
+                if(payload.length!=2) throw new InvitationMailCipher.InvalidPayloadException();
+                return Optional.of(new Dispatch(invitation.getEmail(),invitation.getName(),payload[0],invitation.getCodeExpiresAt(),payload[1]));
+            }
             var user = users.findById(message.getUserId()).orElseThrow();
             var invitation = invitations.findById(message.getInvitationId()).orElseThrow();
             return Optional.of(new Dispatch(user.getEmail(), user.getName(),
@@ -96,6 +117,8 @@ public class InvitationMailOutbox {
     }
 
     private boolean validInvitation(InvitationMail message, Instant now) {
+        if(message.getEnrollmentId()!=null) return enrollments.findById(message.getEnrollmentId())
+                .filter(i->i.available(now)&&now.isBefore(i.getCodeExpiresAt())).isPresent();
         var invitation = invitations.findById(message.getInvitationId()).orElse(null);
         var user = users.findById(message.getUserId()).orElse(null);
         return invitation != null && user != null && invitation.getUserId().equals(user.getId())

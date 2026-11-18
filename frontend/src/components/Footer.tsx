@@ -1,6 +1,7 @@
 // Shared academy, team, and capstone credits.
 import "./Footer.css";
 
+// Render the academy, development team, and capstone credits.
 export default function Footer() {
   return (
     <footer className="site-footer">

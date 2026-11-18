@@ -1,3 +1,4 @@
+-- Historical test fixture only; executed against disposable migration-test databases.
 -- DRAFT: previous committed code -> current V1 application schema.
 -- Reference source commit: 671a9aec091a20a914d4ec2fd0e2f568a8dd4a46
 -- This is NOT a verified description of the live RDS schema.

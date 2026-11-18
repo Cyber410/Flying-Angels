@@ -33,7 +33,9 @@ public class InvitationMailWorker {
             try {
                 var dispatch = outbox.prepare(claim);
                 if (dispatch.isEmpty()) continue;
-                var payload = dispatch.get(); sender.send(payload.email(), payload.name(), payload.activationUrl(), payload.expiresAt());
+                var payload = dispatch.get();
+                if(payload.verificationCode()!=null) sender.sendVerification(payload.email(),payload.name(),payload.activationUrl(),payload.verificationCode(),payload.expiresAt());
+                else sender.send(payload.email(), payload.name(), payload.activationUrl(), payload.expiresAt());
                 outbox.sent(claim); processed++;
             } catch (RuntimeException ex) {
                 String errorCode = "SMTP_UNAVAILABLE"; boolean permanent = false;

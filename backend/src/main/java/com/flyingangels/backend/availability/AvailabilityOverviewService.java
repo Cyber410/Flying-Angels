@@ -39,6 +39,6 @@ public class AvailabilityOverviewService {
         }
         return new OverviewPage(new OverviewFilters(meetId, status, effectiveView, search, today),
                 result.getContent().stream().map(r -> OverviewRow.from(r, clock, events.getOrDefault(new Pair(r.getMeet().getId(), r.getAthlete().getId()), java.util.List.of()), latest.get(r.getId()))).toList(),
-                page, size, result.getTotalElements(), result.getTotalPages(), overview.summary(meetId));
+                page, size, result.getTotalElements(), result.getTotalPages(), overview.summary(meetId, status, effectiveView, search, today));
     }
 }

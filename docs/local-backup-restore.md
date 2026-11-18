@@ -1,5 +1,8 @@
 # Local database backup and restore
 
+> **Legacy capture-based verification:** The local email-capture service has been removed. Inbox polling and activation steps below describe historical checks and are not runnable against the current Gmail setup. The main CI functional Postman collection is unaffected. Use the current frontend email-code flow with an inbox you control for manual account verification. The disposable Postman stack now defaults email delivery to disabled.
+
+
 This rehearsal uses the existing local fa-postman stack as its source. Its separate destination is fa-restore-rehearsal. AWS and the original database receive no test writes.
 
 ## What was verified
@@ -90,7 +93,7 @@ No output and exit code 0 mean the exports are identical. This is stronger than 
 ### 4. Start the backend and inspect history
 
 ~~~sh
-restore_stack up -d --no-build --wait --wait-timeout 240 backend mailpit
+restore_stack up -d --no-build --wait --wait-timeout 240 backend
 
 docker exec fa-restore-rehearsal-mysql-1 sh -c '
   MYSQL_PWD="$MYSQL_PASSWORD" exec mysql -u "$MYSQL_USER" "$MYSQL_DATABASE" \
@@ -102,31 +105,14 @@ The history must match the source. In this database it is a successful V1 BASELI
 
 Use the Postman steps above to verify actual application access. Email delivery starts disabled, so restored pending messages remain available for inspection.
 
-### 5. Test pending invitation recovery
+### 5. Inspect pending invitation recovery
 
-1. With delivery paused, POST /api/users/invitations as Admin with fresh CSRF state. Use a unique synthetic example.test email address, a name and role COACH. Save the returned user ID.
-2. GET /api/users/{id}/invitation/delivery. Expect PENDING with attempts 0.
-3. Stop only this copy's backend with restore_stack stop backend.
-4. Dump this copy using the backup command, substituting fa-restore-rehearsal-mysql-1 as source and with-pending.sql as the output filename.
-5. Import with-pending.sql into fa-restore-rehearsal-mysql-1 using the restore command. This recreates only the disposable copy's backed-up tables.
-6. Start its backend again, sign in again, and inspect the same delivery endpoint. It should still be PENDING with attempts 0.
-7. Enable delivery to the separate local Mailpit inbox:
-
-~~~sh
-RESTORE_SEND_EMAILS=true restore_stack up -d --no-build --no-deps \
-  --wait --wait-timeout 240 backend
-~~~
-
-8. Open http://127.0.0.1:18026. After the worker polls, the message should appear and delivery status should become SENT. The same key is required to recover the encrypted payload.
-9. Copy the captured token and POST /api/auth/invitations/validate with JSON containing the token field and fresh CSRF state. Expect a successful invitation response. Do not put real activation tokens in shared logs.
-10. Pause automatic delivery again:
-
-~~~sh
-RESTORE_SEND_EMAILS=false restore_stack up -d --no-build --no-deps \
-  --wait --wait-timeout 240 backend
-~~~
-
-The worker clears encrypted payloads after successful delivery. Compare backup contents before allowing delivery. One captured message was observed in this rehearsal; the application's at-least-once delivery can still duplicate a message after a crash between SMTP acceptance and database acknowledgment.
+Keep `RESTORE_SEND_EMAILS=false` while inspecting a restored database. Compare the
+restored invitation and outbox records before enabling SMTP. For an intentional
+manual delivery check, configure the real provider, use only a recipient inbox
+you control, and review queued recipients before enabling the worker. Follow the
+current frontend verification-code flow; the former local-inbox recovery check
+is retained only in the historical verification notes above.
 
 ## Cleanup
 
@@ -179,16 +165,13 @@ services:
       APP_MAIL_OUTBOX_KEY: ${POSTMAN_MAIL_OUTBOX_KEY:?Retain the original outbox key}
       APP_MAIL_OUTBOX_ENABLED: ${RESTORE_SEND_EMAILS:-false}
       APP_LOGIN_THROTTLE_CLEANUP_ENABLED: "false"
-      SMTP_HOST: mailpit
-      SMTP_PORT: "1025"
-      SMTP_FROM: noreply@flyingangels.local
-      SMTP_AUTH: "false"
-      SMTP_STARTTLS: "false"
-  mailpit:
-    image: axllent/mailpit:v1.31.5
-    networks: [default, access]
-    ports:
-      - "127.0.0.1:18026:8025"
+      SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_FROM: ${SMTP_FROM:-}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_AUTH: "true"
+      SMTP_STARTTLS: "true"
 networks:
   default:
     internal: true

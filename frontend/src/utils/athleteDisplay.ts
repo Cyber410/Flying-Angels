@@ -7,6 +7,7 @@ export function displayGender(value: string | null | undefined): string {
   return normalized.charAt(0).toUpperCase() + normalized.slice(1);
 }
 
+// Calculate the athlete age group on the event date.
 export function ageGroupAtEvent(dateOfBirth: string | null | undefined, eventDate: string): string {
   if (!dateOfBirth) return "Not provided";
   const [birthYear, birthMonth, birthDay] = dateOfBirth.split("-").map(Number);

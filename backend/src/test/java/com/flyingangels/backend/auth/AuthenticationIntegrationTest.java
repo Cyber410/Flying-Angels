@@ -27,6 +27,7 @@ class AuthenticationIntegrationTest extends DatabaseIntegrationTest {
     @Autowired StaffUserService staff;
     @Autowired StaffUserRepository users;
     @Autowired InvitationService invitations;
+    @Autowired AccountEnrollmentService enrollment;
     @Autowired com.flyingangels.backend.auth.mail.InvitationMailWorker mailWorker;
     @Autowired UserInvitationRepository invitationsRepository;
     @org.springframework.test.context.bean.override.mockito.MockitoBean InvitationEmailSender emails;
@@ -212,7 +213,8 @@ class AuthenticationIntegrationTest extends DatabaseIntegrationTest {
         String body = "{\"email\":\"NEW.COACH@example.com\",\"name\":\"New Coach\",\"role\":\"COACH\"}";
         var created = mockMvc.perform(post("/api/users").session(session).with(csrf()).contentType("application/json").content(body))
                 .andExpect(status().isCreated()).andExpect(jsonPath("$.email").value("new.coach@example.com"))
-                .andExpect(jsonPath("$.active").value(false)).andExpect(jsonPath("$.accountStatus").value("INVITED")).andReturn();
+                .andExpect(jsonPath("$.status").value("AWAITING_VERIFICATION")).andReturn();
+        assertTrue(users.findByEmail("new.coach@example.com").isEmpty(), "Verification must precede account creation");
         assertFalse(created.getResponse().getContentAsString().contains(PASSWORD));
         assertFalse(created.getResponse().getContentAsString().contains("passwordHash"));
         mockMvc.perform(post("/api/users").session(session).with(csrf()).contentType("application/json").content(body))
@@ -222,9 +224,14 @@ class AuthenticationIntegrationTest extends DatabaseIntegrationTest {
                 .andExpect(status().isUnauthorized());
         mailWorker.processBatch();
         var activation = org.mockito.ArgumentCaptor.forClass(String.class);
-        org.mockito.Mockito.verify(emails).send(org.mockito.ArgumentMatchers.eq("new.coach@example.com"),
-                org.mockito.ArgumentMatchers.anyString(), activation.capture(), org.mockito.ArgumentMatchers.any());
-        invitations.accept(new InvitationService.AcceptRequest(activation.getValue().split("#token=")[1], PASSWORD));
+        var code = org.mockito.ArgumentCaptor.forClass(String.class);
+        org.mockito.Mockito.verify(emails).sendVerification(org.mockito.ArgumentMatchers.eq("new.coach@example.com"),
+                org.mockito.ArgumentMatchers.anyString(), activation.capture(), code.capture(), org.mockito.ArgumentMatchers.any());
+        String token = activation.getValue().split("#token=")[1];
+        assertThrows(org.springframework.web.server.ResponseStatusException.class,
+                () -> enrollment.complete(new AccountEnrollmentService.Completion(token, PASSWORD)));
+        enrollment.verify(new AccountEnrollmentService.Verification(token, code.getValue()));
+        enrollment.complete(new AccountEnrollmentService.Completion(token, PASSWORD));
         login("new.coach@example.com");
     }
 
@@ -316,6 +323,7 @@ class AuthenticationIntegrationTest extends DatabaseIntegrationTest {
         var session = login(account.email());
         mockMvc.perform(get("/api/portal/rankings/categories").session(session)).andExpect(status().isOk());
         var ranked = mockMvc.perform(get("/api/portal/rankings").param("categoryId", race.getCategory().getId().toString())
+                .param("meetId", meet.getId().toString()).param("eventId", race.getId().toString())
                 .param("athleteId", competitor.getId().toString()).session(session)).andExpect(status().isOk())
                 .andExpect(jsonPath("$.totalElements").value(2)).andExpect(jsonPath("$.content[0].firstName").value("Competitor"))
                 .andExpect(jsonPath("$.content[0].profileAccessible").value(false)).andExpect(jsonPath("$.content[0].athleteId").doesNotExist())

@@ -3,6 +3,25 @@
   background: var(--background);
 }
 
+/* Scheduling overview adds clear calendar scopes and compact, labeled response counts. */
+.meets-scheduling-heading { display: flex; justify-content: space-between; align-items: center; gap: 20px; }
+.meets-heading-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.meets-schedule-tabs { display: flex; gap: 6px; border-bottom: 1px solid var(--border-light); width: 100%; }
+.meets-schedule-tabs button { border: 0; border-bottom: 3px solid transparent; background: transparent; padding: 12px 18px; font: inherit; font-size: 13px; color: var(--text-secondary); cursor: pointer; }
+.meets-schedule-tabs button[aria-pressed=true] { color: var(--orange-dark); border-bottom-color: var(--orange); font-weight: 600; }
+.meets-search-toolbar { padding-top: 0; }
+.meets-overview-hint,.meets-availability-muted { font-size: 11px; color: var(--text-secondary); }
+.meets-overview-hint { text-align: right; }
+.meets-availability { min-width: 280px; }
+.meets-response-badges { display: flex; gap: 6px; flex-wrap: wrap; }
+.meets-response-badges > span { display: inline-flex; gap: 5px; align-items: center; padding: 5px 7px; border-radius: 4px; font-size: 11px; white-space: nowrap; }
+.meets-response-badges .available { color: #285b38; background: #eaf4e9; }
+.meets-response-badges .pending { color: #705313; background: #fff3cf; }
+.meets-response-badges .unavailable { color: #963d32; background: #fbece8; }
+.meets-availability-footer { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin-top: 9px; font-size: 11px; color: var(--text-secondary); }
+.meets-availability-footer a { color: var(--orange-dark); text-underline-offset: 3px; }
+@media(max-width:750px) { .meets-scheduling-heading { align-items: start; flex-direction: column; }.meets-overview-hint { display: none; }.meets-schedule-tabs button { flex: 1; padding-inline: 12px; } }
+
 .meets-container {
   width: min(1180px, calc(100% - 64px));
   margin: 0 auto;

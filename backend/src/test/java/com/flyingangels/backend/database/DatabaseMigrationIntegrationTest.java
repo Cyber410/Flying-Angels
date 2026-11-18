@@ -12,7 +12,6 @@ import org.flywaydb.core.api.configuration.FluentConfiguration;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.io.ClassPathResource;
-import org.springframework.core.io.FileSystemResource;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.jdbc.datasource.init.ScriptUtils;
@@ -45,11 +44,11 @@ class DatabaseMigrationIntegrationTest {
     }
 
     @Test
-    void freshDatabaseRunsOneMigrationContainingAllApplicationTables() {
+    void freshDatabaseRunsCurrentMigrationsContainingAllApplicationTables() {
         flyway().load().migrate();
-        assertEquals(List.of("1"), versions());
-        assertEquals("SQL", jdbc.queryForObject("SELECT type FROM flyway_schema_history", String.class));
-        assertEquals(17, jdbc.queryForObject("SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE()", Integer.class));
+        assertEquals(List.of("1", "2", "3"), versions());
+        assertEquals("SQL", jdbc.queryForObject("SELECT type FROM flyway_schema_history WHERE version = '1'", String.class));
+        assertEquals(19, jdbc.queryForObject("SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE()", Integer.class));
         seedRecords(); // Exercises core, outbox and throttling tables and their relationships.
         assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM invitation_email_outbox", Integer.class));
         assertEquals(4, jdbc.queryForObject("SELECT failures FROM login_throttle_buckets", Integer.class));
@@ -61,11 +60,12 @@ class DatabaseMigrationIntegrationTest {
         seedRecords();
         var before = businessRecords();
         flyway().baselineOnMigrate(true).load().migrate();
-        assertEquals(List.of("1"), versions());
-        assertEquals("BASELINE", jdbc.queryForObject("SELECT type FROM flyway_schema_history", String.class));
+        assertEquals(List.of("1", "2", "3"), versions());
+        assertEquals("BASELINE", jdbc.queryForObject("SELECT type FROM flyway_schema_history WHERE version = '1'", String.class));
         assertEquals(before, businessRecords());
+        assertNull(jdbc.queryForObject("SELECT enrollment_id FROM invitation_email_outbox WHERE id = 801", Long.class));
         flyway().load().migrate();
-        assertEquals(List.of("1"), versions());
+        assertEquals(List.of("1", "2", "3"), versions());
         assertEquals(before, businessRecords());
     }
 
@@ -107,7 +107,7 @@ class DatabaseMigrationIntegrationTest {
         var before = previousRecords();
         try (var connection = dataSource.getConnection()) {
             ScriptUtils.executeSqlScript(connection,
-                    new FileSystemResource("../deploy/sql/upgrade-existing-to-v1.sql.draft"));
+                    new ClassPathResource("database/upgrade-existing-to-v1.sql"));
         }
         assertEquals(before, previousRecords());
         assertEquals(16, jdbc.queryForObject("SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE()", Integer.class));
@@ -116,8 +116,8 @@ class DatabaseMigrationIntegrationTest {
         assertEquals(5, jdbc.queryForObject("SELECT COUNT(*) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'event_results' AND INDEX_NAME = 'idx_result_ranking'", Integer.class));
         assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM staff_users", Integer.class));
         flyway().baselineOnMigrate(true).load().migrate();
-        assertEquals(List.of("1"), versions());
-        assertEquals("BASELINE", jdbc.queryForObject("SELECT type FROM flyway_schema_history", String.class));
+        assertEquals(List.of("1", "2", "3"), versions());
+        assertEquals("BASELINE", jdbc.queryForObject("SELECT type FROM flyway_schema_history WHERE version = '1'", String.class));
         assertEquals(before, previousRecords());
     }
 
@@ -164,7 +164,10 @@ class DatabaseMigrationIntegrationTest {
     private Map<String, List<Map<String, Object>>> businessRecords() {
         Map<String, List<Map<String, Object>>> result = new LinkedHashMap<>();
         for (String table : List.of("athletes", "meets", "event_categories", "events", "event_participations", "event_results", "athlete_notes", "staff_users", "user_invitations", "invitation_email_outbox", "login_throttle_buckets")) {
-            result.put(table, jdbc.queryForList("SELECT * FROM " + table + " ORDER BY 1"));
+            var rows = jdbc.queryForList("SELECT * FROM " + table + " ORDER BY 1");
+            // V2 adds a nullable reference; all original values must survive.
+            if (table.equals("invitation_email_outbox")) rows.forEach(row -> row.remove("enrollment_id"));
+            result.put(table, rows);
         }
         return result;
     }

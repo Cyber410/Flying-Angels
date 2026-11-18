@@ -13,14 +13,14 @@ const data: ResultsOverview={events:sampleMeetProfile.events,sharedResults:[{
   eventId:-11,eventName:"100M",categoryId:-11,categoryName:"100M",meetId:-1,meetName:"Fall Invitational",
   eventDate:"2026-10-24",result:"13.2s",score:13.2,source:"shared",
 }],allAttempts:[],warnings:[],failedEvents:[]};
-beforeEach(()=>{vi.resetAllMocks();vi.mocked(getResultsOverview).mockResolvedValue(data);});
-it("shows meet-linked results and filters by athlete name",async()=>{
+beforeEach(/* Reset test state and mocks before each test. */ ()=>{vi.resetAllMocks();vi.mocked(getResultsOverview).mockResolvedValue(data);});
+it("shows meet-linked results and filters by athlete name",/* Verify that shows meet-linked results and filters by athlete name. */ async()=>{
   const user=userEvent.setup();render(<MemoryRouter><ResultsPage /></MemoryRouter>);
   expect(await screen.findByText("13.2s")).toBeInTheDocument();
   await user.type(screen.getByRole("searchbox"),"not present");expect(screen.queryByText("13.2s")).not.toBeInTheDocument();
   await user.click(screen.getAllByRole("button",{name:"Clear Filters"})[0]);expect(screen.getByText("13.2s")).toBeInTheDocument();
 });
-it("reports a failed result load",async()=>{
+it("reports a failed result load",/* Verify that reports a failed result load. */ async()=>{
   vi.mocked(getResultsOverview).mockRejectedValue(new Error("Results unavailable"));render(<MemoryRouter><ResultsPage /></MemoryRouter>);
   expect(await screen.findByRole("alert")).toHaveTextContent("Results unavailable");
 });

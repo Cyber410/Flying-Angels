@@ -1,0 +1,21 @@
+CREATE TABLE password_resets (
+    user_id bigint NOT NULL PRIMARY KEY,
+    email varchar(254) NOT NULL,
+    token_hash varchar(64) NOT NULL UNIQUE,
+    code_hash varchar(64) NOT NULL,
+    security_version bigint NOT NULL,
+    expires_at datetime(6) NOT NULL,
+    requested_at datetime(6) NOT NULL,
+    consumed_at datetime(6),
+    failures int NOT NULL,
+    encrypted_code varchar(4096),
+    mail_kind varchar(20) NOT NULL,
+    mail_status varchar(20) NOT NULL,
+    mail_attempts int NOT NULL,
+    next_attempt_at datetime(6) NOT NULL,
+    claimed_until datetime(6),
+    claim_id varchar(36),
+    version bigint NOT NULL,
+    KEY idx_password_reset_mail (mail_status, next_attempt_at, claimed_until),
+    CONSTRAINT fk_password_reset_user FOREIGN KEY (user_id) REFERENCES staff_users(id) ON DELETE CASCADE
+) ENGINE=InnoDB;

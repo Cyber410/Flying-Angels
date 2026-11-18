@@ -30,7 +30,8 @@ public class SessionIdentityFilter extends OncePerRequestFilter {
             SecurityContextHolder.clearContext();
             String path = request.getRequestURI().substring(request.getContextPath().length());
             if (!path.equals("/api/auth/login") && !path.equals("/api/csrf")
-                    && !path.equals("/api/auth/invitations/accept") && !path.equals("/api/auth/invitations/validate")) {
+                    && !path.equals("/api/auth/invitations/accept") && !path.equals("/api/auth/invitations/validate")
+                    && !path.startsWith("/api/auth/password-reset/")) {
                 response.setStatus(401); response.setContentType("application/json");
                 response.getWriter().write("{\"code\":\"SESSION_EXPIRED\",\"message\":\"Your session has expired. Sign in again.\"}");
                 return;

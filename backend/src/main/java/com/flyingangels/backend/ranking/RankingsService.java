@@ -19,6 +19,7 @@ public class RankingsService {
     private final AgeGroupService ageGroups;
     private final com.flyingangels.backend.meet.MeetRepository meets;
     private final EventRepository events;
+    private final PortalRankingScope portalScope;
 
     @Transactional(readOnly = true)
     public List<Category> categories() { return categories.findAllByOrderByNameAsc().stream().map(Category::from).toList(); }
@@ -40,7 +41,11 @@ public class RankingsService {
     }
     @Transactional(readOnly = true)
     public RankingsResponse<StaffRow> staff(Long categoryId, String gender, Integer minAge, Integer maxAge, LocalDate ageAsOf, int page, int size, Long meetId, Long eventId) {
-        return rank(categoryId, gender, minAge, maxAge, ageAsOf, page, size, meetId, eventId, ranked -> {
+        return staff(categoryId, gender, minAge, maxAge, ageAsOf, page, size, meetId, eventId, RankingOrder.ASC);
+    }
+    @Transactional(readOnly = true)
+    public RankingsResponse<StaffRow> staff(Long categoryId, String gender, Integer minAge, Integer maxAge, LocalDate ageAsOf, int page, int size, Long meetId, Long eventId, RankingOrder rankOrder) {
+        return rank(categoryId, gender, minAge, maxAge, ageAsOf, page, size, meetId, eventId, rankOrder, ranked -> {
             var result = ranked.result(); var athlete = result.getAthlete(); var event = result.getEvent();
             return new StaffRow(ranked.position(), athlete.getId(), athlete.getFirstName(), athlete.getLastName(), athlete.getGender(),
                     AgeRange.ageOn(athlete.getDateOfBirth(), ageAsOf), athlete.isArchived(), result.getId(), result.getResultLabel(), result.getResult(), result.getScore(),
@@ -56,7 +61,8 @@ public class RankingsService {
     @Transactional(readOnly = true)
     public RankingsResponse<PortalRow> portal(Long authorizedAthleteId, Long categoryId, String gender, Integer minAge, Integer maxAge, LocalDate ageAsOf, int page, int size, Long meetId, Long eventId) {
         if (authorizedAthleteId == null || authorizedAthleteId <= 0) throw new IllegalArgumentException("A scoped athlete identity is required");
-        return rank(categoryId, gender, minAge, maxAge, ageAsOf, page, size, meetId, eventId, ranked -> {
+        portalScope.requireEvent(authorizedAthleteId, categoryId, meetId, eventId);
+        return rank(categoryId, gender, minAge, maxAge, ageAsOf, page, size, meetId, eventId, RankingOrder.ASC, ranked -> {
             var result = ranked.result(); var athlete = result.getAthlete();
             boolean ownProfile = athlete.getId().equals(authorizedAthleteId);
             return new PortalRow(ranked.position(), athlete.getFirstName(), athlete.getLastName(), result.getResult(), result.getScore(), ownProfile,
@@ -66,7 +72,7 @@ public class RankingsService {
         });
     }
 
-    private <T> RankingsResponse<T> rank(Long categoryId, String gender, Integer minAge, Integer maxAge, LocalDate ageAsOf, int page, int size, Long meetId, Long eventId, Function<Ranked, T> project) {
+    private <T> RankingsResponse<T> rank(Long categoryId, String gender, Integer minAge, Integer maxAge, LocalDate ageAsOf, int page, int size, Long meetId, Long eventId, RankingOrder rankOrder, Function<Ranked, T> project) {
         if (categoryId == null || categoryId <= 0) throw new IllegalArgumentException("Select a positive event category ID");
         if (page < 0 || size < 1 || size > 100) throw new IllegalArgumentException("page must be nonnegative and size between 1 and 100");
         var ages = new AgeRange(minAge, maxAge);
@@ -92,15 +98,20 @@ public class RankingsService {
         if (order == RankingOrder.DESC) byScore = byScore.reversed();
         best.sort(byScore.thenComparing(r -> r.getAthlete().getLastName(), String.CASE_INSENSITIVE_ORDER)
                 .thenComparing(r -> r.getAthlete().getFirstName(), String.CASE_INSENSITIVE_ORDER).thenComparing(r -> r.getAthlete().getId()));
-        List<T> content = new ArrayList<>();
+        List<Ranked> rankedResults = new ArrayList<>();
         long offset = (long) page * size;
         BigDecimal previous = null; int position = 0;
         for (int index = 0; index < best.size(); index++) {
             var result = best.get(index);
             if (previous == null || result.getScore().compareTo(previous) != 0) position = index + 1;
             previous = result.getScore();
-            if (index >= offset && index < offset + size) content.add(project.apply(new Ranked(position, result)));
+            rankedResults.add(new Ranked(position, result));
         }
+        // Reorder complete ranks before pagination, preserving alphabetical ordering within ties.
+        if (rankOrder == RankingOrder.DESC) rankedResults.sort(Comparator.comparingInt(Ranked::position).reversed());
+        List<T> content = new ArrayList<>();
+        for (int index = 0; index < rankedResults.size(); index++)
+            if (index >= offset && index < offset + size) content.add(project.apply(rankedResults.get(index)));
         var status = !best.isEmpty() ? Status.AVAILABLE
                 : (ages.active() || normalizedGender != null) && query.hasEligibleResults(category, meetId, eventId, order) ? Status.NO_MATCHING_ATHLETES : Status.NO_EVENT_RESULTS;
         return new RankingsResponse<>(new Category(category.getId(), category.getName(), category.getUnit(), order),

@@ -8,6 +8,10 @@ import java.util.Optional;
 
 public interface EventResultRepository extends JpaRepository<EventResult, Long>, org.springframework.data.jpa.repository.JpaSpecificationExecutor<EventResult> {
 
+    @EntityGraph(attributePaths = {"category", "event", "event.meet", "event.category", "athlete"})
+    @org.springframework.data.jpa.repository.Query("select r from EventResult r where r.event is not null order by r.id")
+    List<EventResult> findForResultsOverview();
+
     long countByEventMeetId(Long meetId);
     @EntityGraph(attributePaths = {"category", "event", "event.meet", "event.category", "athlete"})
     @org.springframework.data.jpa.repository.Query("""

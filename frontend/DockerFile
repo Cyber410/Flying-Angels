@@ -4,7 +4,8 @@ WORKDIR /app
 
 COPY package*.json ./
 
-RUN npm install
+# Install exactly the dependency versions reviewed in the lockfile.
+RUN npm ci
 
 COPY . .
 

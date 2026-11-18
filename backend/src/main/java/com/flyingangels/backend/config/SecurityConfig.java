@@ -30,7 +30,7 @@ public class SecurityConfig {
             http.authorizeHttpRequests(auth->auth
                 .requestMatchers(HttpMethod.OPTIONS,"/**").permitAll()
                 .requestMatchers("/api/csrf", "/api/auth/me", "/api/auth/login",
-                        "/api/auth/invitations/validate", "/api/auth/invitations/accept").permitAll()
+                        "/api/auth/invitations/validate", "/api/auth/invitations/accept", "/api/auth/enrollment/**", "/api/auth/password-reset/**").permitAll()
                 .requestMatchers("/api/users", "/api/users/**").hasRole("ADMIN")
                 .requestMatchers("/api/portal/**").hasRole("ATHLETE")
                 // Notes are shared staff actions, even though basic athlete writes are Admin-only.

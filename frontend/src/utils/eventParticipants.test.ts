@@ -2,7 +2,7 @@ import { expect, it } from "vitest";
 import { eventParticipants } from "./eventParticipants";
 import { sampleMeetProfile } from "../data/sampleMeet";
 
-it("keeps pending assignments and all attempts while selecting the best score",()=>{
+it("keeps pending assignments and all attempts while selecting the best score",/* Verify that keeps pending assignments and all attempts while selecting the best score. */ ()=>{
   const event=sampleMeetProfile.events[0];
   const participants=eventParticipants({event,participants:[{participationId:5,athleteId:1,firstName:"Maya",lastName:"Johnson",eventId:event.id,eventName:event.name,meetId:1,meetName:"Open",categoryId:1,categoryName:"100M",note:"Strong start"},{participationId:6,athleteId:2,firstName:"Pending",lastName:"Runner",eventId:event.id,eventName:event.name,meetId:1,meetName:"Open",categoryId:1,categoryName:"100M",note:""}],results:[
     {resultId:10,athleteId:1,firstName:"Maya",lastName:"Johnson",categoryId:1,categoryName:"100M",result:"13.4s",score:13.4},

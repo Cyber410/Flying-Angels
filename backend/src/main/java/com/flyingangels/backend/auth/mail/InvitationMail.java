@@ -11,8 +11,9 @@ import java.time.Instant;
 public class InvitationMail {
     public enum Status { PENDING, PROCESSING, SENT, FAILED, CANCELLED }
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY) private Long id;
-    @Column(nullable = false, name = "user_id") private Long userId;
-    @Column(nullable = false, unique = true, name = "invitation_id") private Long invitationId;
+    @Column(name = "user_id") private Long userId;
+    @Column(unique = true, name = "invitation_id") private Long invitationId;
+    private Long enrollmentId;
     @Column(length = 4096) private String encryptedPayload;
     @Enumerated(EnumType.STRING) @Column(nullable = false, length = 12) private Status status = Status.PENDING;
     @Column(nullable = false) private int attempts;
@@ -28,6 +29,9 @@ public class InvitationMail {
     public InvitationMail(Long userId, Long invitationId, String payload, Instant now) {
         this.userId = userId; this.invitationId = invitationId; encryptedPayload = payload;
         createdAt = now; updatedAt = now; nextAttemptAt = now;
+    }
+    public static InvitationMail enrollment(Long id, String payload, Instant now) {
+        var message=new InvitationMail(null,null,payload,now); message.enrollmentId=id; return message;
     }
     public boolean ownedBy(String claim) { return status == Status.PROCESSING && java.util.Objects.equals(claimId, claim); }
     public void claim(String claim, Instant now, long leaseSeconds) {

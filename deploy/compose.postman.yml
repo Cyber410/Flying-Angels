@@ -23,13 +23,12 @@ services:
       APP_ACTIVATION_URL: ${POSTMAN_ACTIVATION_URL:-http://localhost:18080/activate}
       APP_MAIL_OUTBOX_KEY: ${POSTMAN_MAIL_OUTBOX_KEY:?Set POSTMAN_MAIL_OUTBOX_KEY in a private env file; retain it across backend restarts}
       APP_MAIL_OUTBOX_POLL_MS: ${POSTMAN_MAIL_OUTBOX_POLL_MS:-1000}
-      SMTP_HOST: mailpit
-      SMTP_PORT: "1025"
-      SMTP_FROM: noreply@flyingangels.local
-      SMTP_AUTH: "false"
-      SMTP_STARTTLS: "false"
-
-  mailpit:
-    image: axllent/mailpit:v1.31.5
-    ports:
-      - "127.0.0.1:${POSTMAN_MAILPIT_PORT:-18025}:8025"
+      # Synthetic test recipients are not real inboxes. Enable delivery only for an intentional manual check.
+      APP_MAIL_OUTBOX_ENABLED: ${POSTMAN_MAIL_OUTBOX_ENABLED:-false}
+      SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_FROM: ${SMTP_FROM:-}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_AUTH: ${SMTP_AUTH:-true}
+      SMTP_STARTTLS: ${SMTP_STARTTLS:-true}

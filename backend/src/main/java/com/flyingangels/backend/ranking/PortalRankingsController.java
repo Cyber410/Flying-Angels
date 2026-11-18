@@ -15,19 +15,20 @@ import java.util.List;
 @RestController @RequiredArgsConstructor
 public class PortalRankingsController {
     private final RankingsService rankings;
+    private final PortalRankingScope scope;
     private final AthleteSessionService sessions;
     private final com.flyingangels.backend.athlete.AgeGroupService ageGroups;
     @GetMapping("/api/portal/rankings/categories")
     public List<Category> categories(@AuthenticationPrincipal Object identity) {
-        sessions.require(identity); return rankings.categories();
+        return scope.categories(sessions.require(identity).athleteId());
     }
     @GetMapping("/api/portal/rankings/meets")
     public List<MeetChoice> meets(@AuthenticationPrincipal Object identity) {
-        sessions.require(identity); return rankings.meets();
+        return scope.meets(sessions.require(identity).athleteId());
     }
     @GetMapping("/api/portal/rankings/events")
     public List<EventChoice> events(@AuthenticationPrincipal Object identity, @RequestParam(required = false) Long meetId) {
-        sessions.require(identity); return rankings.events(meetId);
+        return scope.events(sessions.require(identity).athleteId(), meetId);
     }
     @GetMapping("/api/portal/rankings")
     public RankingsResponse<PortalRow> rankings(@AuthenticationPrincipal Object identity,

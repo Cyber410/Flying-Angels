@@ -2,6 +2,8 @@ package com.flyingangels.backend.event;
 import org.springframework.data.jpa.repository.*;
 import java.util.*;
 public interface EventParticipationRepository extends JpaRepository<EventParticipation,Long> {
+    @Query("select p.event.id, count(p.id) from EventParticipation p group by p.event.id")
+    List<Object[]> countByEvent();
     boolean existsByEventIdAndAthleteId(Long eventId, Long athleteId);
     Optional<EventParticipation> findByEventIdAndAthleteId(Long eventId, Long athleteId);
     @EntityGraph(attributePaths={"event", "event.meet", "event.category", "athlete"})

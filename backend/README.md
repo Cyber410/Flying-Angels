@@ -1284,11 +1284,11 @@ spring.flyway.baseline-on-migrate=false
 spring.flyway.clean-disabled=true
 ```
 
-A fresh MySQL database runs `V1__application_schema.sql`, containing all 16 current tables, including the invitation email outbox and login-throttling counters. Flyway records successful versions and checksums in `flyway_schema_history`. Later startups validate applied scripts and run only pending versions. CSV imports remain explicit API operations.
+A fresh MySQL database runs four migrations: V1 creates the ten existing RDS tables, V2 adds the missing Sprint 3 schema, V3 adds verified account enrollment, and V4 adds password recovery. Flyway records successful versions and checksums in `flyway_schema_history`. Later startups validate scripts and run only pending migrations. CSV imports remain explicit API operations.
 
-An existing non-empty database without Flyway history stops by default. After a backup and manual review against V1, set `SPRING_FLYWAY_BASELINE_ON_MIGRATE=true` with `SPRING_FLYWAY_BASELINE_VERSION=1` for one startup. Standard Flyway records that starting version; there is no custom schema verifier. Hibernate checks entity compatibility afterward. A different older schema requires a reviewed conversion before baselining. Reset baseline-on-migrate to false afterward.
+The reviewed RDS database has the ten V1 tables and no Flyway history. Even without application rows, it is a non-empty schema. Set `SPRING_FLYWAY_BASELINE_ON_MIGRATE=true` with `SPRING_FLYWAY_BASELINE_VERSION=1` for its first updated startup. Flyway records the V1 baseline and applies V2 through V4; no manual conversion SQL or custom verifier is needed. Reset the override to false afterward. Other schemas require review first; old local databases that ran the earlier unreleased migration layout have incompatible checksums/history and must not be repaired or reset blindly.
 
-For the next persisted change, add V2 and update the entity mappings together. Do not edit applied migration files. Setting a lower target does not undo earlier changes; the application version must remain compatible with the selected schema. MySQL DDL is not guaranteed to roll back as a unit, so test upgrades with representative records and maintain backups.
+The next schema change becomes V5. Do not edit applied/released migrations. Lowering the target does not undo changes; the current backend requires the complete V4 schema. MySQL DDL may commit independently, so test upgrades and maintain recovery backups.
 
 See [Database migrations](../docs/database-migrations.md) for **every variable**, adoption commands, version selection, rollback behavior and RDS rollout precautions. [ADR-0012](../docs/adr/0012-versioned-database-migrations.md) supersedes the earlier Hibernate-update decision.
 

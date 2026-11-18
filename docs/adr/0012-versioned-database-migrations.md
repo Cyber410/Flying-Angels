@@ -12,11 +12,11 @@ Athlete records, accounts, invitation delivery and login-throttling state now su
 
 ## Decision
 
-Use one initial Flyway SQL migration, V1, containing all 16 current application tables. The next real schema change becomes V2. Spring Boot runs Flyway before JPA initialization; Hibernate uses `ddl-auto=validate`. Applied/released SQL files are immutable.
+Use V1 for the ten existing RDS tables, V2 for the missing Sprint 3 schema, V3 for verified account enrollment and V4 for password recovery. The next schema change becomes V5. Spring Boot runs Flyway before JPA initialization; Hibernate uses `ddl-auto=validate`. Applied/released SQL files are immutable.
 
-The initial three-version draft was consolidated at the project owner's request before release. Remove the custom Java migration strategy, schema verifier, frozen snapshots and application-specific adoption flag. Use standard Flyway configuration only.
+On 2026-11-18, before the first RDS Flyway deployment, the owner requested that V1 match the supplied ten-table schema and V2 add its missing functionality. The preceding unreleased layout was reorganized accordingly. Remove the custom Java migration strategy, schema verifier, frozen snapshots and application-specific adoption flag. Use standard Flyway configuration only.
 
-Existing unversioned databases require a backup and manual schema review before a one-time V1 baseline. `baseline-on-migrate=false` is the default; enable it for one reviewed startup, then reset it. Baselining does not prove schema equivalence. Hibernate validates entity compatibility afterward but does not verify every index or constraint. Older incompatible schemas require a separate reviewed conversion.
+Existing unversioned databases require a backup and manual schema review before a one-time V1 baseline. `baseline-on-migrate=false` is the default; enable it for one reviewed startup, then reset it. Baselining does not prove schema equivalence. Hibernate validates entity compatibility afterward but does not verify every index or constraint. The reviewed ten-table RDS schema needs no separate conversion: its missing changes are in V2 and later migrations. Other starting schemas require review.
 
 ## Alternatives and consequences
 
@@ -24,4 +24,4 @@ Keeping Hibernate update would leave schema upgrades implicit. Custom adoption v
 
 SQL and entities must be updated together. Test fresh initialization and populated upgrades. A baseline records a starting version, not that V1 SQL executed. Lowering the target does not reverse SQL. MySQL DDL failures and destructive changes require a reviewed recovery or backup restore. Flyway clean is disabled by default.
 
-Verification covers fresh V1 initialization, explicit populated-schema baselining, record preservation, default refusal without history, repeat startup, checksum failure and clean protection. No RDS schema is assumed or changed. Settings and rollout steps are in [Database migrations](../database-migrations.md).
+Verification covers fresh V1–V4 initialization, explicit populated-schema baselining, record preservation, default refusal without history, repeat startup, checksum failure and clean protection. The RDS definitions were supplied and reviewed; no live SQL changes were made by this workspace. Settings and rollout steps are in [Database migrations](../database-migrations.md).

@@ -4,11 +4,18 @@ Flyway changes the MySQL schema using versioned SQL files. Hibernate uses `ddl-a
 
 ## Files and startup flow
 
-There is one initial migration: `backend/src/main/resources/db/migration/V1__application_schema.sql`. It contains all 16 current application tables, including invitation email delivery and login-throttling storage. The next actual schema change will become V2.
+The migrations follow the existing AWS database schema:
 
-Spring Boot's Flyway integration runs the migration directly. There are no custom migration configuration/verifier classes, schema snapshots or application-specific adoption flags.
+| Version | Purpose |
+| --- | --- |
+| V1__application_schema.sql | The ten existing tables supplied from RDS on 2026-11-18 |
+| V2__sprint3_schema.sql | Six tables for security, availability, invitation delivery and login throttling; optional meet start time, result labels and the ranking index |
+| V3__verified_account_enrollment.sql | Pending account invitations and the corresponding email-outbox changes |
+| V4__password_recovery.sql | Password-reset challenges and durable email-delivery state |
 
-On a fresh database, Flyway creates `flyway_schema_history`, executes V1, and records its checksum and success. Hibernate validates afterward. Later startups validate migration history and run only pending migrations. Regular restarts do not recreate tables or import CSV data.
+The current schema has 18 application tables plus `flyway_schema_history`. The next schema change becomes V5; applied/released migrations must remain immutable. This layout was revised before the first Flyway deployment to RDS, at the project owner's request. Its supplied table list contains no Flyway history.
+
+Spring Boot runs Flyway directly; there are no custom migration configuration/verifier classes or separate adoption SQL scripts. A fresh database executes V1 through V4. The reviewed existing ten-table database is explicitly baselined at version 1 for one startup, then Flyway executes V2 through V4 itself. Hibernate validates the final schema afterward. Regular restarts validate history and run only pending migrations.
 
 ## Configuration variables
 
@@ -19,8 +26,8 @@ The properties live in `backend/src/main/resources/application.properties`. Stan
 | `spring.jpa.hibernate.ddl-auto` / `SPRING_JPA_HIBERNATE_DDL_AUTO` | `validate` | Hibernate checks entity-to-schema compatibility. It does not issue table-creation or alteration SQL. Keep this value when using Flyway. |
 | `spring.flyway.enabled` / `SPRING_FLYWAY_ENABLED` | `true` | Runs Flyway automatically during application startup. Disabling it does not disable Hibernate validation. |
 | `spring.flyway.locations` / `SPRING_FLYWAY_LOCATIONS` | `classpath:db/migration` | Looks for SQL migrations packaged inside the backend JAR. It does not fetch migrations from GitHub. |
-| `spring.flyway.target` / `SPRING_FLYWAY_TARGET` | `latest` | Highest version to apply. `latest` means the highest version packaged in this backend image, currently V1. A lower target does not undo applied changes and may leave the schema incompatible with this application's entities. |
-| `spring.flyway.baseline-version` / `SPRING_FLYWAY_BASELINE_VERSION` | `1` | Version an existing unversioned database already represents. A baseline at V1 skips V1 SQL; future V2 and later migrations still run. Fresh databases execute V1 normally. |
+| `spring.flyway.target` / `SPRING_FLYWAY_TARGET` | `latest` | Highest version to apply. `latest` currently applies through V4. This backend requires the V4 schema; a lower target does not undo applied changes and can leave the schema incompatible. |
+| `spring.flyway.baseline-version` / `SPRING_FLYWAY_BASELINE_VERSION` | `1` | Version an existing unversioned database already represents. A baseline at V1 skips V1 SQL, then V2, V3 and V4 run. Do not baseline this database at V4: that would skip required changes. Fresh databases execute all migrations normally. |
 | `spring.flyway.baseline-on-migrate` / `SPRING_FLYWAY_BASELINE_ON_MIGRATE` | `false` | Refuses a non-empty database without history by default. After backup and manual schema review, enable for one startup to record the V1 baseline. It does not prove that the existing schema matches V1. Reset to false afterward. |
 | `spring.flyway.clean-disabled` / `SPRING_FLYWAY_CLEAN_DISABLED` | `true` | Blocks Flyway's destructive `clean` operation, which removes schema objects. It does not stop someone with database privileges from manually dropping tables. |
 | `spring.flyway.validate-on-migrate` / `SPRING_FLYWAY_VALIDATE_ON_MIGRATE` | `true` | Checks migration history against packaged files before migrating, including checksums of SQL migrations that actually ran. Editing a previously applied SQL migration causes validation failure. |
@@ -29,74 +36,46 @@ The properties live in `backend/src/main/resources/application.properties`. Stan
 
 Use the defaults for routine local work. There is no HTTP migration endpoint or Postman setting for the database version.
 
-## First run against an existing database
+## First startup against the reviewed RDS database
 
-Use the [local backup and restore walkthrough](local-backup-restore.md) to rehearse recovery against a separate MySQL instance before changing a deployed database.
+The owner supplied `SHOW TABLES` and all ten `SHOW CREATE TABLE` definitions from `flying-angels-db` / `flying_angels` on 2026-11-18. V1 contains those exact definitions, in dependency order. RDS is private in `vpc-0f3b48478876eca97`; a CloudShell VPC environment already connected over TLS. The owner reports no application records and has a recovery snapshot. No live database writes have been made by this workspace.
 
-1. Back up the database and verify the backup can be restored into a separate database. Stop application writers during initial baselining. For RDS, take a snapshot and test on a restored copy first.
-2. Review the existing schema against V1, including columns, defaults, indexes and relationships. Standard Flyway baselining records your chosen version; it does not verify that all existing objects match the SQL file. Hibernate validation afterward checks entity compatibility, but is not a complete check of indexes or every constraint. If the schema differs, prepare and test a reviewed conversion rather than assigning it a false baseline.
-3. For the root local Compose stack with an already-current unversioned schema, start only the backend once with:
+Tables without rows still form a non-empty **schema**. Flyway therefore requires the explicit one-time baseline even though the application data is empty. The baseline tells Flyway the existing tables represent V1; V1 SQL is skipped so it does not try to recreate them. There is no manual conversion script to run.
 
-   ```sh
-   SPRING_FLYWAY_BASELINE_ON_MIGRATE=true SPRING_FLYWAY_BASELINE_VERSION=1 \
-     docker compose up -d --build --no-deps backend
+1. Keep the ECS service desired count at zero while merging/building the revised backend image. Retain the available snapshot. Do not run the superseded `upgrade-rds-existing-to-v1.sql` script.
+2. In the **backend** container's task definition, add these plain environment values for the first updated startup:
+
+   ```text
+   SPRING_FLYWAY_BASELINE_ON_MIGRATE=true
+   SPRING_FLYWAY_BASELINE_VERSION=1
    ```
 
-   For the authenticated Postman fixture, add the same two standard environment variables to the existing startup command in its walkthrough. Retain the private outbox key and image/Admin variables. Do not recreate the fixture's MySQL container: its tmpfs data is disposable.
-4. Check the result using SQL:
+   Keep `SPRING_FLYWAY_TARGET=latest` (or its default), Hibernate `ddl-auto=validate`, and all existing secrets unchanged. Attach the revision to the service; registering a revision alone does not update the service.
+3. Start the updated backend only after the new image and deployment configuration are ready. Flyway records BASELINE 1 and executes SQL migrations 2, 3 and 4. V2 adds the missing tables/columns/index; V3 and V4 add enrollment and recovery. The empty `staff_users` table then allows the configured first Admin to be bootstrapped.
+4. Check CloudWatch for successful migration/startup. In the private MySQL client, run:
 
    ```sql
    SELECT installed_rank, version, description, type, success
    FROM flyway_schema_history ORDER BY installed_rank;
+
+   SHOW TABLES;
    ```
 
-   An existing database has one `BASELINE` row at version 1; a fresh database has one `SQL` row at version 1. A baseline does not execute V1 or rewrite existing records. Check account login and existing athlete/results workflows afterward.
-5. Restart the backend with `SPRING_FLYWAY_BASELINE_ON_MIGRATE=false` or its default. The history now controls migration execution; baselining is not needed again.
+   Expect BASELINE 1 followed by successful SQL 2, 3 and 4, with eighteen application tables plus history. Fresh databases instead have SQL rows for all four versions.
+5. Set `SPRING_FLYWAY_BASELINE_ON_MIGRATE=false` or remove the override in the next revision. After the history exists, routine startups use it and only apply pending migrations. Check Admin login and the main application flows.
 
-The earlier local three-version experiment was consolidated before release at the project owner's request. The retained `fa-postman` database had a single V3 `BASELINE` row and no executed SQL migrations. After backup, that local baseline metadata was adjusted to version 1; application records were retained. This was a correction to an unreleased local baseline, not a database rollback. Do not rewrite history on other databases, especially ones where versioned SQL actually executed. Review those separately.
+For other existing databases, review their actual schema before baselining. `baseline-on-migrate=true` is not a schema checker. Do not use this baseline for a database already containing a different subset of Sprint 3 changes.
 
-## Existing deployment missing the current changes
+## Verification and existing local databases
 
-An older populated database must receive its missing changes before it can truthfully be baselined at V1. The complete V1 creation script is for fresh databases; it is not an upgrade script for an older populated schema.
+`DatabaseMigrationIntegrationTest` verifies fresh initialization, direct adoption of the ten-table schema, upgrades from versioned V1 and V2, preservation of existing fields in all ten legacy tables, repeat startup, default refusal without history, checksum rejection and disabled clean. The historical test schema has equivalent columns/constraints in a different column order; it is also adopted directly without a conversion script. `BackendApplicationTests` verifies that all four migrations run and Hibernate accepts the final schema.
 
-A draft one-time upgrade is available at [upgrade-existing-to-v1.sql.draft](../deploy/sql/upgrade-existing-to-v1.sql.draft), outside Flyway's migration directory. V1 remains the only automatic migration. The draft is based on the previous committed backend, `671a9ae`, whose ten-table schema was generated using its actual Hibernate mappings in disposable MySQL 8.4. **This is not a live RDS export.**
-
-The reference comparison requires:
-
-| Change | Purpose |
-| --- | --- |
-| Add nullable `meets.start_time` | Optional meet start time; existing date-only meets retain the default midnight behavior |
-| Add nullable `event_results.result_label` | Labels such as Heat 1, Final and Attempt 2 without changing existing results |
-| Add `idx_result_ranking` | Supports category/athlete/status/unit/score queries |
-| Create `staff_users`, `user_invitations` | Account roles and invitation-based activation |
-| Create `availability_requests`, `availability_responses` | Meet-level requests and response history |
-| Create `invitation_email_outbox` | Durable invitation-email delivery |
-| Create `login_throttle_buckets` | Shared login-failure counters |
-
-The draft does not delete existing records or change recorded performance values. It deliberately does not hide discrepancies behind `IF NOT EXISTS`. Do not apply it to RDS until a schema-only export confirms the starting state, or the draft is revised for the actual differences. MySQL DDL can commit independently; on an error, stop and inspect before rerunning anything.
-
-`DatabaseMigrationIntegrationTest` verifies the draft against the previous-code schema with populated athletes, meets, categories, events, assignments, results and notes. It checks preservation of their existing fields, the new nullable fields/index/tables, and a successful V1 baseline afterward. The schema fixture is test-only. No custom migration/verifier Java classes were reintroduced.
-
-For an AWS-console-only workflow, first collect read-only connection metadata from **RDS → Databases → the instance → Connectivity & security**, including engine/version, status, endpoint, port and public-access setting. Alternatively, in AWS CloudShell in the same Region:
-
-```sh
-aws rds describe-db-instances \
-  --query 'DBInstances[].{Identifier:DBInstanceIdentifier,Engine:Engine,Version:EngineVersion,Status:DBInstanceStatus,Endpoint:Endpoint.Address,Port:Endpoint.Port,InitialDatabase:DBName,Username:MasterUsername,Public:PubliclyAccessible}' \
-  --output table --no-cli-pager
-```
-
-This reads instance metadata, not SQL table definitions, and does not expose the database password. The initial database name can be absent or differ from the application's configured database. Use the connection details to choose an existing permitted client path, then export schema-only SQL with `mysqldump --no-data`; do not change networking or start a stopped instance just to collect metadata. Database-password entry stays in the database client's private prompt. The standard RDS MySQL console manages the instance; the console SQL query editor is an Aurora Data API feature.
-
-After the actual schema comparison: test the revised upgrade on a restored copy, validate the upgraded application, back up live RDS, apply the reviewed SQL with writers stopped, then record V1 through the documented one-startup baseline configuration. Automatic baselining is not a substitute for applying missing changes.
-
-References: [RDS connection details](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/CHAP_GettingStarted.CreatingConnecting.MySQL.html), [read-only instance description](https://docs.aws.amazon.com/cli/latest/reference/rds/describe-db-instances.html), [Aurora query editor](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/query-editor.html).
+Local databases that ran the earlier unreleased migration layout have different V1/V2 checksums and history. They are not compatible with this relabeling merely because they already have the final tables. Do not run Flyway repair, enable a baseline over their existing history, or drop them automatically. Back up any needed data and plan an explicit transition. Only intentionally disposable test databases can be recreated. The retained Postman/restore databases were not changed by this work.
 
 ## Future changes and rollback
 
-For a persisted change, add `V2__clear_description.sql` and update the corresponding entity mapping. Test an empty database and an upgrade from the previous version with representative records. Once released/applied, keep V1 immutable.
+For the next schema change, add `V5__clear_description.sql` and update entity mappings together. Test fresh initialization and upgrades from the previous version with representative records. Keep V1 through V4 immutable after this layout is released.
 
-`SPRING_FLYWAY_TARGET=1` currently installs the complete schema on a fresh database. When V2 exists, a target of 1 prevents it from running; the application version must still be compatible with V1. Lowering the target after V2 has run does not reverse V2 or restore deleted data. A later correction becomes V3. Recovering lost data may require a tested backup restore. MySQL DDL can commit independently, so inspect failures rather than assuming all statements rolled back.
+`SPRING_FLYWAY_TARGET=1` installs only the ten legacy tables on a fresh database, which is insufficient for the current backend. Leave the target at `latest`. Lowering the target after V4 has run does not reverse migrations or remove tables. A later correction becomes a new forward migration. MySQL DDL can commit independently; inspect failures before retrying. Recovering lost data may require a verified backup restore.
 
-RDS has not been inspected or changed. If automatic ECS deployment is enabled, complete the backup/restored-copy/schema-review/baseline plan before releasing this change to main. A populated unversioned database is refused by default. Keep future migrations compatible with older backend tasks still running during rolling deployment.
-
-References: [Spring Boot database initialization](https://docs.spring.io/spring-boot/how-to/data-initialization.html), [Flyway baseline safety](https://documentation.red-gate.com/fd/flyway-baseline-on-migrate-setting-277578974.html), [Flyway target](https://documentation.red-gate.com/fd/flyway-target-setting-277579044.html), [versioned migrations](https://documentation.red-gate.com/fd/versioned-migrations-273973333.html).
+References: [Spring Boot database initialization](https://docs.spring.io/spring-boot/how-to/data-initialization.html), [Flyway baseline](https://documentation.red-gate.com/fd/flyway-baseline-on-migrate-setting-277578974.html), [Flyway target](https://documentation.red-gate.com/fd/flyway-target-setting-277579044.html), [versioned migrations](https://documentation.red-gate.com/fd/versioned-migrations-273973333.html).

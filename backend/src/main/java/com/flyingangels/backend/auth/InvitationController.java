@@ -9,13 +9,17 @@ import static com.flyingangels.backend.auth.InvitationService.*;
 @RestController @RequiredArgsConstructor
 public class InvitationController {
     private final InvitationService invitations;
+    private final AccountEnrollmentService enrollment;
     private final com.flyingangels.backend.auth.mail.InvitationMailOutbox outbox;
     @GetMapping("/api/users/{id}/invitation/delivery")
     public org.springframework.http.ResponseEntity<com.flyingangels.backend.auth.mail.InvitationMailOutbox.DeliveryStatus> delivery(@PathVariable Long id) {
         return org.springframework.http.ResponseEntity.ok().cacheControl(org.springframework.http.CacheControl.noStore().cachePrivate()).body(outbox.status(id));
     }
     @PostMapping("/api/users/invitations") @ResponseStatus(HttpStatus.CREATED)
-    public AuthDtos.UserResponse invite(@Valid @RequestBody InviteRequest request) { return invitations.invite(request); }
+    public AccountEnrollmentService.Summary invite(@Valid @RequestBody InviteRequest request,
+            @org.springframework.security.core.annotation.AuthenticationPrincipal StaffPrincipal principal) {
+        return enrollment.invite(request,principal==null?null:principal.id());
+    }
     @PostMapping("/api/users/{id}/invitation/resend")
     public AuthDtos.UserResponse resend(@PathVariable Long id) { return invitations.resend(id); }
     @PostMapping("/api/auth/invitations/validate")

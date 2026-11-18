@@ -17,7 +17,7 @@ public record ResultOverviewResponse(List<Row> content, int page, int size, long
                       Integer ageAtMeet,Long meetId,String meetName,LocalDate meetStartDate,Long eventId,String eventName,
                       LocalDate eventDate,Long categoryId,String categoryName,RankingOrder rankingOrder,
                       String result,BigDecimal score,ResultUnit unit,ResultStatus status,Instant recordedAt,String resultLabel) {
-        static Row from(EventResult result) {
+        public static Row from(EventResult result) {
             var athlete = result.getAthlete();
             var event = result.getEvent();
             var meet = event.getMeet();

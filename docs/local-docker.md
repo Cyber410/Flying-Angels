@@ -81,7 +81,7 @@ For a fully container-based stack with no host SQL client, remove MySQL's `ports
 
 Frontend source and Vite configuration are unchanged. The existing development proxy targets `http://backend:8080` for the Compose network. The production Nginx API proxy reads `BACKEND_HOST` and `BACKEND_PORT` at container startup. The deployment frontend Dockerfile retains its multi-stage build; frontend development configuration remains outside this backend work.
 
-`APP_CORS_ALLOWED_ORIGINS` is a comma-separated list of exact origins for clients that call the API across origins. Leave it empty for same-origin requests through either proxy. CORS does not replace session authorization or CSRF tokens; Postman is not subject to browser CORS enforcement.
+`APP_CORS_ALLOWED_ORIGINS` is a comma-separated list of exact browser origins. Local Vite uses `changeOrigin: true`, so its upstream Host differs from the browser's Origin on write requests. Configure `http://localhost:5173,http://127.0.0.1:5173` for local frontend access, as shown in `.env.example`. A production proxy that preserves the original Host can use same-origin requests without this local allowlist; configure deployment-specific origins when cross-origin access is required. CORS does not replace session authorization or CSRF tokens. Command-line checks must include the browser Origin header to detect this configuration error.
 
 To activate the network configuration, recreate the containers and inspect the result:
 
@@ -94,7 +94,7 @@ docker compose ps
 
 MySQL stores its data in the named `mysql_data` Docker volume. Stopping/recreating containers keeps that volume and its database records. Initial database credentials and the first Admin account are not reset by changing `.env` after those records already exist.
 
-For the updated account-invitation workflow, use `docker compose --profile mail up --build mysql backend mailpit`. The optional local Mailpit inbox is at `http://localhost:8025`; its SMTP listener stays inside the application network. SMTP_HOST defaults to mailpit and SMTP_PORT to 1025 in Compose. Invitations queue atomically in MySQL and are sent asynchronously; configure a private `APP_MAIL_OUTBOX_KEY` first. SMTP outages leave the account/invitation committed and schedule retries. The inbox captures invitations for local testing; external email delivery requires real provider SMTP settings. APP_ACTIVATION_URL identifies the future client activation route, while Postman can copy the captured token and invoke the backend activation APIs directly. No activation frontend is added.
+For account invitations, configure Gmail SMTP in the private `.env`: host `smtp.gmail.com`, port `587`, your sender address and username, a Google App Password, and authentication/STARTTLS enabled. Start the regular stack with `docker compose up -d`. Invitations queue in MySQL and are delivered asynchronously; retain the private `APP_MAIL_OUTBOX_KEY` across restarts. SMTP failures are tracked by the outbox. `APP_ACTIVATION_URL` points to the frontend email-code verification and password setup screen. No local email-capture service is included.
 
 APP_AVAILABILITY_TIME_ZONE defaults to America/Toronto. Optional meet startTime controls the availability cutoff; date-only meets close at midnight on startDate. APP_AGE_GROUP_BANDS is deliberately empty until club categories are supplied. Once configured, provide ageAsOf on ranking/CSV requests so group attribution uses an explicit date.
 

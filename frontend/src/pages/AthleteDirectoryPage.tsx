@@ -1,3 +1,4 @@
+import { useOptionalAuth } from "../auth/authContext";
 // Searchable athlete table with creation, pagination, and bulk archive/restore.
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
@@ -35,6 +36,7 @@ const EVENT_OPTIONS = [
 
 
 
+// Calculate whole-year age from the supplied birth date.
 function calculateAge(dateOfBirth: string) {
   const today = new Date();
   const birthDate = new Date(`${dateOfBirth}T00:00:00`);
@@ -58,6 +60,7 @@ function calculateAge(dateOfBirth: string) {
   return age;
 }
 
+// Convert an athlete age into the matching directory age-group label.
 function getAgeGroup(
   dateOfBirth: string | null
 ) {
@@ -82,7 +85,10 @@ function getAgeGroup(
   return "";
 }
 
+// Manage the searchable athlete directory, creation, and bulk archive actions.
 function AthleteDirectoryPage() {
+  const auth = useOptionalAuth();
+  const canManage = auth ? auth.can("MANAGE_ATHLETES") : true;
   const navigate = useNavigate();
 
   const [athletes, setAthletes] =
@@ -231,7 +237,7 @@ function AthleteDirectoryPage() {
       length:
         youngestBirthYear - 1940 + 1,
     },
-    (_, index) =>
+    /* Build each generated item from its index. */ (_, index) =>
       youngestBirthYear - index
   );
 
@@ -250,6 +256,7 @@ function AthleteDirectoryPage() {
     { value: "12", label: "December" },
   ];
 
+  // Combine the selected year, month, and day into the birth-date field.
   const updateBirthDate = (
     year: string,
     month: string,
@@ -265,6 +272,7 @@ function AthleteDirectoryPage() {
     );
   };
 
+  // Check that the athlete has reached their fifth birthday.
   const isAtLeastFiveYearsOld = (
     dateOfBirth: string
   ) => {
@@ -285,19 +293,20 @@ function AthleteDirectoryPage() {
      ADD ATHLETE EVENT FUNCTIONS
      ================================================== */
 
+  // Add or remove a discipline from the new athlete form.
   const toggleEvent = (
     eventName: string
   ) => {
-    setNewEvents((currentEvents) => {
+    setNewEvents(/* Derive the next new events value from its current state. */ (currentEvents) => {
       const isSelected =
         currentEvents.some(
-          (event) =>
+          /* Check whether any event matches the required condition. */ (event) =>
             event.eventName === eventName
         );
 
       if (isSelected) {
         return currentEvents.filter(
-          (event) =>
+          /* Exclude entries that do not belong in this result or selection. */ (event) =>
             event.eventName !== eventName
         );
       }
@@ -311,12 +320,13 @@ function AthleteDirectoryPage() {
     });
   };
 
+  // Remove a discipline from the new athlete form.
   const removeEvent = (
     eventName: string
   ) => {
-    setNewEvents((currentEvents) =>
+    setNewEvents(/* Derive the next new events value from its current state. */ (currentEvents) =>
       currentEvents.filter(
-        (event) =>
+        /* Exclude entries that do not belong in this result or selection. */ (event) =>
           event.eventName !== eventName
       )
     );
@@ -326,7 +336,8 @@ function AthleteDirectoryPage() {
      LOAD ATHLETES
      ================================================== */
 
-  useEffect(() => {
+  useEffect(/* Synchronize this view with its dependencies and clean up pending work. */ () => {
+    // Fetch directory records and update the page loading and error states.
     async function loadAthletes() {
       try {
         setIsLoading(true);
@@ -378,7 +389,7 @@ function AthleteDirectoryPage() {
 
         const profiles =
           await Promise.all(
-            athletes.map((athlete) =>
+            athletes.map(/* Build profiles from each athlete. */ (athlete) =>
               getAthleteById(athlete.id)
             )
           );
@@ -388,10 +399,10 @@ function AthleteDirectoryPage() {
           string[]
         > = {};
 
-        profiles.forEach((profile) => {
+        profiles.forEach(/* Apply this operation to each profile. */ (profile) => {
           eventMap[profile.id] = (
             profile.events ?? []
-          ).map((event) =>
+          ).map(/* Trim each value before comparing or saving it. */ (event) =>
             event.categoryName
               .trim()
               .toUpperCase()
@@ -414,14 +425,15 @@ function AthleteDirectoryPage() {
      FILTER FUNCTIONS
      ================================================== */
 
+  // Toggle an age-group filter and reset the visible page.
   const toggleAgeGroup = (
   ageGroup: string
 ) => {
   setSelectedAgeGroups(
-    (currentGroups) =>
+    /* Derive the next selected age groups value from its current state. */ (currentGroups) =>
       currentGroups.includes(ageGroup)
         ? currentGroups.filter(
-            (group) =>
+            /* Exclude entries that do not belong in this result or selection. */ (group) =>
               group !== ageGroup
           )
         : [
@@ -433,14 +445,15 @@ function AthleteDirectoryPage() {
   setCurrentPage(1);
 };
 
+// Toggle a discipline filter and reset the visible page.
 const toggleEventFilter = (
   eventName: string
 ) => {
   setSelectedEventFilters(
-    (currentEvents) =>
+    /* Derive the next selected event filters value from its current state. */ (currentEvents) =>
       currentEvents.includes(eventName)
         ? currentEvents.filter(
-            (event) =>
+            /* Exclude entries that do not belong in this result or selection. */ (event) =>
               event !== eventName
           )
         : [
@@ -451,6 +464,7 @@ const toggleEventFilter = (
 
   setCurrentPage(1);
 };
+// Clear directory filters and return to the first page.
 const clearAll = () => {
   setGenderFilter("");
   setStatusFilter("");
@@ -466,6 +480,7 @@ const clearAll = () => {
      ADD ATHLETE
      ================================================== */
 
+  // Restore the new athlete form to its initial values.
   const resetAddForm = () => {
     setNewFirstName("");
     setNewLastName("");
@@ -479,6 +494,7 @@ const clearAll = () => {
     setAddError("");
   };
 
+  // Close the add-athlete dialog and clear its form state.
   const closeAddModal = () => {
     if (isAdding) {
       return;
@@ -488,6 +504,7 @@ const clearAll = () => {
     resetAddForm();
   };
 
+  // Validate the new athlete form, save it, and refresh the directory state.
   const handleAddAthlete = async (
     event: React.FormEvent<HTMLFormElement>
   ) => {
@@ -538,14 +555,14 @@ const clearAll = () => {
             newFlyStatus.trim(),
           flyaStatus:
             newFlyaStatus.trim(),
-          events: newEvents.map((event) => ({
+          events: newEvents.map(/* Build created athlete from each event. */ (event) => ({
             eventName: event.eventName,
             result: "",
           })),
         });
 
       setAthletes(
-        (currentAthletes) => [
+        /* Derive the next athletes value from its current state. */ (currentAthletes) => [
           ...currentAthletes,
           createdAthlete,
         ]
@@ -580,7 +597,7 @@ const clearAll = () => {
      ================================================== */
 
   const filteredAthletes =
-    athletes.filter((athlete) => {
+    athletes.filter(/* Keep the records included in the current selection. */ (athlete) => {
       const fullName =
         `${athlete.firstName} ${athlete.lastName}`.toLowerCase();
 
@@ -618,7 +635,7 @@ const clearAll = () => {
         selectedEventFilters.length ===
           0 ||
         selectedEventFilters.some(
-          (selectedEvent) =>
+          /* Check whether any selected event matches the required condition. */ (selectedEvent) =>
             athleteEvents.includes(
               selectedEvent.toUpperCase()
             )
@@ -630,7 +647,7 @@ const clearAll = () => {
         matchesAgeGroup &&
         matchesEvent &&
         (!genderFilter || athlete.gender?.trim().toLowerCase() === genderFilter) &&
-        (!statusFilter || [athlete.flyStatus, athlete.flyaStatus].some(status => status?.trim().toLowerCase() === statusFilter))
+        (!statusFilter || [athlete.flyStatus, athlete.flyaStatus].some(/* Check whether any status matches the required condition. */ status => status?.trim().toLowerCase() === statusFilter))
       );
     });
 
@@ -661,22 +678,23 @@ const clearAll = () => {
     selectedAgeGroups.length > 0 ||
     selectedEventFilters.length > 0 || genderFilter !== "" || statusFilter !== "";
 
-  const pageSelectedCount = paginatedAthletes.filter(athlete => selectedAthleteIds.includes(athlete.id)).length;
-  const selectedAthletes = athletes.filter(athlete => selectedAthleteIds.includes(athlete.id));
-  const activeCount = athletes.filter(athlete => !athlete.archived).length;
+  const pageSelectedCount = paginatedAthletes.filter(/* Keep the records included in the current selection. */ athlete => selectedAthleteIds.includes(athlete.id)).length;
+  const selectedAthletes = athletes.filter(/* Keep the records included in the current selection. */ athlete => selectedAthleteIds.includes(athlete.id));
+  const activeCount = athletes.filter(/* Apply the search and selection criteria for active count. */ athlete => !athlete.archived).length;
   const archivedCount = athletes.length - activeCount;
 
-  useEffect(() => {
+  useEffect(/* Synchronize this view with its dependencies and clean up pending work. */ () => {
     if (selectPageRef.current) selectPageRef.current.indeterminate = pageSelectedCount > 0 && pageSelectedCount < paginatedAthletes.length;
   }, [pageSelectedCount, paginatedAthletes.length]);
 
+  // Archive or restore the confirmed selection and refresh the displayed records.
   async function applyArchiveSelection() {
     if (isArchiving || !selectedAthletes.length) return;
     setIsArchiving(true); setArchiveError("");
     try {
-      const updated = await setAthletesArchived(selectedAthletes.map(athlete => athlete.id), archiveView === "active");
-      const updatedById = new Map(updated.map(athlete => [athlete.id, athlete]));
-      setAthletes(current => current.map(athlete => updatedById.get(athlete.id) ?? athlete));
+      const updated = await setAthletesArchived(selectedAthletes.map(/* Extract each athlete ID for lookup or selection. */ athlete => athlete.id), archiveView === "active");
+      const updatedById = new Map(updated.map(/* Index each athlete by its ID. */ athlete => [athlete.id, athlete]));
+      setAthletes(/* Derive the next athletes value from its current state. */ current => current.map(/* Convert each athlete into the required display or request data. */ athlete => updatedById.get(athlete.id) ?? athlete));
       setArchiveFeedback(`${updated.length} athlete${updated.length === 1 ? "" : "s"} ${archiveView === "active" ? "archived" : "restored to the active directory"}.`);
       setSelectedAthleteIds([]); setCurrentPage(1); setArchiveDialogOpen(false);
     } catch (error) { setArchiveError(error instanceof Error ? error.message : "Unable to update the archive."); }
@@ -702,7 +720,7 @@ const clearAll = () => {
         <section className="directory-panel">
           {/* Archive view and feedback are separate from membership/search filters. */}
           <div className="directory-view-switch" role="group" aria-label="Directory view">
-            {(["active", "archived"] as const).map(view => <button type="button" key={view} aria-pressed={archiveView === view} onClick={() => { setArchiveView(view); setSelectedAthleteIds([]); setCurrentPage(1); setArchiveFeedback(""); }}>
+            {(["active", "archived"] as const).map(/* Render each view in the list. */ view => <button type="button" key={view} aria-pressed={archiveView === view} onClick={/* Toggle the selected rows for the next bulk action. */ () => { setArchiveView(view); setSelectedAthleteIds([]); setCurrentPage(1); setArchiveFeedback(""); }}>
               {view === "active" ? "Active athletes" : "Archived athletes"} <span>{isLoading ? "…" : view === "active" ? activeCount : archivedCount}</span>
             </button>)}
           </div>
@@ -720,7 +738,7 @@ const clearAll = () => {
                 placeholder="Search by athlete name..."
                 aria-label="Search athletes by name"
                 value={searchTerm}
-               onChange={(event) => {
+               onChange={/* Update the search term value from this control. */ (event) => {
   setSearchTerm(
     event.target.value
   );
@@ -729,10 +747,10 @@ const clearAll = () => {
               />
             </div>
 
-            <button
+            <button hidden={!canManage}
               className="add-athlete-button"
               type="button"
-              onClick={() =>
+              onClick={/* Update add modal open for the selected action. */ () =>
                 setAddModalOpen(true)
               }
             >
@@ -751,7 +769,7 @@ const clearAll = () => {
                 <button
                   className="multi-select-button"
                   type="button"
-                  onClick={() => {
+                  onClick={/* Update age dropdown open for the selected action. */ () => {
                     setAgeDropdownOpen(
                       !ageDropdownOpen
                     );
@@ -786,7 +804,7 @@ const clearAll = () => {
                       "15-18",
                       "18+",
                     ].map(
-                      (ageGroup) => {
+                      /* Render each age group in the list. */ (ageGroup) => {
                         const isSelected =
                           selectedAgeGroups.includes(
                             ageGroup
@@ -803,7 +821,7 @@ const clearAll = () => {
                                 ? "selected"
                                 : ""
                             }`}
-                            onClick={() =>
+                            onClick={/* Perform the selected button action. */ () =>
                               toggleAgeGroup(
                                 ageGroup
                               )
@@ -838,7 +856,7 @@ const clearAll = () => {
                 <button
                   className="multi-select-button"
                   type="button"
-                  onClick={() => {
+                  onClick={/* Update event filter dropdown open for the selected action. */ () => {
                     void loadAthleteEvents();
                     setEventFilterDropdownOpen(
                       !eventFilterDropdownOpen
@@ -879,7 +897,7 @@ const clearAll = () => {
                   !eventsLoading && (
                     <div className="multi-select-menu">
                       {EVENT_OPTIONS.map(
-                        (
+                        /* Render each event name in the list. */ (
                           eventName
                         ) => {
                           const isSelected =
@@ -898,7 +916,7 @@ const clearAll = () => {
                                   ? "selected"
                                   : ""
                               }`}
-                              onClick={() =>
+                              onClick={/* Perform the selected button action. */ () =>
                                 toggleEventFilter(
                                   eventName
                                 )
@@ -923,16 +941,16 @@ const clearAll = () => {
                   )}
               </div>
 
-              <label className="directory-select-filter"><span className="filter-label">Gender</span><select aria-label="Filter by gender" value={genderFilter} onChange={event => { setGenderFilter(event.target.value); setCurrentPage(1); }}><option value="">All genders</option><option value="female">Female</option><option value="male">Male</option></select></label>
-              <label className="directory-select-filter"><span className="filter-label">Status</span><select aria-label="Filter by roster status" value={statusFilter} onChange={event => { setStatusFilter(event.target.value); setCurrentPage(1); }}><option value="">All statuses</option>{Array.from(new Set(athletes.flatMap(athlete => [athlete.flyStatus, athlete.flyaStatus]).filter((status): status is string => Boolean(status?.trim())).map(status => status.trim().toLowerCase()))).sort().map(status => <option key={status} value={status}>{status.charAt(0).toUpperCase() + status.slice(1)}</option>)}</select></label>
+              <label className="directory-select-filter"><span className="filter-label">Gender</span><select aria-label="Filter by gender" value={genderFilter} onChange={/* Update the gender filter value from this control. */ event => { setGenderFilter(event.target.value); setCurrentPage(1); }}><option value="">All genders</option><option value="female">Female</option><option value="male">Male</option></select></label>
+              <label className="directory-select-filter"><span className="filter-label">Status</span><select aria-label="Filter by roster status" value={statusFilter} onChange={/* Update the status filter value from this control. */ event => { setStatusFilter(event.target.value); setCurrentPage(1); }}><option value="">All statuses</option>{Array.from(new Set(athletes.flatMap(/* Convert each athlete into the required display or request data. */ athlete => [athlete.flyStatus, athlete.flyaStatus]).filter(/* Keep entries that satisfy the current filter conditions. */ (status): status is string => Boolean(status?.trim())).map(/* Trim each value before comparing or saving it. */ status => status.trim().toLowerCase()))).sort().map(/* Render each status in the list. */ status => <option key={status} value={status}>{status.charAt(0).toUpperCase() + status.slice(1)}</option>)}</select></label>
               <button className="clear-filters-button" type="button" onClick={clearAll} disabled={!hasActiveFilters}>Clear</button>
           </div>
 
           {/* Bulk actions use the complete selection, including other pages. */}
-          {!isLoading && !loadError && <div className="directory-bulk-actions">
+          {!isLoading && !loadError && <div hidden={!canManage} className="directory-bulk-actions">
             <span>{selectedAthletes.length} selected{selectedAthletes.length > pageSelectedCount ? " across the directory" : ""}</span>
-            {selectedAthletes.length > 0 && <button type="button" className="directory-clear-selection" onClick={() => setSelectedAthleteIds([])}>Clear selection</button>}
-            <button type="button" className="directory-archive-button" disabled={!selectedAthletes.length} onClick={() => { setArchiveError(""); setArchiveDialogOpen(true); }}>{archiveView === "active" ? "Archive selected" : "Restore selected"}</button>
+            {selectedAthletes.length > 0 && <button type="button" className="directory-clear-selection" onClick={/* Toggle the selected rows for the next bulk action. */ () => setSelectedAthleteIds([])}>Clear selection</button>}
+            <button type="button" className="directory-archive-button" disabled={!selectedAthletes.length} onClick={/* Update archive error for the selected action. */ () => { setArchiveError(""); setArchiveDialogOpen(true); }}>{archiveView === "active" ? "Archive selected" : "Restore selected"}</button>
           </div>}
           <div className="athlete-list">
             {isLoading ? (
@@ -971,20 +989,20 @@ const clearAll = () => {
             ) : (
               <div className="directory-table-scroll" role="region" aria-label="Athlete directory" tabIndex={0}>
                 <table className="directory-table">
-                  <thead><tr><th scope="col" className="directory-selection-cell"><input ref={selectPageRef} type="checkbox" aria-label="Select page" checked={paginatedAthletes.length > 0 && pageSelectedCount === paginatedAthletes.length} onChange={event => {
-                    const pageIds = paginatedAthletes.map(athlete => athlete.id);
-                    setSelectedAthleteIds(current => event.target.checked ? [...new Set([...current, ...pageIds])] : current.filter(id => !pageIds.includes(id)));
-                  }} /></th>{["Name", "Age Group", "Gender", "FLY Status", "FLYA Status", "Actions"].map(label => <th key={label} scope="col">{label}</th>)}</tr></thead>
-                  <tbody>{paginatedAthletes.map(athlete => <tr key={athlete.id}>
-                    <td className="directory-selection-cell"><input type="checkbox" aria-label={`Select ${athlete.firstName} ${athlete.lastName}`} checked={selectedAthleteIds.includes(athlete.id)} onChange={event => setSelectedAthleteIds(current => event.target.checked ? [...current, athlete.id] : current.filter(id => id !== athlete.id))} /></td>
+                  <thead><tr><th hidden={!canManage} scope="col" className="directory-selection-cell"><input ref={selectPageRef} type="checkbox" aria-label="Select page" checked={paginatedAthletes.length > 0 && pageSelectedCount === paginatedAthletes.length} onChange={/* Update the selected athlete ids value from this control. */ event => {
+                    const pageIds = paginatedAthletes.map(/* Extract each athlete ID for lookup or selection. */ athlete => athlete.id);
+                    setSelectedAthleteIds(/* Derive the next selected athlete ids value from its current state. */ current => event.target.checked ? [...new Set([...current, ...pageIds])] : current.filter(/* Keep entries that satisfy the current filter conditions. */ id => !pageIds.includes(id)));
+                  }} /></th>{["Name", "Age Group", "Gender", "FLY Status", "FLYA Status", "Actions"].map(/* Render each label in the list. */ label => <th key={label} scope="col">{label}</th>)}</tr></thead>
+                  <tbody>{paginatedAthletes.map(/* Render each athlete in the list. */ athlete => <tr key={athlete.id}>
+                    <td hidden={!canManage} className="directory-selection-cell"><input type="checkbox" aria-label={`Select ${athlete.firstName} ${athlete.lastName}`} checked={selectedAthleteIds.includes(athlete.id)} onChange={/* Update the selected athlete ids value from this control. */ event => setSelectedAthleteIds(/* Derive the next selected athlete ids value from its current state. */ current => event.target.checked ? [...current, athlete.id] : current.filter(/* Exclude entries that do not belong in this result or selection. */ id => id !== athlete.id))} /></td>
                     <th scope="row"><Link to={`/athletes/${athlete.id}`}>{athlete.firstName} {athlete.lastName}</Link></th>
                     <td>{getAgeGroup(athlete.dateOfBirth) || "Not provided"}</td>
                     <td>{athlete.gender?.trim() || "Not provided"}</td>
                     <td>{athlete.flyStatus?.trim() || "Not provided"}</td>
                     <td>{athlete.flyaStatus?.trim() || "Not provided"}</td>
-                    <td><div className="directory-row-actions">
-                      <button type="button" title="Edit athlete" aria-label={`Edit ${athlete.firstName} ${athlete.lastName}`} onClick={() => navigate(`/athletes/${athlete.id}`, {state: {editAthlete: true}})}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="m15 5 4 4M4 20l4-1 12-12a2.8 2.8 0 0 0-4-4L4 15z" /></svg></button>
-                      <button type="button" className="directory-delete-action" title="Delete athlete" aria-label={`Delete ${athlete.firstName} ${athlete.lastName}`} onClick={() => { setDeleteError(""); setDeleteTarget(athlete); }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7m4-7v7" /></svg></button>
+                    <td><div hidden={!canManage} className="directory-row-actions">
+                      <button type="button" title="Edit athlete" aria-label={`Edit ${athlete.firstName} ${athlete.lastName}`} onClick={/* Perform the selected button action. */ () => navigate(`/athletes/${athlete.id}`, {state: {editAthlete: true}})}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="m15 5 4 4M4 20l4-1 12-12a2.8 2.8 0 0 0-4-4L4 15z" /></svg></button>
+                      <button type="button" className="directory-delete-action" title="Delete athlete" aria-label={`Delete ${athlete.firstName} ${athlete.lastName}`} onClick={/* Choose the record for deletion confirmation. */ () => { setDeleteError(""); setDeleteTarget(athlete); }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7m4-7v7" /></svg></button>
                     </div></td>
                   </tr>)}</tbody>
                 </table>
@@ -993,32 +1011,32 @@ const clearAll = () => {
           </div>
 
           {!isLoading && !loadError && <div className="pagination">
-            <label className="directory-page-size">Show <select value={pageSize} onChange={event => {setPageSize(Number(event.target.value)); setCurrentPage(1);}}>{[10,25,50].map(size => <option key={size} value={size}>{size}</option>)}</select></label>
+            <label className="directory-page-size">Show <select value={pageSize} onChange={/* Update the page size value from this control. */ event => {setPageSize(Number(event.target.value)); setCurrentPage(1);}}>{[10,25,50].map(/* Render each size in the list. */ size => <option key={size} value={size}>{size}</option>)}</select></label>
             <span className="pagination-summary" role="status">{filteredAthletes.length ? startIndex + 1 : 0}–{Math.min(endIndex, filteredAthletes.length)} of {filteredAthletes.length}</span>
             <nav className="pagination-controls" aria-label="Athlete pages">
-              <button className="pagination-button" type="button" aria-label="Previous page" disabled={currentPage <= 1} onClick={() => setCurrentPage(page => Math.max(1,page-1))}>‹</button>
+              <button className="pagination-button" type="button" aria-label="Previous page" disabled={currentPage <= 1} onClick={/* Update current page for the selected action. */ () => setCurrentPage(/* Derive the next current page value from its current state. */ page => Math.max(1,page-1))}>‹</button>
               <span className="pagination-page" aria-current="page">{currentPage}</span>
-              <button className="pagination-button" type="button" aria-label="Next page" disabled={currentPage >= totalPages} onClick={() => setCurrentPage(page => Math.min(totalPages,page+1))}>›</button>
+              <button className="pagination-button" type="button" aria-label="Next page" disabled={currentPage >= totalPages} onClick={/* Update current page for the selected action. */ () => setCurrentPage(/* Derive the next current page value from its current state. */ page => Math.min(totalPages,page+1))}>›</button>
             </nav>
           </div>}
         </section>
       </main>
 
-      {archiveDialogOpen && <MeetDialog title={archiveView === "active" ? "Archive selected athletes?" : "Restore selected athletes?"} busy={isArchiving} onClose={() => { if (!isArchiving) setArchiveDialogOpen(false); }}>
+      {archiveDialogOpen && <MeetDialog title={archiveView === "active" ? "Archive selected athletes?" : "Restore selected athletes?"} busy={isArchiving} onClose={/* Close the dialog and clear its visible state. */ () => { if (!isArchiving) setArchiveDialogOpen(false); }}>
         <div className="athlete-form">
           <p>{archiveView === "active" ? "These athletes will leave the active directory. Their profiles, results, and notes will be preserved, and you can restore them later." : "These athletes will return to the active directory and be available for new event assignments."}</p>
-          <ul className="directory-archive-list">{selectedAthletes.map(athlete => <li key={athlete.id}>{athlete.firstName} {athlete.lastName}</li>)}</ul>
+          <ul className="directory-archive-list">{selectedAthletes.map(/* Render each athlete in the list. */ athlete => <li key={athlete.id}>{athlete.firstName} {athlete.lastName}</li>)}</ul>
           {archiveError && <p className="form-error" role="alert">{archiveError}</p>}
-          <div className="modal-actions"><button className="cancel-button" type="button" disabled={isArchiving} onClick={() => setArchiveDialogOpen(false)} autoFocus>Cancel</button><button className="save-button" type="button" disabled={isArchiving} onClick={applyArchiveSelection}>{isArchiving ? "Saving…" : `${archiveView === "active" ? "Archive" : "Restore"} ${selectedAthletes.length} athlete${selectedAthletes.length === 1 ? "" : "s"}`}</button></div>
+          <div className="modal-actions"><button className="cancel-button" type="button" disabled={isArchiving} onClick={/* Update archive dialog open for the selected action. */ () => setArchiveDialogOpen(false)} autoFocus>Cancel</button><button className="save-button" type="button" disabled={isArchiving} onClick={applyArchiveSelection}>{isArchiving ? "Saving…" : `${archiveView === "active" ? "Archive" : "Restore"} ${selectedAthletes.length} athlete${selectedAthletes.length === 1 ? "" : "s"}`}</button></div>
         </div>
       </MeetDialog>}
 
-      {deleteTarget && <MeetDialog title="Delete athlete?" busy={isDeleting} onClose={() => { if (!isDeleting) setDeleteTarget(null); }}>
+      {deleteTarget && <MeetDialog title="Delete athlete?" busy={isDeleting} onClose={/* Close the dialog and clear its visible state. */ () => { if (!isDeleting) setDeleteTarget(null); }}>
         <div className="athlete-form"><p>Delete {deleteTarget.firstName} {deleteTarget.lastName}? This permanently removes their athlete record.</p>
           {deleteError && <p className="form-error" role="alert">{deleteError}</p>}
-          <div className="modal-actions"><button className="cancel-button" type="button" disabled={isDeleting} onClick={() => setDeleteTarget(null)} autoFocus>Cancel</button><button className="save-button directory-confirm-delete" type="button" disabled={isDeleting} onClick={async () => {
+          <div className="modal-actions"><button className="cancel-button" type="button" disabled={isDeleting} onClick={/* Choose the record for deletion confirmation. */ () => setDeleteTarget(null)} autoFocus>Cancel</button><button className="save-button directory-confirm-delete" type="button" disabled={isDeleting} onClick={/* Choose the record for deletion confirmation. */ async () => {
             setIsDeleting(true); setDeleteError("");
-            try { await deleteAthlete(deleteTarget.id); setAthletes(current => current.filter(athlete => athlete.id !== deleteTarget.id)); setCurrentPage(1); setDeleteTarget(null); }
+            try { await deleteAthlete(deleteTarget.id); setAthletes(/* Derive the next athletes value from its current state. */ current => current.filter(/* Exclude entries that do not belong in this result or selection. */ athlete => athlete.id !== deleteTarget.id)); setCurrentPage(1); setDeleteTarget(null); }
             catch { setDeleteError("Unable to delete this athlete. Please try again."); }
             finally { setIsDeleting(false); }
           }}>{isDeleting ? "Deleting..." : "Delete athlete"}</button></div>
@@ -1038,7 +1056,7 @@ const clearAll = () => {
         >
           <div
             className="athlete-modal"
-            onMouseDown={(event) =>
+            onMouseDown={/* Handle the mouse down interaction. */ (event) =>
               event.stopPropagation()
             }
           >
@@ -1085,7 +1103,7 @@ const clearAll = () => {
                       newFirstName
                     }
                     maxLength={100}
-                    onChange={(
+                    onChange={/* Update the new first name value from this control. */ (
                       event
                     ) =>
                       setNewFirstName(
@@ -1109,7 +1127,7 @@ const clearAll = () => {
                       newLastName
                     }
                     maxLength={100}
-                    onChange={(
+                    onChange={/* Update the new last name value from this control. */ (
                       event
                     ) =>
                       setNewLastName(
@@ -1132,7 +1150,7 @@ const clearAll = () => {
                       value={
                         birthMonth
                       }
-                      onChange={(
+                      onChange={/* Apply the changed control value to the current selection. */ (
                         event
                       ) =>
                         updateBirthDate(
@@ -1148,7 +1166,7 @@ const clearAll = () => {
                       </option>
 
                       {months.map(
-                        (month) => (
+                        /* Render each month in the list. */ (month) => (
                           <option
                             key={
                               month.value
@@ -1168,7 +1186,7 @@ const clearAll = () => {
                     <select
                       aria-label="Birth day"
                       value={birthDay}
-                      onChange={(
+                      onChange={/* Apply the changed control value to the current selection. */ (
                         event
                       ) =>
                         updateBirthDate(
@@ -1187,7 +1205,7 @@ const clearAll = () => {
                         {
                           length: 31,
                         },
-                        (
+                        /* Build each generated item from its index. */ (
                           _,
                           index
                         ) => {
@@ -1222,7 +1240,7 @@ const clearAll = () => {
                       value={
                         birthYear
                       }
-                      onChange={(
+                      onChange={/* Apply the changed control value to the current selection. */ (
                         event
                       ) =>
                         updateBirthDate(
@@ -1238,7 +1256,7 @@ const clearAll = () => {
                       </option>
 
                       {birthYears.map(
-                        (year) => (
+                        /* Render each year in the list. */ (year) => (
                           <option
                             key={
                               year
@@ -1263,7 +1281,7 @@ const clearAll = () => {
                   <select
                     id="gender"
                     value={newGender}
-                    onChange={(
+                    onChange={/* Update the new gender value from this control. */ (
                       event
                     ) =>
                       setNewGender(
@@ -1302,7 +1320,7 @@ const clearAll = () => {
                       newFlyStatus
                     }
                     maxLength={100}
-                    onChange={(
+                    onChange={/* Update the new fly status value from this control. */ (
                       event
                     ) =>
                       setNewFlyStatus(
@@ -1325,7 +1343,7 @@ const clearAll = () => {
                       newFlyaStatus
                     }
                     maxLength={100}
-                    onChange={(
+                    onChange={/* Update the new flya status value from this control. */ (
                       event
                     ) =>
                       setNewFlyaStatus(
@@ -1345,7 +1363,7 @@ const clearAll = () => {
                     id="note"
                     value={newNote}
                     maxLength={500}
-                    onChange={(
+                    onChange={/* Update the new note value from this control. */ (
                       event
                     ) =>
                       setNewNote(
@@ -1376,7 +1394,7 @@ const clearAll = () => {
                   <button
                     className="event-multi-select-button"
                     type="button"
-                    onClick={() =>
+                    onClick={/* Update event dropdown open for the selected action. */ () =>
                       setEventDropdownOpen(
                         !eventDropdownOpen
                       )
@@ -1407,12 +1425,12 @@ const clearAll = () => {
                   {eventDropdownOpen && (
                     <div className="event-multi-select-menu">
                       {EVENT_OPTIONS.map(
-                        (
+                        /* Render each event name in the list. */ (
                           eventName
                         ) => {
                           const isSelected =
                             newEvents.some(
-                              (
+                              /* Check whether any event matches the required condition. */ (
                                 event
                               ) =>
                                 event.eventName ===
@@ -1430,7 +1448,7 @@ const clearAll = () => {
                                   ? "selected"
                                   : ""
                               }`}
-                              onClick={() =>
+                              onClick={/* Perform the selected button action. */ () =>
                                 toggleEvent(
                                   eventName
                                 )
@@ -1471,7 +1489,7 @@ const clearAll = () => {
                     </div>
 
                     {newEvents.map(
-                      (event) => (
+                      /* Render each event in the list. */ (event) => (
                         <div
                           className="selected-event-row"
                           key={
@@ -1491,7 +1509,7 @@ const clearAll = () => {
                           <button
                             className="remove-event-button"
                             type="button"
-                            onClick={() =>
+                            onClick={/* Perform the selected button action. */ () =>
                               removeEvent(
                                 event.eventName
                               )

@@ -10,6 +10,7 @@ type Props = {
   onClose: () => void;
 };
 
+// Collect and validate the fields needed to create or edit a meet.
 export default function MeetFormDialog({ meet, onSave, onClose }: Props) {
   const id = useId();
   const [name, setName] = useState(meet?.name ?? "");
@@ -20,6 +21,7 @@ export default function MeetFormDialog({ meet, onSave, onClose }: Props) {
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState("");
 
+  // Validate the meet fields and submit the requested date range.
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (isSaving) return;
@@ -58,7 +60,7 @@ export default function MeetFormDialog({ meet, onSave, onClose }: Props) {
           <input
             id={`${id}-name`}
             value={name}
-            onChange={(event) => setName(event.target.value)}
+            onChange={/* Update the name value from this control. */ (event) => setName(event.target.value)}
             maxLength={150}
             required
             autoFocus
@@ -71,14 +73,14 @@ export default function MeetFormDialog({ meet, onSave, onClose }: Props) {
             id={`${id}-date`}
             type="date"
             value={meetDate}
-            onChange={(event) => setMeetDate(event.target.value)}
+            onChange={/* Update the meet date value from this control. */ (event) => setMeetDate(event.target.value)}
             required
             disabled={isSaving}
           />
         </label>
         <label className="meet-form-field" htmlFor={`${id}-end-date`}>
           End date (optional)
-          <input id={`${id}-end-date`} type="date" min={meetDate || undefined} value={endDate} onChange={event => setEndDate(event.target.value)} disabled={isSaving} />
+          <input id={`${id}-end-date`} type="date" min={meetDate || undefined} value={endDate} onChange={/* Update the end date value from this control. */ event => setEndDate(event.target.value)} disabled={isSaving} />
           <span className="meet-form-help">Leave blank for a single-day meet.</span>
         </label>
         <label className="meet-form-field" htmlFor={`${id}-location`}>
@@ -86,7 +88,7 @@ export default function MeetFormDialog({ meet, onSave, onClose }: Props) {
           <input
             id={`${id}-location`}
             value={location}
-            onChange={(event) => setLocation(event.target.value)}
+            onChange={/* Update the location value from this control. */ (event) => setLocation(event.target.value)}
             maxLength={150}
             disabled={isSaving}
           />
@@ -99,7 +101,7 @@ export default function MeetFormDialog({ meet, onSave, onClose }: Props) {
             placeholder="https://example.com"
             pattern="https?://.+"
             value={externalUrl}
-            onChange={(event) => setExternalUrl(event.target.value)}
+            onChange={/* Update the external url value from this control. */ (event) => setExternalUrl(event.target.value)}
             maxLength={500}
             disabled={isSaving}
           />

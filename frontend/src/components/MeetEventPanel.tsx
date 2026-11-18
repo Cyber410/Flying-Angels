@@ -25,10 +25,11 @@ type PanelDialog =
   | { type: "notes"; participant?: EventParticipant }
   | null;
 
+// Display event participants and coordinate result and note actions.
 export default function MeetEventPanel({ event, sample, defaultOpen, onCountChanged }: Props) {
   const contentId = useId();
   const [isOpen, setIsOpen] = useState(defaultOpen);
-  const [results, setResults] = useState<EventParticipant[] | null>(() => sample ? sampleEventResults[event.id] ?? [] : null);
+  const [results, setResults] = useState<EventParticipant[] | null>(/* Compute the initial state when this component mounts. */ () => sample ? sampleEventResults[event.id] ?? [] : null);
   const [attemptsByAthlete, setAttemptsByAthlete] = useState<Record<number, ResultAttempt[]>>({});
   const [isLoading, setIsLoading] = useState(!sample);
   const [loadError, setLoadError] = useState("");
@@ -39,26 +40,26 @@ export default function MeetEventPanel({ event, sample, defaultOpen, onCountChan
   const [feedback, setFeedback] = useState("");
 
   // Load all saved participants, including assignments without results.
-  useEffect(() => {
+  useEffect(/* Synchronize this view with its dependencies and clean up pending work. */ () => {
     if (sample || !isOpen) return;
     let ignore = false;
-    getEventProfile(event.id).then((data) => {
+    getEventProfile(event.id).then(/* Apply the successful request result to the current operation. */ (data) => {
       if (ignore) return;
       const participants = eventParticipants(data);
       setResults(participants);
-      setAttemptsByAthlete(Object.fromEntries(participants.map(participant => [participant.athleteId, participantAttempts(participant)])));
-    }).catch((error: unknown) => {
+      setAttemptsByAthlete(Object.fromEntries(participants.map(/* Convert each participant into the required display or request data. */ participant => [participant.athleteId, participantAttempts(participant)])));
+    }).catch(/* Report the request failure without discarding the current view. */ (error: unknown) => {
       if (!ignore) setLoadError(error instanceof Error ? error.message : "Unable to load participants.");
-    }).finally(() => {
+    }).finally(/* Clear the busy state after the request completes. */ () => {
       if (!ignore) setIsLoading(false);
     });
-    return () => { ignore = true; };
+    return /* Stop pending work and release this effect when it is cleaned up. */ () => { ignore = true; };
   }, [event.id, isOpen, revision, sample]);
 
   // Merges newly assigned athletes without duplicating existing participants.
   function addParticipants(assigned: EventParticipant[]) {
-    const existingIds = new Set((results ?? []).map((result) => result.athleteId));
-    const next = [...(results ?? []), ...assigned.filter((assignment) => !existingIds.has(assignment.athleteId))];
+    const existingIds = new Set((results ?? []).map(/* Build existing ids from each result. */ (result) => result.athleteId));
+    const next = [...(results ?? []), ...assigned.filter(/* Apply the search and selection criteria for next. */ (assignment) => !existingIds.has(assignment.athleteId))];
     setResults(next);
     onCountChanged(event.id, next.length);
     setFeedback(`${assigned.length} athlete${assigned.length === 1 ? "" : "s"} assigned to this event. Results can be recorded later.`);
@@ -72,9 +73,9 @@ export default function MeetEventPanel({ event, sample, defaultOpen, onCountChan
     setRemoveError("");
     try {
       await removeEventParticipant(event.id, participant.athleteId);
-      const next = (results ?? []).filter(result => result.athleteId !== participant.athleteId);
+      const next = (results ?? []).filter(/* Exclude entries that do not belong in this result or selection. */ result => result.athleteId !== participant.athleteId);
       setResults(next);
-      setAttemptsByAthlete(current => { const remaining = { ...current }; delete remaining[participant.athleteId]; return remaining; });
+      setAttemptsByAthlete(/* Derive the next attempts by athlete value from its current state. */ current => { const remaining = { ...current }; delete remaining[participant.athleteId]; return remaining; });
       onCountChanged(event.id, next.length);
       setFeedback(`${participant.firstName} ${participant.lastName} was removed from this event.`);
       setDialog(null);
@@ -85,14 +86,14 @@ export default function MeetEventPanel({ event, sample, defaultOpen, onCountChan
     }
   }
 
-  const orderedResults = (results ?? []).toSorted((a, b) => {
+  const orderedResults = (results ?? []).toSorted(/* Order entries using the displayed date, name, or performance values. */ (a, b) => {
     if (a.score === null && b.score !== null) return 1;
     if (b.score === null && a.score !== null) return -1;
     const scoreDifference = (a.score ?? 0) - (b.score ?? 0);
     return (event.rankingOrder === "ASC" ? scoreDifference : -scoreDifference) ||
       a.lastName.localeCompare(b.lastName) || a.firstName.localeCompare(b.firstName);
   });
-  const pendingCount = (results ?? []).filter(result => result.score === null).length;
+  const pendingCount = (results ?? []).filter(/* Identify assignments that still need a result. */ result => result.score === null).length;
   const count = results?.length ?? event.participantCount;
 
   return (
@@ -102,9 +103,9 @@ export default function MeetEventPanel({ event, sample, defaultOpen, onCountChan
         type="button"
         aria-expanded={isOpen}
         aria-controls={contentId}
-        onClick={() => {
+        onClick={/* Update is loading for the selected action. */ () => {
           if (!isOpen && !sample) { setIsLoading(true); setLoadError(""); }
-          setIsOpen((open) => !open);
+          setIsOpen(/* Derive the next is open value from its current state. */ (open) => !open);
         }}
       >
         <span className="meet-event-chevron" aria-hidden="true">{isOpen ? "⌄" : "›"}</span>
@@ -116,15 +117,15 @@ export default function MeetEventPanel({ event, sample, defaultOpen, onCountChan
           <>
             <div className="meet-event-toolbar">
               <p>{event.rankingOrder === "ASC" ? "Lowest result ranks first" : "Highest result ranks first"}</p>
-              <button className="meets-button" type="button" onClick={() => setDialog({ type: "notes" })}>Event Notes</button>
-              <button className="meets-button meets-button-primary" type="button" disabled={sample || isLoading || Boolean(loadError)} onClick={() => setDialog({ type: "assign" })}>+ Assign Athletes</button>
+              <button className="meets-button" type="button" onClick={/* Open or close the requested event action dialog. */ () => setDialog({ type: "notes" })}>Event Notes</button>
+              <button className="meets-button meets-button-primary" type="button" disabled={sample || isLoading || Boolean(loadError)} onClick={/* Open or close the requested event action dialog. */ () => setDialog({ type: "assign" })}>+ Assign Athletes</button>
             </div>
             {!sample && <p className="meet-attempts-notice">Assignments, notes, and every result attempt are saved to the academy database. Click a result to edit it, or use + Result to add another.</p>}
             <p className="meet-event-feedback" role="status">{feedback}</p>
             {isLoading ? <p className="meets-state" role="status">Loading participants...</p> : loadError ? (
               <div className="meets-state">
                 <p role="alert">{loadError}</p>
-                <button className="meets-button" type="button" onClick={() => { setLoadError(""); setIsLoading(true); setRevision((value) => value + 1); }}>Try again</button>
+                <button className="meets-button" type="button" onClick={/* Retry loading the data for this view. */ () => { setLoadError(""); setIsLoading(true); setRevision(/* Derive the next revision value from its current state. */ (value) => value + 1); }}>Try again</button>
               </div>
             ) : (
               <div className="meets-table-scroll" role="region" aria-label={`${event.name} participants`} tabIndex={0}>
@@ -132,7 +133,7 @@ export default function MeetEventPanel({ event, sample, defaultOpen, onCountChan
                   <caption className="meets-sr-only">Athletes and results for {event.name}</caption>
                   <thead><tr><th scope="col">Athlete</th><th scope="col">Results</th><th scope="col">Actions</th></tr></thead>
                   <tbody>
-                    {orderedResults.map((participant) => {
+                    {orderedResults.map(/* Render each participant in the list. */ (participant) => {
                       const fullName = `${participant.firstName} ${participant.lastName}`;
                       const attempts = attemptsByAthlete[participant.athleteId] ?? participantAttempts(participant);
                       const bestAttempt = bestResultAttempt(attempts, event.rankingOrder);
@@ -144,7 +145,7 @@ export default function MeetEventPanel({ event, sample, defaultOpen, onCountChan
                           </th>
                           <td>
                             <div className="meet-result-list">
-                              {attempts.map((attempt, index) => {
+                              {attempts.map(/* Render each attempt in the list. */ (attempt, index) => {
                                 const display = parseEventResult(attempt.result, event)?.result ?? attempt.result;
                                 const isBest = attempts.length > 1 && attempt.id === bestAttempt?.id;
                                 return sample ? (
@@ -155,7 +156,7 @@ export default function MeetEventPanel({ event, sample, defaultOpen, onCountChan
                                     key={attempt.id}
                                     type="button"
                                     aria-label={`Edit result ${index + 1} for ${fullName}: ${display}${isBest ? ", best result" : ""}`}
-                                    onClick={() => setDialog({ type: "result", participant, attempt })}
+                                    onClick={/* Open or close the requested event action dialog. */ () => setDialog({ type: "result", participant, attempt })}
                                   >
                                     {display}{isBest && <span className="meet-result-best-label">Best</span>}
                                   </button>
@@ -166,9 +167,9 @@ export default function MeetEventPanel({ event, sample, defaultOpen, onCountChan
                           </td>
                           <td>
                             <div className="meets-row-actions">
-                              <button className="meets-action" type="button" disabled={sample} aria-label={`Add result for ${fullName}`} onClick={() => setDialog({ type: "result", participant })}>+ Result</button>
-                              <button className="meets-action" type="button" aria-label={`Notes for ${fullName}`} onClick={() => setDialog({ type: "notes", participant })}>Notes</button>
-                              <button className="meets-action meets-action-delete" type="button" disabled={sample} aria-label={`Remove ${fullName} from ${event.name}`} onClick={() => { setRemoveError(""); setDialog({ type: "remove", participant }); }}>Remove</button>
+                              <button className="meets-action" type="button" disabled={sample} aria-label={`Add result for ${fullName}`} onClick={/* Open or close the requested event action dialog. */ () => setDialog({ type: "result", participant })}>+ Result</button>
+                              <button className="meets-action" type="button" aria-label={`Notes for ${fullName}`} onClick={/* Open or close the requested event action dialog. */ () => setDialog({ type: "notes", participant })}>Notes</button>
+                              <button className="meets-action meets-action-delete" type="button" disabled={sample} aria-label={`Remove ${fullName} from ${event.name}`} onClick={/* Open or close the requested event action dialog. */ () => { setRemoveError(""); setDialog({ type: "remove", participant }); }}>Remove</button>
                             </div>
                           </td>
                         </tr>
@@ -184,7 +185,7 @@ export default function MeetEventPanel({ event, sample, defaultOpen, onCountChan
       </div>
 
       {dialog?.type === "assign" && !sample && (
-        <AssignAthletesDialog event={event} assignedIds={(results ?? []).map((result) => result.athleteId)} onAssigned={addParticipants} onClose={() => setDialog(null)} />
+        <AssignAthletesDialog event={event} assignedIds={(results ?? []).map(/* Convert each result into the required display or request data. */ (result) => result.athleteId)} onAssigned={addParticipants} onClose={/* Close the dialog and clear its visible state. */ () => setDialog(null)} />
       )}
       {dialog?.type === "result" && !sample && (
         <EventResultDialog
@@ -192,21 +193,21 @@ export default function MeetEventPanel({ event, sample, defaultOpen, onCountChan
           participant={dialog.participant}
           attempts={attemptsByAthlete[dialog.participant.athleteId] ?? participantAttempts(dialog.participant)}
           editingAttempt={dialog.attempt}
-          onSaved={(saved, attempts) => {
-            const next = (results ?? []).map((result) => result.athleteId === saved.athleteId ? { ...result, ...saved, attempts } : result);
+          onSaved={/* Merge the saved data into the parent view. */ (saved, attempts) => {
+            const next = (results ?? []).map(/* Build next from each result. */ (result) => result.athleteId === saved.athleteId ? { ...result, ...saved, attempts } : result);
             setResults(next);
-            setAttemptsByAthlete((current) => ({ ...current, [saved.athleteId]: attempts }));
-            onCountChanged(event.id, next.filter((result) => result.resultId !== null).length);
+            setAttemptsByAthlete(/* Derive the next attempts by athlete value from its current state. */ (current) => ({ ...current, [saved.athleteId]: attempts }));
+            onCountChanged(event.id, next.filter(/* Exclude entries that do not belong in this result or selection. */ (result) => result.resultId !== null).length);
             setFeedback(`Result saved for ${saved.firstName} ${saved.lastName}. All attempts are saved and shared with your team.`);
           }}
-          onClose={() => setDialog(null)}
+          onClose={/* Close the dialog and clear its visible state. */ () => setDialog(null)}
         />
       )}
       {dialog?.type === "notes" && (
-        <EventNotesDialog event={event} participant={dialog.participant} sample={sample} onSaved={() => setFeedback("Note saved to the academy database.")} onClose={() => setDialog(null)} />
+        <EventNotesDialog event={event} participant={dialog.participant} sample={sample} onSaved={/* Merge the saved data into the parent view. */ () => setFeedback("Note saved to the academy database.")} onClose={/* Close the dialog and clear its visible state. */ () => setDialog(null)} />
       )}
       {dialog?.type === "remove" && (
-        <MeetDialog title="Remove Athlete from Event" busy={isRemoving} onClose={() => setDialog(null)}>
+        <MeetDialog title="Remove Athlete from Event" busy={isRemoving} onClose={/* Close the dialog and clear its visible state. */ () => setDialog(null)}>
           <p className="meet-dialog-message">
             Remove <strong>{dialog.participant.firstName} {dialog.participant.lastName}</strong> from {event.name}?
             {" Their assignment, attempts, and performance note for this event will be deleted."}
@@ -214,7 +215,7 @@ export default function MeetEventPanel({ event, sample, defaultOpen, onCountChan
           </p>
           {removeError && <p className="meet-dialog-error" role="alert">{removeError}</p>}
           <div className="meet-dialog-actions">
-            <button className="meets-button" type="button" autoFocus disabled={isRemoving} onClick={() => setDialog(null)}>Cancel</button>
+            <button className="meets-button" type="button" autoFocus disabled={isRemoving} onClick={/* Open or close the requested event action dialog. */ () => setDialog(null)}>Cancel</button>
             <button className="meets-button meets-button-danger" type="button" disabled={isRemoving} onClick={confirmRemoval}>{isRemoving ? "Removing..." : "Remove Athlete"}</button>
           </div>
         </MeetDialog>

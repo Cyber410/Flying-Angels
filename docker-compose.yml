@@ -58,14 +58,14 @@ services:
       APP_LOGIN_THROTTLE_WINDOW_SECONDS: ${APP_LOGIN_THROTTLE_WINDOW_SECONDS:-900}
       APP_LOGIN_THROTTLE_BLOCK_SECONDS: ${APP_LOGIN_THROTTLE_BLOCK_SECONDS:-900}
       APP_LOGIN_TRUSTED_PROXIES: ${APP_LOGIN_TRUSTED_PROXIES:-}
-      SMTP_HOST: ${SMTP_HOST:-mailpit}
-      SMTP_PORT: ${SMTP_PORT:-1025}
-      SMTP_FROM: ${SMTP_FROM:-noreply@flyingangels.local}
+      SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_FROM: ${SMTP_FROM:-}
       SMTP_USERNAME: ${SMTP_USERNAME:-}
       SMTP_PASSWORD: ${SMTP_PASSWORD:-}
-      SMTP_AUTH: ${SMTP_AUTH:-false}
-      SMTP_STARTTLS: ${SMTP_STARTTLS:-false}
-      APP_ACTIVATION_URL: ${APP_ACTIVATION_URL:-http://localhost:5173/activate}
+      SMTP_AUTH: ${SMTP_AUTH:-true}
+      SMTP_STARTTLS: ${SMTP_STARTTLS:-true}
+      APP_ACTIVATION_URL: ${APP_ACTIVATION_URL:-http://127.0.0.1:5173/activate}
       APP_INVITATION_HOURS: ${APP_INVITATION_HOURS:-48}
       APP_MAIL_OUTBOX_KEY: ${APP_MAIL_OUTBOX_KEY:-}
       APP_MAIL_OUTBOX_ENABLED: ${APP_MAIL_OUTBOX_ENABLED:-true}
@@ -82,14 +82,6 @@ services:
     networks:
       - application
       - database
-
-  mailpit:
-    image: axllent/mailpit:v1.31.5
-    profiles: ["mail"]
-    ports:
-      - "127.0.0.1:8025:8025"
-    networks:
-      - application
 
 volumes:
   mysql_data:

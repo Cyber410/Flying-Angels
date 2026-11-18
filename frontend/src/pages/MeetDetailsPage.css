@@ -276,3 +276,57 @@
     flex-basis: 100%;
   }
 }
+
+/* Export and Edit Meet buttons beside the meet heading. */
+.meet-details-actions {
+  display: flex;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+/* Export dialog options. */
+.meet-export-options {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.meet-export-options legend {
+  margin-bottom: 10px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.meet-export-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.meet-export-option:has(input:checked) {
+  border-color: var(--orange);
+  background: #fff8f2;
+}
+
+.meet-export-option input {
+  margin-top: 3px;
+  accent-color: var(--orange);
+}
+
+.meet-export-option span {
+  display: grid;
+  gap: 3px;
+  font-size: 13px;
+}
+
+.meet-export-option small {
+  color: var(--text-secondary);
+  font-size: 12px;
+}

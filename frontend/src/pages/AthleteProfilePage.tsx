@@ -1,3 +1,4 @@
+import { useOptionalAuth } from "../auth/authContext";
 // Athlete details, meet history, and notes, with existing edit/delete actions.
 import {
   useEffect,
@@ -11,6 +12,7 @@ import {
 } from "react-router-dom";
 import Header from "../components/header";
 import AthleteMeetHistory from "../components/AthleteMeetHistory";
+import AthletePersonalBests from "../components/AthletePersonalBests";
 import type { Athlete } from "../types/athlete";
 import {
   deleteAthlete,
@@ -21,12 +23,14 @@ import "./AthleteProfilePage.css";
 type EditableEvent = {
   eventName: string;
 };
-type ProfileTab = "overview" | "history" | "notes";
+type ProfileTab = "overview" | "history" | "bests" | "notes";
 const PROFILE_TABS: { id: ProfileTab; label: string }[] = [
   { id: "overview", label: "Overview" },
   { id: "history", label: "Meets & Results" },
+  { id: "bests", label: "Personal Bests" },
   { id: "notes", label: "Notes" },
 ];
+// Calculate whole-year age from the supplied birth date.
 function calculateAge(
   dateOfBirth: string | null
 ) {
@@ -53,6 +57,7 @@ function calculateAge(
   }
   return age;
 }
+// Show a consistent fallback when a profile field is missing.
 function displayValue(
   value?: string | null
 ) {
@@ -60,12 +65,15 @@ function displayValue(
     ? value
     : "Not provided";
 }
+// Display athlete details, history, personal bests, and staff notes with permitted edit actions.
 function AthleteProfilePage() {
+  const auth = useOptionalAuth();
+  const canManage = auth ? auth.can("MANAGE_ATHLETES") : true;
   const { athleteId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
   const openEditor = location.state?.editAthlete === true;
-  const [activeTab, setActiveTab] = useState<ProfileTab>("overview");
+  const [activeTab, setActiveTab] = useState<ProfileTab>(/* Compute the initial state when this component mounts. */ () => new URLSearchParams(location.search).get("tab") === "personal-bests" ? "bests" : "overview");
   const [athlete, setAthlete] =
     useState<Athlete | null>(null);
   const [isLoading, setIsLoading] =
@@ -119,7 +127,8 @@ function AthleteProfilePage() {
   /* ==================================================
      LOAD ATHLETE
      ================================================== */
-  useEffect(() => {
+  useEffect(/* Synchronize this view with its dependencies and clean up pending work. */ () => {
+    // Fetch the athlete identified by the current profile route.
     async function loadAthlete() {
       const id = Number(athleteId);
       if (
@@ -140,12 +149,12 @@ function AthleteProfilePage() {
         setAthlete(
           loadedAthlete
         );
-        if (openEditor) {
+        if (openEditor && canManage) {
           setEditedGender(loadedAthlete.gender ?? "");
           setEditedFlyStatus(loadedAthlete.flyStatus ?? "");
           setEditedFlyaStatus(loadedAthlete.flyaStatus ?? "");
           setEditedNote(loadedAthlete.note ?? "");
-          setEditedEvents((loadedAthlete.events ?? []).map(event => ({eventName: event.categoryName})));
+          setEditedEvents((loadedAthlete.events ?? []).map(/* Convert each event into the required display or request data. */ event => ({eventName: event.categoryName})));
           setIsEditing(true);
         }
       } catch (error) {
@@ -158,11 +167,13 @@ function AthleteProfilePage() {
       }
     }
     loadAthlete();
-  }, [athleteId, openEditor]);
+  }, [athleteId, openEditor, canManage]);
   /* ==================================================
      EDIT FUNCTIONS
      ================================================== */
+  // Copy the current profile into editable fields and open the requested tab.
   const startEditing = (tab: ProfileTab = "overview") => {
+    if (!canManage) return;
     if (!athlete) {
       return;
     }
@@ -180,7 +191,7 @@ function AthleteProfilePage() {
     );
     setEditedEvents(
       (athlete.events ?? []).map(
-        (event) => ({
+        /* Convert each event into the required display or request data. */ (event) => ({
           eventName:
             event.categoryName,
         })
@@ -190,11 +201,13 @@ function AthleteProfilePage() {
     setActiveTab(tab);
     setIsEditing(true);
   };
+  // Leave edit mode and clear unsaved validation feedback.
   const cancelEditing = () => {
     setIsEditing(false);
     setSaveError("");
     setEditedEvents([]);
   };
+  // Validate and persist the edited athlete details.
   const saveChanges =
     async () => {
       if (!athlete) {
@@ -220,9 +233,9 @@ function AthleteProfilePage() {
               editedFlyaStatus.trim(),
             note:
               editedNote.trim(),
-            events: editedEvents.map((event) => {
+            events: editedEvents.map(/* Convert each event into the required display or request data. */ (event) => {
               const existingEvent = athlete.events?.find(
-                (currentEvent) =>
+                /* Find the current event matching the requested identifier or value. */ (currentEvent) =>
                   currentEvent.categoryName === event.eventName
               );
 
@@ -259,10 +272,12 @@ function AthleteProfilePage() {
   /* ==================================================
      DELETE FUNCTIONS
      ================================================== */
+  // Open the athlete deletion confirmation.
   const openDeleteModal = () => {
     setDeleteError("");
     setDeleteModalOpen(true);
   };
+  // Close deletion confirmation and clear its previous error.
   const closeDeleteModal = () => {
     if (isDeleting) {
       return;
@@ -270,6 +285,7 @@ function AthleteProfilePage() {
     setDeleteError("");
     setDeleteModalOpen(false);
   };
+  // Delete the confirmed athlete and return to the directory.
   const handleDeleteAthlete =
     async () => {
       if (
@@ -293,6 +309,7 @@ function AthleteProfilePage() {
         setIsDeleting(false);
       }
     };
+  // Move profile-tab focus using the supported keyboard navigation keys.
   function handleTabKey(event: KeyboardEvent<HTMLButtonElement>, index: number) {
     let nextIndex: number;
     if (event.key === "ArrowRight") nextIndex = (index + 1) % PROFILE_TABS.length;
@@ -316,7 +333,7 @@ function AthleteProfilePage() {
           <button
             className="back-button"
             type="button"
-            onClick={() =>
+            onClick={/* Perform the selected button action. */ () =>
               navigate("/")
             }
           >
@@ -349,7 +366,7 @@ function AthleteProfilePage() {
           <button
             className="back-button"
             type="button"
-            onClick={() =>
+            onClick={/* Perform the selected button action. */ () =>
               navigate("/")
             }
           >
@@ -387,7 +404,7 @@ function AthleteProfilePage() {
     <div className="profile-page">
       <Header />
       <main className="profile-container">
-        <button className="back-button" type="button" onClick={() => navigate("/")}>
+        <button className="back-button" type="button" onClick={/* Perform the selected button action. */ () => navigate("/")}>
           ← Back to Athlete Directory
         </button>
 
@@ -409,7 +426,7 @@ function AthleteProfilePage() {
             )}
           </div>
           {!isEditing ? (
-            <button className="edit-athlete-button" type="button" onClick={() => startEditing()}>Edit Athlete</button>
+            <button hidden={!canManage} className="edit-athlete-button" type="button" onClick={/* Perform the selected button action. */ () => startEditing()}>Edit Athlete</button>
           ) : (
             <div className="edit-actions">
               <button className="profile-cancel-button" type="button" onClick={cancelEditing} disabled={isSaving}>Cancel</button>
@@ -423,7 +440,7 @@ function AthleteProfilePage() {
 
         <section className="profile-panel">
           <div className="profile-tabs" role="tablist" aria-label="Athlete profile sections">
-            {PROFILE_TABS.map((tab, index) => (
+            {PROFILE_TABS.map(/* Render each tab in the list. */ (tab, index) => (
               <button
                 key={tab.id}
                 id={`profile-tab-${tab.id}`}
@@ -434,8 +451,8 @@ function AthleteProfilePage() {
                 aria-controls={`profile-panel-${tab.id}`}
                 tabIndex={activeTab === tab.id ? 0 : -1}
                 disabled={isSaving}
-                onClick={() => setActiveTab(tab.id)}
-                onKeyDown={(event) => handleTabKey(event, index)}
+                onClick={/* Update active tab for the selected action. */ () => setActiveTab(tab.id)}
+                onKeyDown={/* Handle keyboard navigation for this control. */ (event) => handleTabKey(event, index)}
               >
                 {tab.label}
               </button>
@@ -456,7 +473,7 @@ function AthleteProfilePage() {
               <p>Personal details and academy membership.</p>
             </div>
             <dl className="profile-details">
-              {personalDetails.map((detail) => (
+              {personalDetails.map(/* Render each detail in the list. */ (detail) => (
                 <div className="profile-detail" key={detail.label}>
                   <dt className="detail-label">{detail.label}</dt>
                   <dd className="detail-value">{detail.value}</dd>
@@ -465,23 +482,23 @@ function AthleteProfilePage() {
               <div className="profile-detail">
                 <dt className="detail-label"><label htmlFor="profile-gender">Gender</label></dt>
                 <dd className="detail-value">
-                  {isEditing ? <input id="profile-gender" className="profile-input" value={editedGender} disabled={isSaving} onChange={(event) => setEditedGender(event.target.value)} /> : displayValue(athlete.gender)}
+                  {isEditing ? <input id="profile-gender" className="profile-input" value={editedGender} disabled={isSaving} onChange={/* Update the edited gender value from this control. */ (event) => setEditedGender(event.target.value)} /> : displayValue(athlete.gender)}
                 </dd>
               </div>
               <div className="profile-detail">
                 <dt className="detail-label"><label htmlFor="profile-fly-status">FLY Status</label></dt>
                 <dd className="detail-value">
-                  {isEditing ? <input id="profile-fly-status" className="profile-input" value={editedFlyStatus} disabled={isSaving} onChange={(event) => setEditedFlyStatus(event.target.value)} /> : displayValue(athlete.flyStatus)}
+                  {isEditing ? <input id="profile-fly-status" className="profile-input" value={editedFlyStatus} disabled={isSaving} onChange={/* Update the edited fly status value from this control. */ (event) => setEditedFlyStatus(event.target.value)} /> : displayValue(athlete.flyStatus)}
                 </dd>
               </div>
               <div className="profile-detail">
                 <dt className="detail-label"><label htmlFor="profile-flya-status">FLYA Status</label></dt>
                 <dd className="detail-value">
-                  {isEditing ? <input id="profile-flya-status" className="profile-input" value={editedFlyaStatus} disabled={isSaving} onChange={(event) => setEditedFlyaStatus(event.target.value)} /> : displayValue(athlete.flyaStatus)}
+                  {isEditing ? <input id="profile-flya-status" className="profile-input" value={editedFlyaStatus} disabled={isSaving} onChange={/* Update the edited flya status value from this control. */ (event) => setEditedFlyaStatus(event.target.value)} /> : displayValue(athlete.flyaStatus)}
                 </dd>
               </div>
             </dl>
-            <details className="profile-manage">
+            <details hidden={!canManage} className="profile-manage">
               <summary>Manage athlete</summary>
               <div className="danger-zone-content">
                 <div>
@@ -493,12 +510,16 @@ function AthleteProfilePage() {
             </details>
           </section>
 
+          <section id="profile-panel-bests" role="tabpanel" aria-labelledby="profile-tab-bests" hidden={activeTab !== "bests"} tabIndex={0}>
+            {activeTab === "bests" && <AthletePersonalBests key={athlete.id} athleteId={athlete.id} />}
+          </section>
+
           <AthleteMeetHistory
             key={athlete.id}
             athlete={athlete}
             readOnly={isEditing}
-            view={activeTab === "overview" ? "hidden" : activeTab}
-            onShowHistory={() => {
+            view={activeTab === "history" || activeTab === "notes" ? activeTab : "hidden"}
+            onShowHistory={/* Switch the profile to its meet-history view. */ () => {
               setActiveTab("history");
               document.getElementById("profile-tab-history")?.focus();
             }}
@@ -510,12 +531,12 @@ function AthleteProfilePage() {
                     <h2 id="profile-general-note-heading">Athlete note</h2>
                     <p>General coaching context, training preferences, and reminders about this athlete.</p>
                   </div>
-                  {!isEditing && <button className="ath-history-button" type="button" aria-label={athlete.note?.trim() ? "Edit general athlete note" : "Add general athlete note"} onClick={() => startEditing("notes")}>{athlete.note?.trim() ? "Edit athlete note" : "Add athlete note"}</button>}
+                  {!isEditing && <button hidden={!canManage} className="ath-history-button" type="button" aria-label={athlete.note?.trim() ? "Edit general athlete note" : "Add general athlete note"} onClick={/* Perform the selected button action. */ () => startEditing("notes")}>{athlete.note?.trim() ? "Edit athlete note" : "Add athlete note"}</button>}
                 </div>
                 <div className="profile-note-field">
                   {isEditing && <label className="detail-label" htmlFor="profile-general-note-input">Athlete note</label>}
                   {isEditing ? (
-                    <textarea id="profile-general-note-input" className="profile-textarea" value={editedNote} disabled={isSaving} maxLength={500} onChange={(event) => setEditedNote(event.target.value)} rows={4} placeholder="For example: Prefers afternoon training. Focus on building confidence at the start." />
+                    <textarea id="profile-general-note-input" className="profile-textarea" value={editedNote} disabled={isSaving} maxLength={500} onChange={/* Update the edited note value from this control. */ (event) => setEditedNote(event.target.value)} rows={4} placeholder="For example: Prefers afternoon training. Focus on building confidence at the start." />
                   ) : (
                     <p className={`profile-note-text${athlete.note?.trim() ? "" : " profile-note-empty"}`}>{athlete.note?.trim() || "No athlete note yet. Add a reminder that applies across training and competitions."}</p>
                   )}
@@ -537,7 +558,7 @@ function AthleteProfilePage() {
         >
           <div
             className="delete-modal"
-            onMouseDown={(event) =>
+            onMouseDown={/* Handle the mouse down interaction. */ (event) =>
               event.stopPropagation()
             }
           >

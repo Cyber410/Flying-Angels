@@ -1141,15 +1141,9 @@ Admin-only `GET /api/users/{id}/invitation/delivery` returns the latest delivery
 
 Delivery is at least once: if SMTP accepts a message and the backend crashes before recording SENT, a retry can send a duplicate. Token acceptance remains single-use. Queue durability depends on a persistent database; the disposable Postman MySQL fixture uses tmpfs and is intentionally erased by stopping/removing that MySQL container.
 
-Configure SMTP_HOST, SMTP_PORT, SMTP_FROM, and, where required, SMTP_USERNAME, SMTP_PASSWORD, SMTP_AUTH and SMTP_STARTTLS. Production SMTP configuration must use the chosen provider's settings; Mailpit only captures mail locally. No cloud email provider is provisioned by this change.
+Configure SMTP_HOST, SMTP_PORT, SMTP_FROM, SMTP_USERNAME, SMTP_PASSWORD, SMTP_AUTH and SMTP_STARTTLS for the chosen provider. The local setup uses Gmail on smtp.gmail.com:587 with authentication and STARTTLS enabled. Store a Google App Password in the ignored .env file; never commit credentials. No local SMTP capture container is included.
 
-For a local email inbox, start:
-
-```sh
-docker compose --profile mail up --build mysql backend mailpit
-```
-
-Open `http://localhost:8025`. The optional Mailpit service captures SMTP internally on port 1025 and publishes its inbox only on localhost. See [Mailpit's Docker documentation](https://mailpit.axllent.org/docs/install/docker/). No activation page is implemented: backend/Postman clients copy the token from the captured link and call the validation/acceptance APIs. APP_ACTIVATION_URL is the future client route, not an added frontend screen. The [invitation Postman collection](../docs/postman/flying-angels-invitations.postman_collection.json) automates this through the local inbox API with synthetic recipients.
+Start the ordinary stack with `docker compose up -d`. Recipients use the emailed link and verification code to create their account in the frontend. APP_ACTIVATION_URL must be reachable by the recipient. Older Postman email-capture collections are retained as legacy references and do not support the current Gmail verification workflow.
 
 ### Browser origin policy
 

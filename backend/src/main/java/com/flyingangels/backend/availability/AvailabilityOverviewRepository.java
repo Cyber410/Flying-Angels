@@ -15,11 +15,14 @@ public class AvailabilityOverviewRepository {
     private final EntityManager entityManager;
 
     public Summary summary(Long meetId) {
+        return summary(meetId, null, MeetView.ALL, "", LocalDate.now());
+    }
+
+    public Summary summary(Long meetId, Status selectedStatus, MeetView view, String search, LocalDate today) {
         var cb = entityManager.getCriteriaBuilder(); var query = cb.createTupleQuery(); var request = query.from(AvailabilityRequest.class);
-        var active = cb.gt(request.get("assignmentCount"), 0);
         query.multiselect(cb.count(request), cb.coalesce(count(cb, status(cb, request, Status.PENDING)), 0L),
                 cb.coalesce(count(cb, status(cb, request, Status.AVAILABLE)), 0L), cb.coalesce(count(cb, status(cb, request, Status.UNAVAILABLE)), 0L))
-                .where(meetId == null ? active : cb.and(active, cb.equal(request.get("meet").get("id"), meetId)));
+                .where(filters(cb, request, meetId, selectedStatus, view, search, today));
         var row = entityManager.createQuery(query).getSingleResult();
         return new Summary(row.get(0, Long.class), row.get(1, Long.class), row.get(2, Long.class), row.get(3, Long.class));
     }

@@ -1,5 +1,8 @@
 # Backend testing in Postman
 
+> **Legacy capture-based verification:** The local email-capture service has been removed. Inbox polling and activation steps below describe historical checks and are not runnable against the current Gmail setup. The main CI functional Postman collection is unaffected. Use the current frontend email-code flow with an inbox you control for manual account verification. The disposable Postman stack now defaults email delivery to disabled.
+
+
 For the multi-stage Docker images, Nginx reverse proxy, configurable CORS, CSRF headers and email validation, start with the [deployment/security walkthrough](deployment-security-walkthrough.md). It includes an isolated authenticated local stack, an importable verification collection, manual request instructions and the run order for all backend collections. The CI fixture alone disables authentication; the walkthrough adds the authenticated Postman override.
 
 This test pack exercises the core backend workflows with 186 ordered functional requests, 438 separate secured-mode requests, response assertions, captured IDs, and synthetic import files. No frontend changes are required to run this test pack. See [new backend contracts](../sprint2-api-updates.md), [competition history](../../backend/README.md#athlete-competition-history-personal-bests-and-progression), [centralized rankings](../../backend/README.md#centralized-rankings), [portal availability](../../backend/README.md#athlete-portal-and-meet-availability), [meet/availability overviews](../../backend/README.md#meet-views-and-centralized-availability) and [meet CSV exports](../../backend/README.md#meet-csv-exports) for the API integration changes.

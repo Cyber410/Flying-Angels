@@ -9,6 +9,15 @@ import java.util.Optional;
 public interface EventRepository extends JpaRepository<Event, Long> {
 
     @EntityGraph(attributePaths = {"meet", "category"})
+    @org.springframework.data.jpa.repository.Query("""
+        select e from Event e where
+        exists (select p.id from EventParticipation p where p.event = e and p.athlete.id = :athleteId)
+        or exists (select r.id from EventResult r where r.event = e and r.athlete.id = :athleteId)
+        order by e.eventDate desc, e.meet.id, lower(e.name), e.id
+        """)
+    List<Event> findPortalRankingChoices(Long athleteId);
+
+    @EntityGraph(attributePaths = {"meet", "category"})
     @org.springframework.data.jpa.repository.Query("select e from Event e where (:meetId is null or e.meet.id = :meetId) order by e.eventDate desc, e.meet.id, lower(e.name), e.id")
     List<Event> findRankingChoices(Long meetId);
     @EntityGraph(attributePaths = {"meet", "category"})

@@ -1,0 +1,11 @@
+# Keep local dependencies, build output, and private settings out of the image.
+node_modules
+dist
+coverage
+.git
+.env
+.env.*
+*.tsbuildinfo
+npm-debug.log*
+playwright-report
+test-results

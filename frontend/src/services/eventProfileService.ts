@@ -2,16 +2,16 @@
 import { getEventProfile } from "./eventService";
 import type { EventProfile, FailedEventProfile, MeetEvent } from "../types/event";
 
-// The API has no combined history/results query. Bound requests for both pages.
+// Bound requests for legacy athlete history; Results uses its dedicated overview endpoint.
 export async function loadEventProfiles(events: MeetEvent[], signal?: AbortSignal) {
   const profiles: EventProfile[] = [];
   const failedEvents: FailedEventProfile[] = [];
   for (let offset = 0; offset < events.length; offset += 6) {
     signal?.throwIfAborted();
     const batch = events.slice(offset, offset + 6);
-    const outcomes = await Promise.allSettled(batch.map((event) => getEventProfile(event.id, signal)));
+    const outcomes = await Promise.allSettled(batch.map(/* Build outcomes from each event. */ (event) => getEventProfile(event.id, signal)));
     signal?.throwIfAborted();
-    outcomes.forEach((outcome, index) => {
+    outcomes.forEach(/* Apply this operation to each outcome. */ (outcome, index) => {
       const event = batch[index];
       if (outcome.status === "fulfilled") profiles.push(outcome.value);
       else failedEvents.push({

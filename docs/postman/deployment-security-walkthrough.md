@@ -1,5 +1,8 @@
 # Test deployment, CORS, CSRF and backend workflows in Postman
 
+> **Legacy capture-based verification:** The local email-capture service has been removed. Inbox polling and activation steps below describe historical checks and are not runnable against the current Gmail setup. The main CI functional Postman collection is unaffected. Use the current frontend email-code flow with an inbox you control for manual account verification. The disposable Postman stack now defaults email delivery to disabled.
+
+
 This walkthrough uses the production multi-stage images behind Nginx, a disposable MySQL database, authentication and CSRF enabled, and Mailpit for local email capture. It does not start AWS resources or send external emails. No new frontend functionality is needed.
 
 ## 1. Start the isolated local stack

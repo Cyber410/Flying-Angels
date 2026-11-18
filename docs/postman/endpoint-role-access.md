@@ -1,5 +1,8 @@
 # Endpoint access by role
 
+> **Legacy capture-based verification:** The local email-capture service has been removed. Inbox polling and activation steps below describe historical checks and are not runnable against the current Gmail setup. The main CI functional Postman collection is unaffected. Use the current frontend email-code flow with an inbox you control for manual account verification. The disposable Postman stack now defaults email delivery to disabled.
+
+
 Authentication must be enabled (`APP_REQUIRE_AUTHENTICATION=true`, the default). The explicitly authentication-disabled CI fixture bypasses these restrictions and must not be used to verify roles.
 
 All accounts use `POST /api/auth/login`. The server loads the role from the account and stores the authenticated identity in the HTTP session. Postman retains the `JSESSIONID` cookie. Changing the request body, sending an athlete ID, or adding a role header does not change the signed-in user's authority.

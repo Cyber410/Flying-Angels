@@ -18,4 +18,6 @@ public interface InvitationMailRepository extends JpaRepository<InvitationMail, 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     List<InvitationMail> findByUserIdAndStatusInOrderByIdAsc(Long userId, Collection<InvitationMail.Status> statuses);
     Optional<InvitationMail> findFirstByUserIdOrderByIdDesc(Long userId);
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    List<InvitationMail> findByEnrollmentIdAndStatusInOrderByIdAsc(Long enrollmentId, Collection<InvitationMail.Status> statuses);
 }

@@ -4,6 +4,7 @@ import type { EventParticipant, ResultAttempt } from "../types/event";
 type AttemptHistory = { version: 1; attempts: ResultAttempt[] };
 type StagedHistory = AttemptHistory & { ready: boolean };
 
+// Build the retired attempt-history key for an event and athlete.
 function historyKey(eventId: number, athleteId: number) {
   if (!Number.isSafeInteger(eventId) || eventId < 1 || !Number.isSafeInteger(athleteId) || athleteId < 1) {
     throw new Error("Attempt history requires a live event and athlete.");
@@ -11,6 +12,7 @@ function historyKey(eventId: number, athleteId: number) {
   return `flying-angels:event-attempts:${eventId}:${athleteId}`;
 }
 
+// Check that a stored attempt has a usable ID, result, and score.
 function isAttempt(value: unknown): value is ResultAttempt {
   return typeof value === "object" && value !== null &&
     "id" in value && typeof value.id === "string" && value.id.length > 0 &&
@@ -18,6 +20,7 @@ function isAttempt(value: unknown): value is ResultAttempt {
     "score" in value && typeof value.score === "number" && Number.isFinite(value.score) && value.score >= 0;
 }
 
+// Read valid attempts from the retired result-history store.
 function readHistory(key: string): AttemptHistory | null {
   const raw = localStorage.getItem(key);
   if (raw === null) return null;
@@ -32,6 +35,7 @@ function readHistory(key: string): AttemptHistory | null {
   return { version: 1, attempts: data.attempts };
 }
 
+// Read attempts that were staged by the earlier result-entry workflow.
 function readStagedHistory(key: string): StagedHistory | null {
   const history = readHistory(key);
   if (!history) return null;
@@ -46,7 +50,7 @@ function readStagedHistory(key: string): StagedHistory | null {
 export function includeSharedResult(attempts: ResultAttempt[], participant: EventParticipant): ResultAttempt[] {
   if (participant.result === null || participant.score === null) return attempts;
   const sharedScore = participant.score;
-  if (attempts.some((attempt) => Math.abs(attempt.score - sharedScore) < 0.00005)) return attempts;
+  if (attempts.some(/* Check whether any attempt matches the required condition. */ (attempt) => Math.abs(attempt.score - sharedScore) < 0.00005)) return attempts;
   return [...attempts, {
     id: `shared-${participant.resultId}-${participant.score}`,
     result: participant.result, score: participant.score,

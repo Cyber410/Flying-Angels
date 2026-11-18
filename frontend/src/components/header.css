@@ -82,6 +82,9 @@
   border-radius: 50%;
 }
 
+.site-signout { border: 1px solid var(--border); background: var(--surface); color: var(--text-secondary); border-radius: 5px; padding: 6px 10px; cursor: pointer; }
+.site-nav { overflow-x: auto; }
+
 @media (max-width: 750px) {
   .site-header-content {
     width: calc(100% - 32px);

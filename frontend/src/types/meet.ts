@@ -10,7 +10,10 @@ export type Meet = {
   location: string | null;
   externalUrl: string | null;
   eventCount: number;
+  startDate?: string;
+  availabilitySummary?: { total: number; available: number; awaitingResponse: number; unavailable: number };
 };
+export type MeetView = "UPCOMING" | "PAST" | "ALL";
 
 export type MeetRequest = {
   name: string;

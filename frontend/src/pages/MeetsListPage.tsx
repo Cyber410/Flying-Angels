@@ -1,3 +1,4 @@
+import { useOptionalAuth } from "../auth/authContext";
 // Searches meet date ranges and opens create, edit, and delete dialogs.
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
@@ -5,7 +6,7 @@ import Header from "../components/header";
 import MeetDialog from "../components/MeetDialog";
 import MeetFormDialog from "../components/MeetFormDialog";
 import { createMeet, deleteMeet, getMeets, updateMeet } from "../services/meetService";
-import type { Meet, MeetRequest } from "../types/meet";
+import type { Meet, MeetRequest, MeetView } from "../types/meet";
 import "./MeetsListPage.css";
 import { formatMeetDates } from "../utils/meetDate";
 
@@ -15,11 +16,15 @@ type ActiveDialog =
   | { type: "delete"; meet: Meet }
   | null;
 
+// Display searchable meets and coordinate creation, editing, and deletion.
 export default function MeetsListPage() {
+  const auth = useOptionalAuth();
+  const canManage = auth ? auth.can("MANAGE_MEETS") : true;
   const [meets, setMeets] = useState<Meet[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [loadVersion, setLoadVersion] = useState(0);
+  const [view, setView] = useState<MeetView>("UPCOMING");
   const [search, setSearch] = useState("");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
@@ -31,31 +36,32 @@ export default function MeetsListPage() {
   const [feedback, setFeedback] = useState("");
 
   // Load meet summaries and ignore results after navigation.
-  useEffect(() => {
+  useEffect(/* Synchronize this view with its dependencies and clean up pending work. */ () => {
     let ignore = false;
-    getMeets().then((data) => {
+    getMeets(undefined, view).then(/* Apply the successful request result to the current operation. */ (data) => {
       if (!ignore) {
         setMeets(data);
         setIsLoading(false);
       }
-    }).catch((error: unknown) => {
+    }).catch(/* Report the request failure without discarding the current view. */ (error: unknown) => {
       if (!ignore) {
         setLoadError(error instanceof Error ? error.message : "Unable to load meets.");
         setIsLoading(false);
       }
     });
-    return () => { ignore = true; };
-  }, [loadVersion]);
+    return /* Stop pending work and release this effect when it is cleaned up. */ () => { ignore = true; };
+  }, [loadVersion, view]);
 
   // Include meets that overlap the requested date window.
   const invalidDateRange = Boolean(fromDate && toDate && fromDate > toDate);
   const query = search.trim().toLowerCase();
-  const filteredMeets = meets.filter((meet) =>
+  const filteredMeets = meets.filter(/* Keep entries matching the current search text. */ (meet) =>
     !invalidDateRange &&
     (!query || `${meet.name} ${meet.location ?? ""}`.toLowerCase().includes(query)) &&
     (!fromDate || (meet.endDate || meet.meetDate) >= fromDate) &&
     (!toDate || meet.meetDate <= toDate)
-  ).sort((a, b) => b.meetDate.localeCompare(a.meetDate) || a.name.localeCompare(b.name));
+  ).sort(/* Show the nearest upcoming meet first and the most recent historical meet first. */ (a, b) =>
+    (view === "UPCOMING" ? a.meetDate.localeCompare(b.meetDate) : b.meetDate.localeCompare(a.meetDate)) || a.name.localeCompare(b.name));
   const totalPages = Math.max(1, Math.ceil(filteredMeets.length / pageSize));
   const currentPage = Math.min(page, totalPages);
   const startIndex = (currentPage - 1) * pageSize;
@@ -70,20 +76,28 @@ export default function MeetsListPage() {
     setPage(1);
   }
 
+  // Refresh availability counts and schedule membership from the backend.
+  function refresh() { setLoadError(""); setIsLoading(true); setLoadVersion(version => version + 1); }
+
+  // Switch calendar scope and reset paging while retaining search and date filters.
+  function changeView(next: MeetView) { if (next === view) return; setView(next); setPage(1); setLoadError(""); setIsLoading(true); }
+
+  // Create or update the selected meet and refresh the meet list.
   async function handleSave(request: MeetRequest) {
     if (activeDialog?.type === "edit") {
       const updated = await updateMeet(activeDialog.meet.id, request);
-      setMeets((current) => current.map((meet) => meet.id === updated.id ? updated : meet));
       setFeedback(`${updated.name} was updated.`);
     } else {
       const created = await createMeet(request);
-      setMeets((current) => [...current, created]);
       clearFilters();
+      setView("ALL");
       setFeedback(`${created.name} was created.`);
     }
     setActiveDialog(null);
+    refresh();
   }
 
+  // Delete the confirmed meet and keep pagination within range.
   async function handleDelete() {
     if (activeDialog?.type !== "delete" || isDeleting) return;
     const meet = activeDialog.meet;
@@ -91,7 +105,7 @@ export default function MeetsListPage() {
     setDeleteError("");
     try {
       await deleteMeet(meet.id);
-      setMeets((current) => current.filter((item) => item.id !== meet.id));
+      setMeets(/* Derive the next meets value from its current state. */ (current) => current.filter(/* Exclude entries that do not belong in this result or selection. */ (item) => item.id !== meet.id));
       setFeedback(`${meet.name} was deleted.`);
       setActiveDialog(null);
     } catch (error) {
@@ -105,31 +119,27 @@ export default function MeetsListPage() {
     <div className="meets-page">
       <Header />
       <main className="meets-container">
-        <div className="meets-heading">
-          <h1>Meets</h1>
-          <p>View, create, and manage Flying Angels meets.</p>
+        <div className="meets-heading meets-scheduling-heading">
+          <div><h1>Meets</h1><p>Plan your schedule and track athlete availability at a glance.</p></div>
+          <div className="meets-heading-actions"><button className="meets-button" type="button" onClick={refresh} disabled={isLoading}>Refresh</button><button hidden={!canManage} className="meets-button meets-button-primary" type="button" disabled={isLoading} onClick={/* Open meet creation without changing the current filters. */ () => { setFeedback(""); setActiveDialog({ type: "create" }); }}>+ New Meet</button></div>
         </div>
 
         <p className="meets-feedback" role="status">{feedback}</p>
 
         <section className="meets-panel" aria-label="Meets list">
           <div className="meets-toolbar">
+            <div className="meets-schedule-tabs" role="group" aria-label="Meet schedule">{(["UPCOMING", "PAST", "ALL"] as const).map(/* Apply the backend's schedule scopes through accessible toggle buttons. */ schedule => <button key={schedule} type="button" aria-pressed={view === schedule} onClick={/* Switch the meet calendar scope. */ () => changeView(schedule)}>{schedule === "UPCOMING" ? "Upcoming" : schedule === "PAST" ? "Past" : "All"}</button>)}</div>
+          </div>
+          <div className="meets-toolbar meets-search-toolbar">
             <input
               className="meets-search"
               type="search"
               aria-label="Search meets"
               placeholder="Search by meet name or location..."
               value={search}
-              onChange={(event) => { setSearch(event.target.value); setPage(1); }}
+              onChange={/* Update the search value from this control. */ (event) => { setSearch(event.target.value); setPage(1); }}
             />
-            <button
-              className="meets-button meets-button-primary"
-              type="button"
-              disabled={isLoading}
-              onClick={() => { setFeedback(""); setActiveDialog({ type: "create" }); }}
-            >
-              + New Meet
-            </button>
+            <span className="meets-overview-hint">One response per athlete, per meet</span>
           </div>
 
           <div className="meets-filters">
@@ -141,7 +151,7 @@ export default function MeetsListPage() {
                 max={toDate || undefined}
                 aria-invalid={invalidDateRange}
                 aria-describedby={invalidDateRange ? "meets-date-error" : undefined}
-                onChange={(event) => { setFromDate(event.target.value); setPage(1); }}
+                onChange={/* Update the from date value from this control. */ (event) => { setFromDate(event.target.value); setPage(1); }}
               />
             </label>
             <label>
@@ -152,7 +162,7 @@ export default function MeetsListPage() {
                 min={fromDate || undefined}
                 aria-invalid={invalidDateRange}
                 aria-describedby={invalidDateRange ? "meets-date-error" : undefined}
-                onChange={(event) => { setToDate(event.target.value); setPage(1); }}
+                onChange={/* Update the to date value from this control. */ (event) => { setToDate(event.target.value); setPage(1); }}
               />
             </label>
             {hasFilters && (
@@ -173,10 +183,10 @@ export default function MeetsListPage() {
               <button
                 className="meets-button"
                 type="button"
-                onClick={() => {
+                onClick={/* Update load error for the selected action. */ () => {
                   setLoadError("");
                   setIsLoading(true);
-                  setLoadVersion((version) => version + 1);
+                  setLoadVersion(/* Derive the next load version value from its current state. */ (version) => version + 1);
                 }}
               >
                 Try again
@@ -186,39 +196,41 @@ export default function MeetsListPage() {
             <>
               <div className="meets-table-scroll" role="region" aria-label="Meets table" tabIndex={0}>
                 <table className="meets-table">
-                  <caption className="meets-sr-only">Flying Angels meets, most recent first</caption>
+                  <caption className="meets-sr-only">{view === "UPCOMING" ? "Upcoming meets, earliest first" : "Flying Angels meets, most recent first"}</caption>
                   <thead>
                     <tr>
                       <th scope="col">Meet Name</th>
                       <th scope="col">Date</th>
                       <th scope="col">Location</th>
                       <th scope="col">Events</th>
+                      <th scope="col">Athlete availability</th>
                       <th scope="col">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {visibleMeets.map((meet) => (
+                    {visibleMeets.map(/* Render each meet in the list. */ (meet) => (
                       <tr key={meet.id}>
                         <th scope="row"><Link className="meets-name-link" to={`/meets/${meet.id}`}>{meet.name}</Link></th>
                         <td><time dateTime={meet.meetDate}>{formatMeetDates(meet.meetDate, meet.endDate)}</time></td>
                         <td>{meet.location || "—"}</td>
                         <td>{meet.eventCount}</td>
+                        <td><MeetAvailability meet={meet} /></td>
                         <td>
                           <div className="meets-row-actions">
                             <Link className="meets-action meets-view-link" to={`/meets/${meet.id}`} aria-label={`View ${meet.name}`}>View</Link>
-                            <button
+                            <button hidden={!canManage}
                               className="meets-action"
                               type="button"
                               aria-label={`Edit ${meet.name}`}
-                              onClick={() => { setFeedback(""); setActiveDialog({ type: "edit", meet }); }}
+                              onClick={/* Update feedback for the selected action. */ () => { setFeedback(""); setActiveDialog({ type: "edit", meet }); }}
                             >
                               Edit
                             </button>
-                            <button
+                            <button hidden={!canManage}
                               className="meets-action meets-action-delete"
                               type="button"
                               aria-label={`Delete ${meet.name}`}
-                              onClick={() => {
+                              onClick={/* Update feedback for the selected action. */ () => {
                                 setFeedback("");
                                 setDeleteError("");
                                 setActiveDialog({ type: "delete", meet });
@@ -232,9 +244,9 @@ export default function MeetsListPage() {
                     ))}
                     {visibleMeets.length === 0 && (
                       <tr>
-                        <td colSpan={5} className="meets-empty">
-                          <p>{hasFilters ? "No meets match your search or date range." : "No meets yet. Create your first meet to get started."}</p>
-                          {!hasFilters && <Link className="meets-sample-link" to="/meets/demo">Preview a sample meet</Link>}
+                        <td colSpan={6} className="meets-empty">
+                          <p>{hasFilters ? "No meets match your search or date range." : view === "ALL" ? "No meets yet. Create your first meet to get started." : `No ${view === "UPCOMING" ? "upcoming" : "past"} meets to display.`}</p>
+                          {!hasFilters && (view === "ALL" ? <Link className="meets-sample-link" to="/meets/demo">Preview a sample meet</Link> : <button type="button" className="meets-clear" onClick={/* Reveal meets outside the current calendar scope. */ () => changeView("ALL")}>View all meets</button>)}
                         </td>
                       </tr>
                     )}
@@ -247,7 +259,7 @@ export default function MeetsListPage() {
                   <select
                     aria-label="Meets per page"
                     value={pageSize}
-                    onChange={(event) => { setPageSize(Number(event.target.value)); setPage(1); }}
+                    onChange={/* Update the page size value from this control. */ (event) => { setPageSize(Number(event.target.value)); setPage(1); }}
                   >
                     <option value={10}>10</option>
                     <option value={25}>25</option>
@@ -263,7 +275,7 @@ export default function MeetsListPage() {
                     type="button"
                     aria-label="Previous page"
                     disabled={currentPage === 1}
-                    onClick={() => setPage(currentPage - 1)}
+                    onClick={/* Show the previous page of matching records. */ () => setPage(currentPage - 1)}
                   >
                     &lsaquo;
                   </button>
@@ -273,7 +285,7 @@ export default function MeetsListPage() {
                     type="button"
                     aria-label="Next page"
                     disabled={currentPage === totalPages}
-                    onClick={() => setPage(currentPage + 1)}
+                    onClick={/* Show the next page of matching records. */ () => setPage(currentPage + 1)}
                   >
                     &rsaquo;
                   </button>
@@ -288,18 +300,18 @@ export default function MeetsListPage() {
         <MeetFormDialog
           meet={activeDialog.type === "edit" ? activeDialog.meet : undefined}
           onSave={handleSave}
-          onClose={() => setActiveDialog(null)}
+          onClose={/* Close the dialog and clear its visible state. */ () => setActiveDialog(null)}
         />
       )}
       {activeDialog?.type === "delete" && (
-        <MeetDialog title="Delete Meet" busy={isDeleting} onClose={() => setActiveDialog(null)}>
+        <MeetDialog title="Delete Meet" busy={isDeleting} onClose={/* Close the dialog and clear its visible state. */ () => setActiveDialog(null)}>
           <p className="meet-dialog-message">
             Delete <strong>{activeDialog.meet.name}</strong>? This cannot be undone.
             {activeDialog.meet.eventCount > 0 && " Its events and their results will also be deleted."}
           </p>
           {deleteError && <p className="meet-dialog-error" role="alert">{deleteError}</p>}
           <div className="meet-dialog-actions">
-            <button className="meets-button" type="button" autoFocus disabled={isDeleting} onClick={() => setActiveDialog(null)}>
+            <button className="meets-button" type="button" autoFocus disabled={isDeleting} onClick={/* Update active dialog for the selected action. */ () => setActiveDialog(null)}>
               Cancel
             </button>
             <button className="meets-button meets-button-danger" type="button" disabled={isDeleting} onClick={handleDelete}>
@@ -310,4 +322,15 @@ export default function MeetsListPage() {
       )}
     </div>
   );
+}
+
+// Display real meet-level nomination counts with a direct route to the response overview.
+function MeetAvailability({ meet }: { meet: Meet }) {
+  const summary = meet.availabilitySummary;
+  if (!summary) return <span className="meets-availability-muted">Availability not loaded</span>;
+  return <div className="meets-availability"><div className="meets-response-badges" aria-label={`Availability for ${meet.name}`}>
+    <span className="available"><strong>{summary.available}</strong> Available</span>
+    <span className="pending"><strong>{summary.awaitingResponse}</strong> Awaiting</span>
+    <span className="unavailable"><strong>{summary.unavailable}</strong> Unavailable</span>
+  </div><div className="meets-availability-footer"><span>{summary.total} {summary.total === 1 ? "athlete" : "athletes"} nominated</span><Link to={`/availability?meetId=${meet.id}`} aria-label={`Manage availability for ${meet.name}`}>View responses →</Link></div></div>;
 }

@@ -24,6 +24,7 @@ type Props = {
   onClose: () => void;
 };
 
+// Choose event definitions to add or copy into a meet.
 export default function EventSelectionDialog({ mode, meet, existingEvents, onCreated, onClose }: Props) {
   const [categories, setCategories] = useState<EventCategory[]>([]);
   const [sourceMeets, setSourceMeets] = useState<Meet[]>([]);
@@ -44,8 +45,9 @@ export default function EventSelectionDialog({ mode, meet, existingEvents, onCre
   const [eventDate, setEventDate] = useState(meet.meetDate);
 
   // Load either discipline choices or source meets for copying.
-  useEffect(() => {
+  useEffect(/* Synchronize this view with its dependencies and clean up pending work. */ () => {
     let ignore = false;
+    // Fetch discipline choices or source meets for the selected dialog mode.
     async function load() {
       try {
         if (mode === "add") {
@@ -53,7 +55,7 @@ export default function EventSelectionDialog({ mode, meet, existingEvents, onCre
           if (!ignore) setCategories(data);
         } else {
           const data = await getMeets();
-          if (!ignore) setSourceMeets(data.filter((item) => item.id !== meet.id));
+          if (!ignore) setSourceMeets(data.filter(/* Exclude entries that do not belong in this result or selection. */ (item) => item.id !== meet.id));
         }
       } catch (error) {
         if (!ignore) setLoadError(error instanceof Error ? error.message : "Unable to load events.");
@@ -62,41 +64,42 @@ export default function EventSelectionDialog({ mode, meet, existingEvents, onCre
       }
     }
     void load();
-    return () => { ignore = true; };
+    return /* Stop pending work and release this effect when it is cleaned up. */ () => { ignore = true; };
   }, [mode, meet.id, revision]);
 
-  useEffect(() => {
+  useEffect(/* Synchronize this view with its dependencies and clean up pending work. */ () => {
     if (mode !== "copy" || !sourceId) return;
     let ignore = false;
-    getMeetById(Number(sourceId)).then((data) => {
+    getMeetById(Number(sourceId)).then(/* Apply the successful request result to the current operation. */ (data) => {
       if (!ignore) setSourceEvents(data.events);
-    }).catch((error: unknown) => {
+    }).catch(/* Report the request failure without discarding the current view. */ (error: unknown) => {
       if (!ignore) setLoadError(error instanceof Error ? error.message : "Unable to load source events.");
-    }).finally(() => {
+    }).finally(/* Clear the busy state after the request completes. */ () => {
       if (!ignore) setIsSourceLoading(false);
     });
-    return () => { ignore = true; };
+    return /* Stop pending work and release this effect when it is cleaned up. */ () => { ignore = true; };
   }, [mode, sourceId, revision]);
 
   const choices: Choice[] = mode === "add"
-    ? [...categories.map((category) => ({
+    ? [...categories.map(/* Build choices from each category. */ (category) => ({
       id: category.id, name: category.name, categoryId: category.id,
       rankingOrder: category.rankingOrder, eventType: null,
     })), ...customChoices]
-    : sourceEvents.map((event) => ({
+    : sourceEvents.map(/* Build choices from each event. */ (event) => ({
       id: event.id, name: event.name, categoryId: event.category.id,
       rankingOrder: event.rankingOrder, eventType: event.eventType,
     }));
 
+  // Check whether an event choice is already present or was just created.
   function alreadyAdded(choice: Choice) {
-    return completed.includes(choice.id) || existingEvents.some((event) =>
+    return completed.includes(choice.id) || existingEvents.some(/* Check whether any event matches the required condition. */ (event) =>
       event.name.trim().toLowerCase() === choice.name.trim().toLowerCase() &&
       (choice.categoryId === null || event.category.id === choice.categoryId)
     );
   }
 
-  const selectedChoices = choices.filter((choice) => selected.includes(choice.id) && !alreadyAdded(choice));
-  const visibleChoices = choices.filter((choice) => choice.name.toLowerCase().includes(search.trim().toLowerCase()));
+  const selectedChoices = choices.filter(/* Keep the records included in the current selection. */ (choice) => selected.includes(choice.id) && !alreadyAdded(choice));
+  const visibleChoices = choices.filter(/* Keep entries matching the current search text. */ (choice) => choice.name.toLowerCase().includes(search.trim().toLowerCase()));
   const loading = isLoading || isSourceLoading;
 
   // Saves the chosen items while retaining partial successes for retry.
@@ -131,8 +134,8 @@ export default function EventSelectionDialog({ mode, meet, existingEvents, onCre
       }
     }
     if (created.length) onCreated(created);
-    setCompleted((current) => [...current, ...successfulIds]);
-    setSelected((current) => current.filter((id) => !successfulIds.includes(id)));
+    setCompleted(/* Derive the next completed value from its current state. */ (current) => [...current, ...successfulIds]);
+    setSelected(/* Derive the next selected value from its current state. */ (current) => current.filter(/* Keep entries that satisfy the current filter conditions. */ (id) => !successfulIds.includes(id)));
     setIsSaving(false);
     if (failures.length) {
       setSaveError(`${created.length} of ${selectedChoices.length} events added. ${failures.join(" ")}`);
@@ -146,7 +149,7 @@ export default function EventSelectionDialog({ mode, meet, existingEvents, onCre
     event.preventDefault();
     const name = newName.trim();
     if (!name) return;
-    if (choices.some((choice) => choice.name.toLowerCase() === name.toLowerCase())) {
+    if (choices.some(/* Check whether any choice matches the required condition. */ (choice) => choice.name.toLowerCase() === name.toLowerCase())) {
       setSaveError("That event type is already listed. Select it from the list.");
       return;
     }
@@ -154,8 +157,8 @@ export default function EventSelectionDialog({ mode, meet, existingEvents, onCre
       id: -(customChoices.length + 1), name, categoryId: null,
       rankingOrder: newRanking, eventType: null,
     };
-    setCustomChoices((current) => [...current, choice]);
-    setSelected((current) => [...current, choice.id]);
+    setCustomChoices(/* Derive the next custom choices value from its current state. */ (current) => [...current, choice]);
+    setSelected(/* Derive the next selected value from its current state. */ (current) => [...current, choice.id]);
     setNewName("");
     setSearch("");
     setSaveError("");
@@ -175,7 +178,7 @@ export default function EventSelectionDialog({ mode, meet, existingEvents, onCre
             <select
               value={sourceId}
               disabled={isSaving || isLoading}
-              onChange={(event) => {
+              onChange={/* Update the source id value from this control. */ (event) => {
                 setSourceId(event.target.value);
                 setSourceEvents([]);
                 setSelected([]);
@@ -187,36 +190,36 @@ export default function EventSelectionDialog({ mode, meet, existingEvents, onCre
               }}
             >
               <option value="">Select a meet...</option>
-              {sourceMeets.map((source) => <option key={source.id} value={source.id}>{source.name} ({formatMeetDates(source.meetDate, source.endDate)})</option>)}
+              {sourceMeets.map(/* Render each source in the list. */ (source) => <option key={source.id} value={source.id}>{source.name} ({formatMeetDates(source.meetDate, source.endDate)})</option>)}
             </select>
           </label>
         )}
         {meet.endDate && meet.endDate !== meet.meetDate && <label className="meet-form-field">
           Event date
-          <input type="date" value={eventDate} min={meet.meetDate} max={meet.endDate} disabled={isSaving} onChange={event => setEventDate(event.target.value)} />
+          <input type="date" value={eventDate} min={meet.meetDate} max={meet.endDate} disabled={isSaving} onChange={/* Update the event date value from this control. */ event => setEventDate(event.target.value)} />
           <span className="meet-form-help">Selected events will be scheduled on this day. Add another selection for a different day.</span>
         </label>}
         <label className="meet-form-field">
           Search events
-          <input type="search" placeholder="Search events..." value={search} disabled={isSaving} onChange={(event) => setSearch(event.target.value)} />
+          <input type="search" placeholder="Search events..." value={search} disabled={isSaving} onChange={/* Update the search value from this control. */ (event) => setSearch(event.target.value)} />
         </label>
         {loading ? <p role="status">Loading events...</p> : loadError ? (
           <div>
             <p className="meet-dialog-error" role="alert">{loadError}</p>
-            <button className="meets-button" type="button" onClick={() => { setLoadError(""); setIsLoading(true); setIsSourceLoading(Boolean(sourceId)); setRevision((value) => value + 1); }}>
+            <button className="meets-button" type="button" onClick={/* Retry loading the data for this view. */ () => { setLoadError(""); setIsLoading(true); setIsSourceLoading(Boolean(sourceId)); setRevision(/* Derive the next revision value from its current state. */ (value) => value + 1); }}>
               Try again
             </button>
           </div>
         ) : (
           <fieldset className="meet-choice-list" disabled={isSaving}>
             <legend className="meets-sr-only">Available events</legend>
-            {visibleChoices.map((choice) => (
+            {visibleChoices.map(/* Render each choice in the list. */ (choice) => (
               <label className="meet-choice" key={choice.id}>
                 <input
                   type="checkbox"
                   checked={selected.includes(choice.id)}
                   disabled={alreadyAdded(choice)}
-                  onChange={(event) => setSelected((current) => event.target.checked ? [...current, choice.id] : current.filter((id) => id !== choice.id))}
+                  onChange={/* Update the selected value from this control. */ (event) => setSelected(/* Derive the next selected value from its current state. */ (current) => event.target.checked ? [...current, choice.id] : current.filter(/* Exclude entries that do not belong in this result or selection. */ (id) => id !== choice.id))}
                 />
                 <span>{choice.name}{alreadyAdded(choice) && <small>Already in this meet</small>}</span>
               </label>
@@ -236,11 +239,11 @@ export default function EventSelectionDialog({ mode, meet, existingEvents, onCre
             <form className="meet-form" onSubmit={addCustomChoice}>
               <label className="meet-form-field">
                 Event name
-                <input value={newName} maxLength={150} required disabled={isSaving} onChange={(event) => setNewName(event.target.value)} />
+                <input value={newName} maxLength={150} required disabled={isSaving} onChange={/* Update the new name value from this control. */ (event) => setNewName(event.target.value)} />
               </label>
               <label className="meet-form-field">
                 Ranking
-                <select value={newRanking} disabled={isSaving} onChange={(event) => setNewRanking(event.target.value as RankingOrder)}>
+                <select value={newRanking} disabled={isSaving} onChange={/* Update the new ranking value from this control. */ (event) => setNewRanking(event.target.value as RankingOrder)}>
                   <option value="ASC">Lowest value wins (timed events)</option>
                   <option value="DESC">Highest value wins (distance or height)</option>
                 </select>

@@ -1,0 +1,5 @@
+target
+src/bin
+.git
+.env
+.env.*

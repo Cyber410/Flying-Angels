@@ -21,12 +21,15 @@ public class RankingsController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate ageAsOf,
             @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "25") int size,
             @RequestParam(required = false) String ageGroup, @RequestParam(required = false) String season,
-            @RequestParam(required = false) Long meetId, @RequestParam(required = false) Long eventId) {
+            @RequestParam(required = false) Long meetId, @RequestParam(required = false) Long eventId,
+            @RequestParam(defaultValue = "ASC") com.flyingangels.backend.event.RankingOrder rankOrder) {
         if (season != null && !season.isBlank()) throw new IllegalArgumentException("Season filtering is not configured; season attribution must be agreed first");
         if (ageGroup != null && !ageGroup.isBlank()) {
             if (minAge != null || maxAge != null) throw new IllegalArgumentException("Select ageGroup or numeric age bounds, not both");
             var band = ageGroups.require(ageGroup, ageAsOf); minAge = band.minAge(); maxAge = band.maxAge();
         }
+        if (rankOrder == com.flyingangels.backend.event.RankingOrder.DESC)
+            return rankings.staff(categoryId, gender, minAge, maxAge, ageAsOf, page, size, meetId, eventId, rankOrder);
         return meetId == null && eventId == null ? rankings.staff(categoryId, gender, minAge, maxAge, ageAsOf, page, size)
                 : rankings.staff(categoryId, gender, minAge, maxAge, ageAsOf, page, size, meetId, eventId);
     }

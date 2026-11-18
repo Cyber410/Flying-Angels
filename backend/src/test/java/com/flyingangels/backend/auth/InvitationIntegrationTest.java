@@ -32,6 +32,8 @@ class InvitationIntegrationTest extends DatabaseIntegrationTest {
     @Autowired StaffUserRepository users;
     @Autowired StaffUserService accounts;
     @Autowired UserInvitationRepository tokens;
+    @Autowired AccountInvitationRepository pendingInvitations;
+    @Autowired AccountEnrollmentService enrollment;
     @Autowired InvitationService invitations;
     @Autowired com.flyingangels.backend.auth.mail.InvitationMailWorker mailWorker;
     @Autowired com.flyingangels.backend.auth.mail.InvitationMailOutbox mailOutbox;
@@ -40,13 +42,17 @@ class InvitationIntegrationTest extends DatabaseIntegrationTest {
     @Autowired JdbcTemplate jdbc;
     @MockitoBean InvitationEmailSender emails;
     private final Map<String, String> secrets = new ConcurrentHashMap<>();
+    private final Map<String, String> codes = new ConcurrentHashMap<>();
     private Athlete own, other;
     private MockHttpSession admin;
 
     @BeforeEach void seed() throws Exception {
-        tokens.deleteAllInBatch(); users.deleteAllInBatch(); secrets.clear();
+        tokens.deleteAllInBatch(); users.deleteAllInBatch(); secrets.clear(); codes.clear();
         doAnswer(call -> { String url = call.getArgument(2); secrets.put(call.getArgument(0), url.substring(url.indexOf("#token=") + 7)); return null; })
                 .when(emails).send(anyString(), anyString(), anyString(), any());
+        doAnswer(call -> { String url = call.getArgument(2); secrets.put(call.getArgument(0), url.substring(url.indexOf("#token=") + 7));
+            codes.put(call.getArgument(0), call.getArgument(3)); return null; })
+                .when(emails).sendVerification(anyString(), anyString(), anyString(), anyString(), any());
         accounts.create(new CreateUserRequest("admin@example.com", "Admin", PASSWORD, StaffRole.ADMIN));
         accounts.create(new CreateUserRequest("coach@example.com", "Coach", PASSWORD, StaffRole.COACH));
         own = athleteRepository.saveAndFlush(new Athlete("Own", "Runner", "Private coaching note", "", "", LocalDate.of(2010, 1, 1), "Female"));
@@ -67,7 +73,7 @@ class InvitationIntegrationTest extends DatabaseIntegrationTest {
         return "{\"email\":\"" + email + "\",\"name\":\"Invited athlete\",\"role\":\"" + role + "\",\"athleteId\":" + athleteId + "}";
     }
 
-    @Test void athleteAccountsCanBrowseRankingsForEveryEventAndMeetWithoutANomination() throws Exception {
+    @Test void athleteAccountsCanBrowseOnlyAssignedEventRankingsWithoutOtherProfileAccess() throws Exception {
         var account = invite("rankings@example.com", StaffRole.ATHLETE, own.getId()); activate(account.email());
         var past = meets.create(new MeetRequest("Past public competition", LocalDate.of(2026, 5, 10), "Track", null));
         var future = meets.create(new MeetRequest("Future public competition", LocalDate.of(2050, 5, 10), "Track", null));
@@ -77,9 +83,11 @@ class InvitationIntegrationTest extends DatabaseIntegrationTest {
         events.addResult(jump.getId(), new EventResultRequest(other.getId(), "5.0m", null));
         var session = login(account.email());
         mockMvc.perform(get("/api/portal/meets").session(session)).andExpect(status().isOk()).andExpect(content().json("[]"));
-        mockMvc.perform(get("/api/portal/rankings/meets").session(session)).andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(2));
-        mockMvc.perform(get("/api/portal/rankings/categories").session(session)).andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(2));
-        for (var event : List.of(race, jump)) {
+        mockMvc.perform(get("/api/portal/rankings/meets").session(session)).andExpect(status().isOk()).andExpect(content().json("[]"));
+        events.assignParticipant(race.getId(), new EventParticipantRequest(own.getId()));
+        mockMvc.perform(get("/api/portal/rankings/meets").session(session)).andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(1));
+        mockMvc.perform(get("/api/portal/rankings/categories").session(session)).andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(1));
+        for (var event : List.of(race)) {
             var catalogue = mockMvc.perform(get("/api/portal/rankings/events").param("meetId", event.getMeet().getId().toString()).session(session))
                     .andExpect(status().isOk()).andExpect(jsonPath("$[0].id").value(event.getId())).andReturn().getResponse().getContentAsString();
             assertFalse(catalogue.contains("Private")); assertFalse(catalogue.contains("participants"));
@@ -91,6 +99,12 @@ class InvitationIntegrationTest extends DatabaseIntegrationTest {
                     .andExpect(jsonPath("$.content[0].dateOfBirth").doesNotExist()).andReturn().getResponse().getContentAsString();
             assertFalse(ranking.contains("private note"));
         }
+        mockMvc.perform(get("/api/portal/rankings/events").param("meetId", future.getId().toString()).session(session))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(get("/api/portal/rankings").param("categoryId", jump.getCategory().getId().toString())
+                .param("eventId", jump.getId().toString()).session(session)).andExpect(status().isForbidden());
+        mockMvc.perform(get("/api/portal/rankings").param("categoryId", race.getCategory().getId().toString())
+                .session(session)).andExpect(status().isBadRequest());
         mockMvc.perform(get("/api/athletes/{id}", other.getId()).session(session)).andExpect(status().isForbidden());
         mockMvc.perform(get("/api/athletes/{id}/notes", other.getId()).session(session)).andExpect(status().isForbidden());
         mockMvc.perform(get("/api/meets/{id}", future.getId()).session(session)).andExpect(status().isForbidden());
@@ -102,20 +116,25 @@ class InvitationIntegrationTest extends DatabaseIntegrationTest {
         String email = "athlete@example.com";
         var created = mockMvc.perform(post("/api/users").session(admin).with(csrf()).contentType("application/json")
                 .content(inviteBody(email, "ATHLETE", own.getId()))).andExpect(status().isCreated())
-                .andExpect(jsonPath("$.accountStatus").value("INVITED")).andExpect(jsonPath("$.active").value(false))
+                .andExpect(jsonPath("$.status").value("AWAITING_VERIFICATION"))
                 .andExpect(jsonPath("$.athleteId").value(own.getId())).andReturn();
+        assertTrue(users.findByEmail(email).isEmpty(), "An invitation must not create an account before verification");
         mailWorker.processBatch();
         String token = secrets.get(email); assertEquals(43, token.length());
         assertFalse(created.getResponse().getContentAsString().contains(token));
-        var storedToken = tokens.findAll().get(0); assertEquals(64, storedToken.getTokenHash().length()); assertNotEquals(token, storedToken.getTokenHash());
+        var storedToken = pendingInvitations.findAll().get(0); assertEquals(64, storedToken.getTokenHash().length()); assertNotEquals(token, storedToken.getTokenHash());
         mockMvc.perform(post("/api/auth/login").with(csrf()).contentType("application/json")
                 .content("{\"email\":\"" + email + "\",\"password\":\"" + PASSWORD + "\"}")).andExpect(status().isUnauthorized());
-        mockMvc.perform(post("/api/auth/invitations/validate").with(csrf()).contentType("application/json")
+        mockMvc.perform(post("/api/auth/enrollment/info").with(csrf()).contentType("application/json")
                 .content("{\"token\":\"" + token + "\"}")).andExpect(status().isOk()).andExpect(jsonPath("$.role").value("ATHLETE"));
-        mockMvc.perform(post("/api/auth/invitations/accept").with(csrf()).contentType("application/json")
+        assertThrows(ResponseStatusException.class, () -> enrollment.complete(new AccountEnrollmentService.Completion(token, PASSWORD)));
+        mockMvc.perform(post("/api/auth/enrollment/verify").with(csrf()).contentType("application/json")
+                .content("{\"token\":\"" + token + "\",\"code\":\"" + codes.get(email) + "\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.verified").value(true));
+        mockMvc.perform(post("/api/auth/enrollment/complete").with(csrf()).contentType("application/json")
                 .content("{\"token\":\"" + token + "\",\"password\":\"" + PASSWORD + "\"}"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.accountStatus").value("ACTIVE"));
-        assertThrows(ResponseStatusException.class, () -> activate(email));
+        assertThrows(ResponseStatusException.class, () -> enrollment.complete(new AccountEnrollmentService.Completion(token, PASSWORD)));
         assertNotEquals(PASSWORD, users.findByEmail(email).orElseThrow().getPasswordHash());
         var meet = meets.create(new MeetRequest("Nominated meet", LocalDate.of(2050, 5, 10), "Track", null));
         var race = events.create(new EventRequest("100m", meet.getStartDate(), "Track", null, null, RankingOrder.ASC, meet.getId(), null, "100m"));
@@ -143,7 +162,8 @@ class InvitationIntegrationTest extends DatabaseIntegrationTest {
         mockMvc.perform(get("/api/portal/availability/{id}", forbiddenRequest.getId()).session(session)).andExpect(status().isNotFound());
         mockMvc.perform(get("/api/portal/meets").session(session)).andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(1));
         mockMvc.perform(get("/api/portal/meets/{id}", unrelated.getId()).session(session)).andExpect(status().isNotFound());
-        mockMvc.perform(get("/api/portal/rankings").param("categoryId", race.getCategory().getId().toString()).session(session))
+        mockMvc.perform(get("/api/portal/rankings").param("categoryId", race.getCategory().getId().toString())
+                .param("meetId", meet.getId().toString()).param("eventId", race.getId().toString()).session(session))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.content[0].athleteId").doesNotExist())
                 .andExpect(jsonPath("$.content[1].athleteId").value(own.getId()));
         for (String path : List.of("/api/athletes", "/api/users", "/api/athletes/" + own.getId() + "/notes", "/api/athletes/" + other.getId(),

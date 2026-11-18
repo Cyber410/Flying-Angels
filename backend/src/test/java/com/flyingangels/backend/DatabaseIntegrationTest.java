@@ -76,10 +76,14 @@ public abstract class DatabaseIntegrationTest {
     @Autowired protected com.flyingangels.backend.availability.AvailabilityResponseRepository availabilityResponseRepository;
 	@Autowired protected com.flyingangels.backend.auth.mail.InvitationMailRepository invitationMailRepository;
     @Autowired protected com.flyingangels.backend.auth.throttle.LoginThrottleRepository loginThrottleRepository;
+    @Autowired protected com.flyingangels.backend.auth.AccountInvitationRepository accountInvitationRepository;
+    @Autowired protected com.flyingangels.backend.auth.PasswordResetRepository passwordResetRepository;
     @BeforeEach
 	void clearAthleteAndEventData() {
 		// Children before parents, so no foreign key blocks a delete.
         invitationMailRepository.deleteAllInBatch();
+        accountInvitationRepository.deleteAllInBatch();
+        passwordResetRepository.deleteAllInBatch();
         loginThrottleRepository.deleteAllInBatch();
         importRowRepository.deleteAllInBatch(); importJobRepository.deleteAllInBatch();
         availabilityResponseRepository.deleteAllInBatch(); availabilityRequestRepository.deleteAllInBatch();

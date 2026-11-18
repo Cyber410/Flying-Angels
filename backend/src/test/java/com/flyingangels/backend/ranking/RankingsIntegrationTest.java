@@ -60,7 +60,7 @@ class RankingsIntegrationTest extends DatabaseIntegrationTest {
         var scoped = rankings.staff(race.getCategory().getId(), null, null, null, null, 0, 25, early.getId(), null);
         assertEquals(3, scoped.totalElements()); assertEquals(List.of(1, 1, 3), scoped.content().stream().map(StaffRow::position).toList());
         assertEquals(earlyBest.getId(), scoped.content().get(0).resultId()); assertEquals(early.getId(), scoped.filters().meetId());
-        var page = rankings.portal(ada.getId(), race.getCategory().getId(), null, null, null, null, 1, 1, early.getId(), null);
+        var page = rankings.portal(ada.getId(), race.getCategory().getId(), null, null, null, null, 1, 1, early.getId(), race.getId());
         assertEquals(1, page.content().get(0).position()); assertEquals("Ben", page.content().get(0).firstName()); assertEquals(3, page.totalElements());
         assertEquals(early.getId(), page.content().get(0).meetId());
     }
@@ -69,7 +69,7 @@ class RankingsIntegrationTest extends DatabaseIntegrationTest {
         add(race, ada, "12.4");
         jdbc.update("update events set ranking_order = 'DESC' where id = ?", laterRace.getId());
         add(laterRace, ada, "10.0"); add(laterRace, ben, "20.0");
-        var selected = rankings.portal(unknown.getId(), race.getCategory().getId(), null, null, null, null, 0, 25, null, laterRace.getId());
+        var selected = rankings.portal(ada.getId(), race.getCategory().getId(), null, null, null, null, 0, 25, null, laterRace.getId());
         assertEquals(RankingOrder.DESC, selected.category().rankingOrder()); assertEquals("Ben", selected.content().get(0).firstName());
         assertEquals(late.getId(), selected.filters().meetId()); assertEquals(laterRace.getId(), selected.filters().eventId());
         assertEquals(laterRace.getId(), selected.content().get(0).eventId()); assertEquals("Summer", selected.content().get(0).meetName());
@@ -89,11 +89,12 @@ class RankingsIntegrationTest extends DatabaseIntegrationTest {
     }
 
     @Test void scopedEmptyStatusesNeverUseResultsFromAnotherMeet() {
+        events.assignParticipant(laterRace.getId(), new EventParticipantRequest(unknown.getId()));
         add(race, ada, "12.4");
-        var none = rankings.portal(unknown.getId(), race.getCategory().getId(), "Male", null, null, null, 0, 25, late.getId(), null);
+        var none = rankings.portal(unknown.getId(), race.getCategory().getId(), "Male", null, null, null, 0, 25, late.getId(), laterRace.getId());
         assertEquals(Status.NO_EVENT_RESULTS, none.status());
         add(laterRace, ada, "12.2");
-        var unmatched = rankings.portal(unknown.getId(), race.getCategory().getId(), "Male", null, null, null, 0, 25, late.getId(), null);
+        var unmatched = rankings.portal(unknown.getId(), race.getCategory().getId(), "Male", null, null, null, 0, 25, late.getId(), laterRace.getId());
         assertEquals(Status.NO_MATCHING_ATHLETES, unmatched.status());
     }
 

@@ -898,6 +898,145 @@
     "multipart": false
   },
   {
+    "method": "GET",
+    "path": "/api/users/pending-invitations",
+    "allowedRoles": [
+      "ADMIN"
+    ],
+    "probeUrl": "/api/users/pending-invitations",
+    "allowedStatus": 200,
+    "multipart": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/users/pending-invitations",
+    "allowedRoles": [
+      "ADMIN"
+    ],
+    "probeUrl": "/api/users/pending-invitations",
+    "allowedStatus": 400,
+    "multipart": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/users/pending-invitations/{id}/resend",
+    "allowedRoles": [
+      "ADMIN"
+    ],
+    "probeUrl": "/api/users/pending-invitations/9000000000000000000/resend",
+    "allowedStatus": 400,
+    "multipart": false
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/users/pending-invitations/{id}",
+    "allowedRoles": [
+      "ADMIN"
+    ],
+    "probeUrl": "/api/users/pending-invitations/9000000000000000000",
+    "allowedStatus": 400,
+    "multipart": false
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/users/{id}",
+    "allowedRoles": [
+      "ADMIN"
+    ],
+    "probeUrl": "/api/users/9000000000000000000",
+    "allowedStatus": 404,
+    "multipart": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/enrollment/info",
+    "allowedRoles": [
+      "ANONYMOUS",
+      "ADMIN",
+      "COACH",
+      "ATHLETE"
+    ],
+    "probeUrl": "/api/auth/enrollment/info",
+    "allowedStatus": 400,
+    "multipart": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/enrollment/verify",
+    "allowedRoles": [
+      "ANONYMOUS",
+      "ADMIN",
+      "COACH",
+      "ATHLETE"
+    ],
+    "probeUrl": "/api/auth/enrollment/verify",
+    "allowedStatus": 400,
+    "multipart": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/enrollment/resend",
+    "allowedRoles": [
+      "ANONYMOUS",
+      "ADMIN",
+      "COACH",
+      "ATHLETE"
+    ],
+    "probeUrl": "/api/auth/enrollment/resend",
+    "allowedStatus": 400,
+    "multipart": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/enrollment/complete",
+    "allowedRoles": [
+      "ANONYMOUS",
+      "ADMIN",
+      "COACH",
+      "ATHLETE"
+    ],
+    "probeUrl": "/api/auth/enrollment/complete",
+    "allowedStatus": 400,
+    "multipart": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/password-reset/request",
+    "allowedRoles": [
+      "ANONYMOUS",
+      "ADMIN",
+      "COACH",
+      "ATHLETE"
+    ],
+    "probeUrl": "/api/auth/password-reset/request",
+    "allowedStatus": 400,
+    "multipart": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/password-reset/complete",
+    "allowedRoles": [
+      "ANONYMOUS",
+      "ADMIN",
+      "COACH",
+      "ATHLETE"
+    ],
+    "probeUrl": "/api/auth/password-reset/complete",
+    "allowedStatus": 400,
+    "multipart": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/results/overview",
+    "allowedRoles": [
+      "ADMIN",
+      "COACH"
+    ],
+    "probeUrl": "/api/results/overview",
+    "allowedStatus": 200,
+    "multipart": false
+  },
+  {
     "method": "POST",
     "path": "/api/auth/logout",
     "allowedRoles": [

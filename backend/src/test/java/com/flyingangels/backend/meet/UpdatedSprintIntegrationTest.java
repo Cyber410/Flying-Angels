@@ -109,11 +109,13 @@ class UpdatedSprintIntegrationTest extends DatabaseIntegrationTest {
                 .andExpect(status().isOk()).andExpect(jsonPath("$.content[0].events.length()").value(2))
                 .andExpect(jsonPath("$.content[0].latestResponse.communicationMethod").value("WHATSAPP"))
                 .andExpect(jsonPath("$.content[0].latestResponse.staffUserId").value(42))
-                .andExpect(jsonPath("$.summary.total").value(2)).andExpect(jsonPath("$.summary.pending").value(1))
+                .andExpect(jsonPath("$.summary.total").value(1)).andExpect(jsonPath("$.summary.pending").value(0))
                 .andExpect(jsonPath("$.summary.available").value(1));
         mockMvc.perform(get("/api/availability").param("meetId", meet.getId().toString()).param("status", "AWAITING_RESPONSE"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.filters.status").value("PENDING"))
-                .andExpect(jsonPath("$.content[0].status").value("PENDING"));
+                .andExpect(jsonPath("$.content[0].status").value("PENDING"))
+                .andExpect(jsonPath("$.summary.total").value(1)).andExpect(jsonPath("$.summary.pending").value(1))
+                .andExpect(jsonPath("$.summary.available").value(0));
     }
 
     @Test void materialAssignmentAndScheduleChangesRequireReconfirmation() {

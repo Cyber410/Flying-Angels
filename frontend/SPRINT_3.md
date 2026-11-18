@@ -596,3 +596,20 @@ All 120 frontend tests passed across 29 files using two workers in Node 22.
 The initial concurrent run had one async UI timeout while containers were
 rebuilding; limiting test workers resolved it without changing assertions.
 Containers were rebuilt and restarted with the feature.
+
+
+## Database integration CI compatibility
+
+Updated existing integration expectations for migrations V1-V3, verified account
+creation, assigned-event portal rankings, and filtered availability summaries.
+Extended the independent endpoint role matrix for enrollment, password reset,
+account deletion, and results overview routes, retaining role and CSRF checks.
+The historical V1 upgrade SQL is now a classpath test fixture instead of a
+reference to the removed deployment folder. Test cleanup includes pending
+invitations and password resets. Production code and applied migrations are unchanged.
+
+Validation: the full integration profile ran 292 tests with zero assertion
+failures, two existing skips, and one JDBC connection error during migration
+test setup. All five migration tests then passed in an isolated focused rerun.
+Both runs used disposable Testcontainers MySQL databases; academy data was untouched.
+The existing backend unit profile previously passed all 82 tests.

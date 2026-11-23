@@ -1,0 +1,149 @@
+<?xml version='1.0' encoding='utf-8'?>
+<svg xmlns="http://www.w3.org/2000/svg" role="img" width="1900" height="1902" viewBox="0 0 1900 1902">
+  <title>Role-Based Dashboards and Shared Navigation — code design</title>
+  <desc>Admin: organization overview; Coach: all meets; Athlete: own nominated meets. SUNNY: login / dashboard route -&gt; session role -&gt; role summary + own notifications -&gt; cards / meets / outstanding actions -&gt; existing authorized feature. Desktop top nav or mobile hamburger uses the same permissions. ADMIN / COACH: Admin receives organization statistics and Admin quick actions; Coach monitors all meets and can assign events, record results, edit programs and review availability without Admin-only actions. ATHLETE: nominated meets + own availability + next published scheduled event. No Pending responses -&gt; All Caught Up; no nominations/schedule -&gt; clear empty state; My Profile and notifications remain accessible. EMPTY / FAILURE: no upcoming meets, no staff actions or no recent notifications -&gt; section-specific empty state. Failed section -&gt; unavailable message + retry; other accessible sections stay usable. AUTHORIZATION: wrong-role feature request -&gt; server denies; unrelated athlete records -&gt; denied using linked athlete identity. Role navigation and responsive layouts preserve the same access rules on every device.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+      <path d="M0,0 L9,3 L0,6" fill="none" stroke="#53617b" />
+    </marker>
+  </defs>
+  <rect width="1900" fill="white" height="1902" />
+  <rect x="32" y="24" width="1836" height="130" rx="8" fill="#f7f9fc" stroke="#53617b" />
+  <text x="50" y="49" fill="#53617b" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="700">TITLE / NOTE</text>
+  <text x="50" y="78" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700">Role-Based Dashboards and Shared Navigation</text>
+  <text x="50" y="113" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">Admin: organization overview; Coach: all meets; Athlete: own nominated meets</text>
+  <rect x="32" y="168" width="1836" height="130" rx="8" fill="#f7f9fc" stroke="#53617b" />
+  <text x="50" y="193" fill="#53617b" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="700">LEGEND / NOTE</text>
+  <text x="50" y="222" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700">Sprint 4 target code design</text>
+  <text x="50" y="257" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">E = existing source | P = proposed component/contract | EXTEND = existing code + planned changes | solid = request/data flow | dashed = response</text>
+  <rect x="32" y="330" width="450" height="347" rx="8" fill="#fff8e8" stroke="#966719" />
+  <text x="50" y="355" fill="#966719" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="700">FRONTEND / EXTEND</text>
+  <text x="50" y="384" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700">DashboardPage / role-specific sections</text>
+  <text x="50" y="419" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[E] AuthProvider, RequireSession, header.tsx</text>
+  <text x="50" y="441" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[P] Post-login role dashboard + reusable cards</text>
+  <text x="50" y="463" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">Upcoming meets, outstanding actions, recent</text>
+  <text x="50" y="485" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">notifications</text>
+  <text x="50" y="507" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[P] Role-permitted desktop nav / mobile</text>
+  <text x="50" y="529" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">hamburger</text>
+  <text x="50" y="551" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">Orange/white, Inter, desktop/tablet/mobile</text>
+  <text x="50" y="573" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">layout</text>
+  <text x="50" y="595" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">Each section: loading, empty, error + retry</text>
+  <text x="50" y="617" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">Existing feature links perform authorized</text>
+  <text x="50" y="639" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">actions</text>
+  <rect x="514" y="330" width="820" height="347" rx="8" fill="#f3f0ff" stroke="#7050a3" />
+  <text x="532" y="355" fill="#7050a3" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="700">API / P</text>
+  <text x="532" y="384" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700">Role-specific dashboard query contracts</text>
+  <text x="532" y="419" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">ADMIN: GET /api/dashboard/admin</text>
+  <text x="532" y="441" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">COACH: GET /api/dashboard/coach</text>
+  <text x="532" y="463" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">ATHLETE: GET /api/portal/dashboard</text>
+  <text x="532" y="485" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[P] GET /api/notifications?filter=ALL&amp;limit=5 (UC-14)</text>
+  <text x="532" y="507" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[E] GET /api/auth/me -&gt; role + permitted actions</text>
+  <text x="532" y="529" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">Server chooses data scope from principal; no athleteId parameter</text>
+  <text x="532" y="551" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">Independent summary/notification requests allow partial rendering</text>
+  <text x="532" y="573" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">401 no session; 403 wrong role; section error remains retryable</text>
+  <rect x="1366" y="330" width="502" height="347" rx="8" fill="#f7f9fc" stroke="#53617b" />
+  <text x="1384" y="355" fill="#53617b" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="700">SCOPE / NOTE</text>
+  <text x="1384" y="384" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700">Proposed dashboard / reused features</text>
+  <text x="1384" y="419" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">Dashboard classes and summary routes are new.</text>
+  <text x="1384" y="441" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">Reuse existing meet, athlete, assignment and</text>
+  <text x="1384" y="463" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">availability sources.</text>
+  <text x="1384" y="485" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">Programs and UC-14 notifications depend on the</text>
+  <text x="1384" y="507" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">companion proposed designs.</text>
+  <text x="1384" y="529" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">Coach sees all meets; quick actions retain existing</text>
+  <text x="1384" y="551" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">feature permissions.</text>
+  <text x="1384" y="573" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">Admin-only links: Add Athlete, Create Meet, Manage</text>
+  <text x="1384" y="595" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">Users. Import uses current permission.</text>
+  <rect x="32" y="741" width="550" height="347" rx="8" fill="#fff8e8" stroke="#966719" />
+  <text x="50" y="766" fill="#966719" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="700">CONTROLLER / EXTEND</text>
+  <text x="50" y="795" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700">DashboardController / PortalDashboardController</text>
+  <text x="50" y="830" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[P] Admin/Coach route guards + dashboard query service</text>
+  <text x="50" y="852" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[E] AthleteSessionService.require(identity) resolves</text>
+  <text x="50" y="874" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">athlete</text>
+  <text x="50" y="896" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[EXTEND] SecurityConfig: role summary routes before</text>
+  <text x="50" y="918" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">generic staff API rules</text>
+  <text x="50" y="940" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[E] RequireSession and auth permissions guard feature</text>
+  <text x="50" y="962" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">routes</text>
+  <text x="50" y="984" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[P] Destination endpoints enforce role/ownership again</text>
+  <text x="50" y="1006" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[P] Return section availability/error metadata where one</text>
+  <text x="50" y="1028" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">data source fails</text>
+  <rect x="620" y="741" width="714" height="347" rx="8" fill="#f3f0ff" stroke="#7050a3" />
+  <text x="638" y="766" fill="#7050a3" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="700">SERVICE / P</text>
+  <text x="638" y="795" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700">DashboardService / AthleteDashboardService</text>
+  <text x="638" y="830" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">Admin: total athletes, upcoming meets, Pending responses and unpublished</text>
+  <text x="638" y="852" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">program drafts</text>
+  <text x="638" y="874" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">Coach: all upcoming meets, nominated athlete counts, Pending responses and</text>
+  <text x="638" y="896" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">permitted outstanding actions</text>
+  <text x="638" y="918" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">Athlete: only nominated meets, own availability and next scheduled event in</text>
+  <text x="638" y="940" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">published programs</text>
+  <text x="638" y="962" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">Pending availability -&gt; action links; none -&gt; All Caught Up</text>
+  <text x="638" y="984" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">Next event from own assigned published sessions; TBC has no invented</text>
+  <text x="638" y="1006" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">ordering time; keep Conditional label</text>
+  <text x="638" y="1028" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">Recent notifications fetched through recipient-owned UC-14 API; dashboard</text>
+  <text x="638" y="1050" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">performs no duplicate notification writes</text>
+  <rect x="32" y="1136" width="550" height="391" rx="8" fill="#f3f0ff" stroke="#7050a3" />
+  <text x="50" y="1161" fill="#7050a3" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="700">RESPONSE / P</text>
+  <text x="50" y="1190" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700">Admin / Coach / AthleteDashboardDto</text>
+  <text x="50" y="1225" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">Role-scoped stats, upcomingMeets[], outstandingActions[]</text>
+  <text x="50" y="1247" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">Athlete: own availability + nextScheduledEvent or empty</text>
+  <text x="50" y="1269" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">state</text>
+  <text x="50" y="1291" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">Action links match current authorization; Manage Users</text>
+  <text x="50" y="1313" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">hidden from Coach</text>
+  <text x="50" y="1335" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">No nominations / no upcoming schedule -&gt; explicit empty</text>
+  <text x="50" y="1357" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">states</text>
+  <text x="50" y="1379" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">No outstanding staff actions / notifications -&gt; empty</text>
+  <text x="50" y="1401" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">state</text>
+  <text x="50" y="1423" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">Section failures show retry while other loaded sections</text>
+  <text x="50" y="1445" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">remain usable</text>
+  <text x="50" y="1467" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">Unauthorized destination -&gt; access denied + authorized</text>
+  <text x="50" y="1489" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">return</text>
+  <rect x="620" y="1136" width="714" height="391" rx="8" fill="#fff8e8" stroke="#966719" />
+  <text x="638" y="1161" fill="#966719" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="700">REPOSITORY / EXTEND</text>
+  <text x="638" y="1190" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700">DashboardQueries / existing repositories</text>
+  <text x="638" y="1225" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[P] Aggregate queries with shared upcoming/Pending definitions; count</text>
+  <text x="638" y="1247" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">distinct nominated athletes</text>
+  <text x="638" y="1269" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[E] AthleteRepository, MeetRepository / MeetOverviewRepository</text>
+  <text x="638" y="1291" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[E] AvailabilityRequest.status() semantics include assignment revisions; do</text>
+  <text x="638" y="1313" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">not count raw lastAnswer</text>
+  <text x="638" y="1335" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[E] EventParticipationRepository scopes schedule to own assignments</text>
+  <text x="638" y="1357" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[P] ProgramVersion query excludes drafts; owner filtering in database</text>
+  <text x="638" y="1379" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">queries</text>
+  <text x="638" y="1401" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[P] No coach-specific meet ownership restriction</text>
+  <rect x="1366" y="741" width="502" height="786" rx="8" fill="#fff8e8" stroke="#966719" />
+  <text x="1384" y="766" fill="#966719" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="700">DATA / EXTEND</text>
+  <text x="1384" y="795" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700">Read model / existing authoritative records</text>
+  <text x="1384" y="830" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[E] Athlete: organization athlete count</text>
+  <text x="1384" y="852" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[E] Meet: start/end dates; all-meet staff overview</text>
+  <text x="1384" y="874" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[E] EventParticipation: athlete/event assignments</text>
+  <text x="1384" y="896" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[E] AvailabilityRequest: meet/athlete nomination +</text>
+  <text x="1384" y="918" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">computed Pending/Available/Unavailable state</text>
+  <text x="1384" y="940" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[E] StaffUser: role + linked athlete ID</text>
+  <text x="1384" y="962" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[P] ProgramDraft vs ProgramVersion for unpublished</text>
+  <text x="1384" y="984" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">count and published personal schedule</text>
+  <text x="1384" y="1006" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">Unpublished count includes saved changes newer than</text>
+  <text x="1384" y="1028" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">the published version</text>
+  <text x="1384" y="1050" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[P] UC-14 Notification data stays behind</text>
+  <text x="1384" y="1072" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">notification API; recipient scope always applies</text>
+  <text x="1384" y="1094" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">No new dashboard table required; read-only</text>
+  <text x="1384" y="1116" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">aggregation over authoritative sources</text>
+  <text x="1384" y="1138" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">Return only authenticated athlete's records; never</text>
+  <text x="1384" y="1160" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">accept another athlete ID for portal scope</text>
+  <polyline points="482,430 514,430" fill="none" stroke="#53617b" stroke-width="2" marker-end="url(#arrow)" />
+  <polyline points="924,677 924,709 307,709 307,741" fill="none" stroke="#53617b" stroke-width="2" marker-end="url(#arrow)" />
+  <polyline points="582,851 620,851" fill="none" stroke="#53617b" stroke-width="2" marker-end="url(#arrow)" />
+  <polyline points="977,1088 977,1136" fill="none" stroke="#53617b" stroke-width="2" marker-end="url(#arrow)" />
+  <polyline points="1334,1256 1366,1256" fill="none" stroke="#53617b" stroke-width="2" marker-end="url(#arrow)" />
+  <polyline points="307,1088 307,1136" fill="none" stroke="#53617b" stroke-width="2" marker-end="url(#arrow)" stroke-dasharray="7 5" />
+  <polyline points="32,1236 14,1236 14,480 32,480" fill="none" stroke="#53617b" stroke-width="2" marker-end="url(#arrow)" stroke-dasharray="7 5" />
+  <rect x="32" y="1567" width="1836" height="303" rx="8" fill="#f7f9fc" stroke="#53617b" />
+  <text x="50" y="1592" fill="#53617b" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="700">PATHS / NOTE</text>
+  <text x="50" y="1621" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700">Sunny-day and rainy-day paths</text>
+  <text x="50" y="1656" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">SUNNY: login / dashboard route -&gt; session role -&gt; role summary + own notifications -&gt; cards / meets / outstanding actions -&gt; existing authorized feature. Desktop top nav or mobile hamburger uses the same</text>
+  <text x="50" y="1678" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">permissions.</text>
+  <text x="50" y="1700" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">ADMIN / COACH: Admin receives organization statistics and Admin quick actions; Coach monitors all meets and can assign events, record results, edit programs and review availability without Admin-only</text>
+  <text x="50" y="1722" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">actions.</text>
+  <text x="50" y="1744" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">ATHLETE: nominated meets + own availability + next published scheduled event. No Pending responses -&gt; All Caught Up; no nominations/schedule -&gt; clear empty state; My Profile and notifications remain</text>
+  <text x="50" y="1766" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">accessible.</text>
+  <text x="50" y="1788" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">EMPTY / FAILURE: no upcoming meets, no staff actions or no recent notifications -&gt; section-specific empty state. Failed section -&gt; unavailable message + retry; other accessible sections stay usable.</text>
+  <text x="50" y="1810" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">AUTHORIZATION: wrong-role feature request -&gt; server denies; unrelated athlete records -&gt; denied using linked athlete identity. Role navigation and responsive layouts preserve the same access rules on</text>
+  <text x="50" y="1832" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">every device.</text>
+</svg>

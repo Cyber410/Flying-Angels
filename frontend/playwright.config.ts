@@ -14,7 +14,10 @@ export default defineConfig({
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
   },
-  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
+  projects: [
+    { name: "chromium", use: { ...devices["Desktop Chrome"] } },
+    { name: "mobile-chromium", use: { ...devices["Desktop Chrome"], viewport: { width: 375, height: 667 } } },
+  ],
   webServer: {
     command: "npm run dev -- --host 127.0.0.1 --port 5180 --strictPort",
     url: "http://127.0.0.1:5180",

@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { expectNoSeriousA11yViolations } from "./a11y.ts";
 import { meet, mockSession, nomination } from "./helpers.ts";
 
 // UC-10: save an explicit athlete reply against the displayed proposal revision.
@@ -13,9 +14,12 @@ test("athlete responds to a nominated meet", async ({ page }) => {
     answered = true; return route.fulfill({ json: saved });
   });
   await page.goto("/portal");
+  await expect(page.getByRole("button", { name: "Respond", exact: true })).toBeVisible();
+  await expectNoSeriousA11yViolations(page, "portal");
   await page.getByRole("button", { name: "Respond", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "Respond to meet invitation" });
   await expect(dialog.getByRole("button", { name: "Save response" })).toBeDisabled();
+  await expectNoSeriousA11yViolations(page, "respond-dialog");
   await dialog.getByRole("radio", { name: /^Available/ }).check();
   await dialog.getByRole("button", { name: "Save response" }).click();
   await expect(dialog).toBeHidden();
@@ -30,8 +34,12 @@ test("stale availability response requires reload and reconfirmation", async ({ 
   await page.route("**/api/portal/availability/8", route => route.fulfill({ json: nomination }));
   await page.route("**/api/portal/availability/8/response", route => route.fulfill({ status: 409, json: { message: "Assigned events changed. Reload and confirm again." } }));
   await page.goto("/portal");
+  await expect(page.getByRole("button", { name: "Respond", exact: true })).toBeVisible();
+  await expectNoSeriousA11yViolations(page, "portal");
   await page.getByRole("button", { name: "Respond", exact: true }).click();
   const dialog = page.getByRole("dialog");
+  await expect(dialog.getByRole("radio", { name: /^Available/ })).toBeVisible();
+  await expectNoSeriousA11yViolations(page, "respond-dialog");
   await dialog.getByRole("radio", { name: /^Available/ }).check();
   await dialog.getByRole("button", { name: "Save response" }).click();
   await expect(dialog.getByRole("alert")).toContainText("Assigned events changed");
@@ -54,6 +62,8 @@ test("staff filters nominations and records an external response", async ({ page
     return route.fulfill({ json: { ...nomination, status: "UNAVAILABLE", lastAnswer: "UNAVAILABLE", version: 5 } });
   });
   await page.goto("/availability");
+  await expect(page.getByRole("combobox", { name: "Meet", exact: true })).toBeVisible();
+  await expectNoSeriousA11yViolations(page, "availability");
   await page.getByRole("combobox", { name: "Meet", exact: true }).selectOption("2");
   await page.getByLabel("Search athletes").fill("Fictional");
   const filtered = page.waitForRequest(request => request.url().includes("/api/availability?") && new URL(request.url()).searchParams.get("search") === "Fictional");
@@ -62,6 +72,8 @@ test("staff filters nominations and records an external response", async ({ page
   expect(query.get("meetId")).toBe("2"); expect(query.get("view")).toBe("ALL");
   await page.getByRole("button", { name: "Record response" }).click();
   const dialog = page.getByRole("dialog", { name: "Record external response" });
+  await expect(dialog).toBeVisible();
+  await expectNoSeriousA11yViolations(page, "record-response-dialog");
   await dialog.getByRole("radio", { name: /^Unavailable/ }).check();
   await expect(dialog.getByRole("button", { name: "Save response" })).toBeDisabled();
   await dialog.getByLabel("Response received via").selectOption("WHATSAPP");

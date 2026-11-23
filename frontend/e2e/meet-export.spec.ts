@@ -2,6 +2,7 @@
 // The backend is mocked with page.route, so only the front end needs to run.
 import { expect, test, type Page } from "@playwright/test";
 import { readFile } from "node:fs/promises";
+import { expectNoSeriousA11yViolations } from "./a11y.ts";
 
 const meet = {
   id: 7, name: "Fall Invitational", meetDate: "2026-10-24", endDate: null,
@@ -76,9 +77,11 @@ async function openExportDialog(page: Page, counts: Counts = { registration: 2, 
   await mockMeetApi(page, counts);
   await page.goto("/meets/7");
   await expect(page.getByRole("heading", { level: 1, name: "Fall Invitational" })).toBeVisible();
+  await expectNoSeriousA11yViolations(page, "meet-details");
   await page.getByRole("button", { name: "Export", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "Export Meet Data" });
   await expect(dialog).toBeVisible();
+  await expectNoSeriousA11yViolations(page, "export-dialog");
   return dialog;
 }
 

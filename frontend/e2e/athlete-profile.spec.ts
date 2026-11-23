@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { expectNoSeriousA11yViolations } from "./a11y.ts";
 import { event, mockProfile } from "./helpers.ts";
 
 // UC-08: show the server-selected best rather than simply the newest performance.
@@ -15,6 +16,7 @@ test("athlete views personal best and progression", async ({ page }) => {
   await expect(table).toContainText("12.1 s");
   await expect(table).not.toContainText("12.4 s");
   await expect(page.getByRole("img", { name: /100m performance progression/ })).toBeVisible();
+  await expectNoSeriousA11yViolations(page, "profile-personal-bests");
   await expect(table.getByRole("link")).toHaveCount(0);
 });
 
@@ -33,6 +35,7 @@ test("athlete filters event rankings without competitor profile links", async ({
   await page.getByRole("tab", { name: "Rankings" }).click();
   const table = page.getByRole("table", { name: /100m rankings/ });
   await expect(table.getByRole("row", { name: /Fictional Runner/ })).toContainText("You");
+  await expectNoSeriousA11yViolations(page, "profile-rankings");
   await expect(table.getByRole("link")).toHaveCount(0);
   await page.getByRole("combobox", { name: "Age group", exact: true }).selectOption("5:14");
   const changed = page.waitForRequest(request => request.url().includes("/api/portal/rankings?") && new URL(request.url()).searchParams.get("gender") === "Female");

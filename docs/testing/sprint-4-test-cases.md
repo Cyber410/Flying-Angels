@@ -3,7 +3,11 @@
 Source: Sprint 4 Testing Plan, "Test cases" section (Khoa Tran, Nov 22, 2026).
 Use cases, user stories, acceptance criteria and wireframes: written by Joshua (Trello "Sprint 4 Backlog" cards + *Sprint 4 Final Integrated Delivery Plan*). Expected results below come from his acceptance criteria.
 
-72 cases cover every sunny-day and rainy-day path in the three Sprint 4 Backlog cards: 35 sunny-day, 37 rainy-day, all automated. "Live" means the case also runs against the production URL after deploy. Where a criterion leaves a value open (autosave delay, local time zone, 403 vs 404, tablet navigation), the expected result is pending an answer in the plan's open questions.
+76 cases cover every sunny-day and rainy-day path in the three Sprint 4 Backlog cards: 37 sunny-day, 39 rainy-day, all automated. "Live" means the case also runs against the production URL after deploy.
+
+Open values answered by Joshua on Teams (Nov 25): autosave saves once the user stops editing (no fixed delay); all times are Toronto time (America/Toronto) for server and users; a non-nominated athlete gets 404; tablet (768 px) uses the hamburger menu like mobile. Still open: the send time of the day-before participation reminder (S4-14-14), and Clock injection in the UC-14 reminder code (needed for S4-14-07, S4-14-10 to S4-14-15).
+
+Routes and status codes named below follow Dev's proposed Sprint 4 code-design diagrams (docs/diagrams, PR #37). They are proposals until the code is written. Four cases were added on Nov 25 from that design (S4-13-24, S4-13-25, S4-14-24, S4-14-25); the team can drop them.
 
 ## UC-13 Detailed Meet Program
 
@@ -16,14 +20,14 @@ Use cases, user stories, acceptance criteria and wireframes: written by Joshua (
 | S4-13-05 | Sunny | Session saved with TBC report and start times | Saved, labelled TBC, does not block publish | Unit + E2E | JUnit, Playwright |
 | S4-13-06 | Sunny | **+ Add Event** from Add Session, create the event, return | New event appears in the session's event list; meet and program context restored | E2E (live) | Playwright |
 | S4-13-07 | Rainy | **+ Add Event**, then return without creating | No new event; athlete assignments unchanged (counts before = after) | Integration + E2E | MockMvc, Playwright |
-| S4-13-08 | Sunny | Staff edits a program field | Draft saved automatically; "Last saved" time updates | Unit + Integration | RTL, MockMvc |
+| S4-13-08 | Sunny | Staff edits a program field, then stops editing | Draft saved automatically once editing stops (no fixed delay); "Last saved" time updates | Unit + Integration | RTL, MockMvc |
 | S4-13-09 | Rainy | Staff edits a published program but does not republish | Athlete endpoint still returns the published version | Integration | MockMvc |
 | S4-13-10 | Sunny | Staff republishes | Athlete sees the new version; version history shows v2 | E2E (live) | Playwright |
 | S4-13-11 | Rainy | Publish with no days, or with a day that has no sessions | Publish blocked; "at least one day with one session" error | Integration + Unit | MockMvc, RTL |
 | S4-13-12 | Sunny | Delete a program day and confirm | Day and its sessions removed; events and assignments intact | Integration | MockMvc |
 | S4-13-13 | Rainy | Delete a program day, then cancel the confirmation | Nothing removed | Unit | RTL |
 | S4-13-14 | Rainy | Athlete calls the program create/edit/publish endpoints | 403 on every call | Integration + API (live) | MockMvc, Newman |
-| S4-13-15 | Rainy | Non-nominated athlete requests a published program | Access denied (403 or 404, per Joshua's API) | Integration + API (live) | MockMvc, Newman |
+| S4-13-15 | Rainy | Non-nominated athlete requests a published program | 404; program content never returned | Integration + API (live) | MockMvc, Newman |
 | S4-13-16 | Rainy | Athlete requests a program that has only a draft | Draft content never returned | Integration | MockMvc |
 | S4-13-17 | Sunny | Nominated athlete marked Unavailable opens the program | Published program visible | Integration | MockMvc |
 | S4-13-18 | Sunny | Athlete opens My Schedule | Only own assigned events; conditional rounds labelled "Conditional" | Unit + E2E (live) | RTL, Playwright |
@@ -32,6 +36,8 @@ Use cases, user stories, acceptance criteria and wireframes: written by Joshua (
 | S4-13-21 | Rainy | Save a session without an event, round or location | Save blocked; each missing field flagged; nothing saved | Unit + Integration | RTL, MockMvc |
 | S4-13-22 | Rainy | Autosave request fails (server returns 500) | Error shown saying the latest changes are not saved; a retry saves them | Unit + E2E | RTL, Playwright (route mock) |
 | S4-13-23 | Rainy | Athlete opens a nominated meet's program page | Read-only view; no edit, publish or delete controls | E2E (live) | Playwright |
+| S4-13-24 | Rainy | Two staff edit the same draft; the second saves with an old revision | 409; the newer save is kept, nothing silently overwritten; the UI asks the user to reload | Integration + Unit | MockMvc, RTL |
+| S4-13-25 | Sunny | Admin deletes a meet that has a draft, a published program and notifications | Delete succeeds (no foreign-key error); its program days, sessions, versions and reminder records are gone; old notifications for it open an "unavailable" page (S4-14-18) | Integration | MockMvc + Testcontainers |
 
 ## UC-14 Notifications & Reminders
 
@@ -46,13 +52,13 @@ Use cases, user stories, acceptance criteria and wireframes: written by Joshua (
 | S4-14-07 | Rainy | Delete, wait more than 5 seconds | Not restorable | Unit | JUnit (fixed Clock), RTL (fake timers) |
 | S4-14-08 | Sunny | Staff-directed meet alert fires | Every active Admin and Coach gets it; inactive staff and athletes do not | Integration | MockMvc |
 | S4-14-09 | Sunny | Program published, then republished | Each nominated athlete gets a notification each time | Integration + E2E (live) | MockMvc, Playwright |
-| S4-14-10 | Sunny | Clock set to 9:00 AM meet-local, two calendar days before start; athlete still Pending | Exactly one Pending reminder | Unit | JUnit + Mockito (fixed Clock) |
+| S4-14-10 | Sunny | Clock set to 9:00 AM Toronto time (America/Toronto), two calendar days before start; athlete still Pending | Exactly one Pending reminder | Unit | JUnit + Mockito (fixed Clock) |
 | S4-14-11 | Rainy | Same time, athlete already responded | No reminder | Unit | JUnit (fixed Clock) |
 | S4-14-12 | Rainy | Clock at 8:59 AM, and three days before | No reminder yet | Unit | JUnit (fixed Clock) |
 | S4-14-13 | Rainy | Reminder job runs twice for the same meet | Still exactly one reminder per athlete | Integration | MockMvc + Testcontainers |
 | S4-14-14 | Sunny | Athlete has 3 sessions on one participation day | One consolidated reminder the day before, not three | Unit | JUnit (fixed Clock) |
 | S4-14-15 | Rainy | Athlete's only event that day is a conditional final | No participation reminder | Unit | JUnit (fixed Clock) |
-| S4-14-16 | Rainy | Meet cancelled before reminders are due | Affected users alerted; no later reminders sent | Integration | MockMvc + fixed Clock |
+| S4-14-16 | Rainy | Meet cancelled (the new cancel action, not delete) before reminders are due | Affected users alerted; no later reminders sent | Integration | MockMvc + fixed Clock |
 | S4-14-17 | Sunny | Click a notification | Goes to the linked meet, program, availability or schedule page | E2E (live) | Playwright |
 | S4-14-18 | Rainy | Click a notification for content the user can no longer access | Unavailable or access-denied state, no crash | Unit + E2E | RTL, Playwright |
 | S4-14-19 | Rainy | User with no notifications | Empty state shown; count hidden or 0 | Unit | RTL |
@@ -60,6 +66,8 @@ Use cases, user stories, acceptance criteria and wireframes: written by Joshua (
 | S4-14-21 | Rainy | Unread filter when everything is read | "All notifications read" message | Unit | RTL |
 | S4-14-22 | Rainy | Open a notification that is already read | Stays read; unread count unchanged; user goes to the linked page | Unit + Integration | RTL, MockMvc |
 | S4-14-23 | Sunny | Delete a read notification, then Undo | Restored with its previous read state, not as unread | Unit + Integration | RTL, MockMvc |
+| S4-14-24 | Sunny | Athlete and Coach call GET /api/notifications and /api/notifications/unread-count | 200 with only their own notifications (all-role rules not blocked by staff-only API rules) | Integration + API (live) | MockMvc, Newman |
+| S4-14-25 | Rainy | The same publish event is processed twice (retry) | Each nominated athlete still has exactly one notification for that publish | Integration | MockMvc + Testcontainers |
 
 ## UC-15 Role-Based Dashboards
 
@@ -84,7 +92,7 @@ Use cases, user stories, acceptance criteria and wireframes: written by Joshua (
 | S4-15-17 | Rainy | Athlete requests another athlete's profile or meet by URL or API | Access denied; athlete stays on own records | Integration + API (live) | MockMvc, Newman |
 | S4-15-18 | Rainy | Admin or Coach with no outstanding actions and no notifications | Completed or empty state in each section | Unit | RTL |
 | S4-15-19 | Rainy | Athlete with no nominated meets | Empty state; My Profile and notifications still reachable | Unit + E2E | RTL, Playwright |
-| S4-15-20 | Sunny | Tablet width (768 px) per role | Layout adapts; role navigation still correct | E2E (live) | Playwright (tablet viewport) |
+| S4-15-20 | Sunny | Tablet width (768 px) per role | Hamburger menu like mobile, with the same role links; layout adapts | E2E (live) | Playwright (tablet viewport) |
 
 ## Cross-feature flows
 
@@ -96,7 +104,7 @@ These are Joshua's six demo scenarios, written as Playwright tests against the l
 | S4-X-02 | Rainy | Admin edits a published program and tries to publish an empty draft | Athlete view unchanged; publish blocked; republish after fix updates athlete view | E2E (live) | Playwright |
 | S4-X-03 | Rainy | Conditional final in the program | Shown with a Conditional label; no participation reminder created | E2E (live) + Unit | Playwright, JUnit |
 | S4-X-04 | Sunny | Publish a program | Nominated athlete sees a new notification and the program from it | E2E (live) | Playwright |
-| S4-X-05 | Rainy | Cancel a meet | Affected users alerted; scheduled reminders removed | E2E (live) + Integration | Playwright, MockMvc |
+| S4-X-05 | Rainy | Cancel a meet (the new cancel action, not delete) | Affected users alerted; scheduled reminders removed | E2E (live) + Integration | Playwright, MockMvc |
 | S4-X-06 | Sunny | Athlete with nothing Pending logs in on desktop and phone | All Caught Up; correct navigation on both | E2E (live) | Playwright |
 
 No case is planned as manual. If one ends up manual, this file must say why in one line (for example, "automated scan cannot judge whether a label makes sense").

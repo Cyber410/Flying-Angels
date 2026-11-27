@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { expectNoSeriousA11yViolations } from "./a11y.ts";
 import { mockSession } from "./helpers.ts";
 
 // UC-07: an invitation remains separate from a created login account.
@@ -16,8 +17,12 @@ test("Admin invites a Coach into Pending invitations", async ({ page }) => {
     return route.fulfill({ json: pending });
   });
   await page.goto("/users");
+  await expect(page.getByRole("button", { name: "+ Invite user" })).toBeVisible();
+  await expectNoSeriousA11yViolations(page, "users");
   await page.getByRole("button", { name: "+ Invite user" }).click();
   const dialog = page.getByRole("dialog", { name: "Invite a user" });
+  await expect(dialog).toBeVisible();
+  await expectNoSeriousA11yViolations(page, "invite-user-dialog");
   await dialog.getByLabel("Full name").fill(invitation.name);
   await dialog.getByLabel("Email address").fill(invitation.email);
   await dialog.getByRole("button", { name: "Send verification invitation" }).click();
@@ -38,6 +43,8 @@ test("invited user verifies email before creating an account", async ({ page }) 
   await page.route("**/api/auth/enrollment/complete", route => { completed = true; return route.fulfill({ json: { id: 7 } }); });
   await page.goto("/activate#token=fictional-invitation");
   await expect(page.getByLabel("New password")).toBeHidden();
+  await expect(page.getByLabel("Verification code")).toBeVisible();
+  await expectNoSeriousA11yViolations(page, "activate");
   await page.getByLabel("Verification code").fill("000000");
   await page.getByRole("button", { name: "Verify email" }).click();
   await expect(page.getByRole("alert")).toContainText("incorrect");
@@ -60,6 +67,7 @@ test("athlete is redirected away from user management", async ({ page }) => {
   await expect(page).toHaveURL(/\/portal$/);
   await expect(page.getByRole("heading", { name: "My Meets" })).toBeVisible();
   await expect(page.getByRole("button", { name: "+ Invite user" })).toBeHidden();
+  await expectNoSeriousA11yViolations(page, "portal");
 });
 
 // Recovery uses a code and matching passwords without automatically signing in.
@@ -71,7 +79,11 @@ test("forgot password accepts a reset code and returns to sign in", async ({ pag
     return route.fulfill({ status: 204 });
   });
   await page.goto("/login");
+  await expect(page.getByRole("heading", { name: "Welcome back" })).toBeVisible();
+  await expectNoSeriousA11yViolations(page, "login");
   await page.getByRole("link", { name: "Forgot password?" }).click();
+  await expect(page.getByRole("button", { name: "Send reset code" })).toBeVisible();
+  await expectNoSeriousA11yViolations(page, "forgot-password");
   await page.getByLabel("Email address").fill("runner@example.test");
   await page.getByRole("button", { name: "Send reset code" }).click();
   await page.getByLabel("Reset code").fill("123456");

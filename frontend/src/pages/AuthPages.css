@@ -18,7 +18,7 @@
 .auth-success { color: #256044; border-color: #b4d5c0; background: #eef7f0; }
 .auth-footnote { font-size: 12px; color: var(--text-secondary); line-height: 1.65; font-weight: 400; }
 .auth-card > .auth-footnote { margin-top: 24px; margin-bottom: 0; }
-.auth-progress { list-style: none; padding: 0; display: flex; gap: 20px; font-size: 12px; color: var(--text-muted); margin-bottom: 24px; }
+.auth-progress { list-style: none; padding: 0; display: flex; gap: 20px; font-size: 12px; color: var(--text-secondary); margin-bottom: 24px; }
 .auth-progress [aria-current] { color: var(--orange-dark); font-weight: 600; }
 .auth-code { font-size: 24px; letter-spacing: .25em; }
 .auth-status { margin: auto; padding: 48px 24px; text-align: center; }

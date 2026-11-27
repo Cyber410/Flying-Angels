@@ -1,0 +1,142 @@
+<?xml version='1.0' encoding='utf-8'?>
+<svg xmlns="http://www.w3.org/2000/svg" role="img" width="1900" height="1704" viewBox="0 0 1900 1704">
+  <title>Competition Programs: Draft, Publish and Athlete Schedule — code design</title>
+  <desc>Admin / Coach: edit and publish; nominated Athlete: published views only. SUNNY: Meet -&gt; Program -&gt; instructions -&gt; add valid day -&gt; event/category/round -&gt; times or TBC + location -&gt; save draft -&gt; Preview -&gt; Publish -&gt; athlete views Full Program / My Schedule. EVENT SHORTCUT: missing event -&gt; + Add Event -&gt; existing create workflow -&gt; return and refresh options; cancellation returns without creating an event or clearing the session form. VALIDATION: reject out-of-range date, missing event/round/location, mismatched event/category, and Publish with no session; surface errors so staff can correct input. DELETION: confirm removes day + its instructions/sessions from draft; cancel preserves all content. Confirm session deletion separately. ISOLATION / FAILURE: edits after Publish remain draft until Republish; athletes cannot edit or read drafts. Failed saves show unsaved state and retry; stale revisions cannot silently overwrite newer changes.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+      <path d="M0,0 L9,3 L0,6" fill="none" stroke="#53617b" />
+    </marker>
+  </defs>
+  <rect width="1900" fill="white" height="1704" />
+  <rect x="32" y="24" width="1836" height="130" rx="8" fill="#f7f9fc" stroke="#53617b" />
+  <text x="50" y="49" fill="#53617b" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="700">TITLE / NOTE</text>
+  <text x="50" y="78" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700">Competition Programs: Draft, Publish and Athlete Schedule</text>
+  <text x="50" y="113" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">Admin / Coach: edit and publish; nominated Athlete: published views only</text>
+  <rect x="32" y="168" width="1836" height="130" rx="8" fill="#f7f9fc" stroke="#53617b" />
+  <text x="50" y="193" fill="#53617b" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="700">LEGEND / NOTE</text>
+  <text x="50" y="222" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700">Sprint 4 target code design</text>
+  <text x="50" y="257" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">E = existing source | P = proposed component/contract | EXTEND = existing code + planned changes | solid = request/data flow | dashed = response</text>
+  <rect x="32" y="330" width="450" height="325" rx="8" fill="#fff8e8" stroke="#966719" />
+  <text x="50" y="355" fill="#966719" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="700">FRONTEND / EXTEND</text>
+  <text x="50" y="384" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700">MeetDetailsPage / ProgramTab</text>
+  <text x="50" y="419" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[E] MeetDetailsPage + existing Events workflow</text>
+  <text x="50" y="441" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[P] ProgramTab, DayEditor, SessionEditor</text>
+  <text x="50" y="463" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">General / daily instructions; Preview; Publish</text>
+  <text x="50" y="485" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">+ Add Event preserves meet and session form;</text>
+  <text x="50" y="507" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">return or cancel without losing input</text>
+  <text x="50" y="529" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">Autosave status: saving / saved / failed +</text>
+  <text x="50" y="551" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">retry</text>
+  <text x="50" y="573" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">Confirm day/session deletion; Cancel preserves</text>
+  <text x="50" y="595" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">content</text>
+  <text x="50" y="617" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">Athlete: Full Program / My Schedule, read-only</text>
+  <rect x="514" y="330" width="820" height="325" rx="8" fill="#f3f0ff" stroke="#7050a3" />
+  <text x="532" y="355" fill="#7050a3" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="700">API / P</text>
+  <text x="532" y="384" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700">Program routes / target contracts</text>
+  <text x="532" y="419" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">ADMIN / COACH: base = /api/meets/{id}/program</text>
+  <text x="532" y="441" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">GET, PUT {base}/draft (autosave draft + expected revision)</text>
+  <text x="532" y="463" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">POST {base}/publish (publish or republish saved revision)</text>
+  <text x="532" y="485" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">PUT draft owns nested day/session create, update and delete</text>
+  <text x="532" y="507" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">ATHLETE: GET /api/portal/meets/{id}/program</text>
+  <text x="532" y="529" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">ATHLETE: GET /api/portal/meets/{id}/schedule</text>
+  <text x="532" y="551" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[E] POST /api/events via existing Events workflow</text>
+  <text x="532" y="573" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">400 validation; 403 ownership; 409 stale draft; 404 unpublished</text>
+  <rect x="1366" y="330" width="502" height="325" rx="8" fill="#f7f9fc" stroke="#53617b" />
+  <text x="1384" y="355" fill="#53617b" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="700">SCOPE / NOTE</text>
+  <text x="1384" y="384" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700">Proposed design / existing integration</text>
+  <text x="1384" y="419" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">Program classes and routes are new.</text>
+  <text x="1384" y="441" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">Reuse Meet, Event, EventCategory and</text>
+  <text x="1384" y="463" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">EventParticipation.</text>
+  <text x="1384" y="485" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">Nomination uses the existing active</text>
+  <text x="1384" y="507" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">AvailabilityRequest / assignment model.</text>
+  <text x="1384" y="529" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">No separate qualification-confirmation workflow in</text>
+  <text x="1384" y="551" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">Sprint 4.</text>
+  <text x="1384" y="573" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">Publish emits a durable notification trigger</text>
+  <text x="1384" y="595" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">(notification design).</text>
+  <rect x="32" y="719" width="550" height="347" rx="8" fill="#fff8e8" stroke="#966719" />
+  <text x="50" y="744" fill="#966719" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="700">CONTROLLER / EXTEND</text>
+  <text x="50" y="773" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700">ProgramController / PortalProgramController</text>
+  <text x="50" y="808" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[P] Read draft; validate and save aggregate; publish</text>
+  <text x="50" y="830" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[E] AthleteSessionService resolves linked athlete</text>
+  <text x="50" y="852" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[P] Portal checks nominated meet before either read</text>
+  <text x="50" y="874" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[EXTEND] SecurityConfig: program staff rules before</text>
+  <text x="50" y="896" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">generic /api/** matchers</text>
+  <text x="50" y="918" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[E] EventController / EventService create events and</text>
+  <text x="50" y="940" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">prevent duplicate meet/category events</text>
+  <text x="50" y="962" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[P] Validate every day/session ID belongs to this draft</text>
+  <rect x="620" y="719" width="714" height="347" rx="8" fill="#f3f0ff" stroke="#7050a3" />
+  <text x="638" y="744" fill="#7050a3" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="700">SERVICE / P</text>
+  <text x="638" y="773" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700">ProgramService / PublishedScheduleService</text>
+  <text x="638" y="808" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">saveDraft(): transaction + optimistic revision check; never overwrite</text>
+  <text x="638" y="830" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">published snapshot</text>
+  <text x="638" y="852" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">Validate dates inside Meet.startDate..endDate; event belongs to selected</text>
+  <text x="638" y="874" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">meet; category matches event</text>
+  <text x="638" y="896" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">Require event, round and location; each report/start time is a value OR</text>
+  <text x="638" y="918" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">explicit TBC</text>
+  <text x="638" y="940" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">Conditional flag for qualification-dependent rounds</text>
+  <text x="638" y="962" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">publish(): require &gt;= 1 day with &gt;= 1 valid session; atomically store</text>
+  <text x="638" y="984" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">immutable snapshot + publication event</text>
+  <text x="638" y="1006" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">mySchedule(): published sessions joined to own assignments; preserve TBC and</text>
+  <text x="638" y="1028" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">Conditional labels</text>
+  <rect x="32" y="1114" width="550" height="281" rx="8" fill="#f3f0ff" stroke="#7050a3" />
+  <text x="50" y="1139" fill="#7050a3" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="700">RESPONSE / P</text>
+  <text x="50" y="1168" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700">DraftProgramDto / PublishedProgramDto</text>
+  <text x="50" y="1203" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">Draft: revision, instructions, days[], sessions[]</text>
+  <text x="50" y="1225" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">Save acknowledgment returned only after commit</text>
+  <text x="50" y="1247" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">Preview uses the current draft after a successful save</text>
+  <text x="50" y="1269" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">Published: version, publishedAt, days[], sessions[]</text>
+  <text x="50" y="1291" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">MyScheduleDto filters by authenticated athlete</text>
+  <text x="50" y="1313" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">No draft fields appear in portal responses</text>
+  <text x="50" y="1335" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">Failed autosave keeps local edits and shows retry;</text>
+  <text x="50" y="1357" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">publishing waits for a successful save</text>
+  <rect x="620" y="1114" width="714" height="281" rx="8" fill="#fff8e8" stroke="#966719" />
+  <text x="638" y="1139" fill="#966719" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="700">REPOSITORY / EXTEND</text>
+  <text x="638" y="1168" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700">ProgramRepository / ProgramVersionRepository</text>
+  <text x="638" y="1203" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[P] Lock/check draft revision; persist nested days and sessions atomically</text>
+  <text x="638" y="1225" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[P] Day removal cascades only its draft content</text>
+  <text x="638" y="1247" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[P] Publish snapshot and pointer in one transaction</text>
+  <text x="638" y="1269" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[E] MeetRepository / EventRepository validate references</text>
+  <text x="638" y="1291" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[E] EventParticipationRepository + AvailabilityRequestRepository restrict</text>
+  <text x="638" y="1313" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">athlete reads</text>
+  <text x="638" y="1335" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[P] Publication event outbox saved with snapshot</text>
+  <rect x="1366" y="719" width="502" height="676" rx="8" fill="#fff8e8" stroke="#966719" />
+  <text x="1384" y="744" fill="#966719" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="700">DATA / EXTEND</text>
+  <text x="1384" y="773" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700">Program data / version isolation</text>
+  <text x="1384" y="808" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[P] ProgramDraft: meet_id UNIQUE, revision,</text>
+  <text x="1384" y="830" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">instructions</text>
+  <text x="1384" y="852" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[P] ProgramDay: draft_id FK, date, instructions,</text>
+  <text x="1384" y="874" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">displayOrder</text>
+  <text x="1384" y="896" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[P] ProgramSession: day_id FK, event_id FK, round,</text>
+  <text x="1384" y="918" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">location, conditional</text>
+  <text x="1384" y="940" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">reportTime / startTime nullable with separate TBC</text>
+  <text x="1384" y="962" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">flags</text>
+  <text x="1384" y="984" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[P] ProgramVersion: meet_id, version, immutable</text>
+  <text x="1384" y="1006" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">snapshot, publishedAt</text>
+  <text x="1384" y="1028" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">UNIQUE(meet_id, version); current published version</text>
+  <text x="1384" y="1050" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">pointer</text>
+  <text x="1384" y="1072" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">Published snapshot freezes days, instructions,</text>
+  <text x="1384" y="1094" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">event/category labels and sessions</text>
+  <text x="1384" y="1116" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[E] Meet 1 -&gt; many Event; Event -&gt; EventCategory</text>
+  <text x="1384" y="1138" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[E] EventParticipation links Event to Athlete</text>
+  <text x="1384" y="1160" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">[E] AvailabilityRequest identifies nominated</text>
+  <text x="1384" y="1182" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">athlete/meet</text>
+  <text x="1384" y="1204" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">Snapshot retained across later draft edits or draft</text>
+  <text x="1384" y="1226" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">day deletion</text>
+  <text x="1384" y="1248" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">Version-qualified session IDs support links from</text>
+  <text x="1384" y="1270" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">published schedules</text>
+  <polyline points="482,430 514,430" fill="none" stroke="#53617b" stroke-width="2" marker-end="url(#arrow)" />
+  <polyline points="924,655 924,687 307,687 307,719" fill="none" stroke="#53617b" stroke-width="2" marker-end="url(#arrow)" />
+  <polyline points="582,829 620,829" fill="none" stroke="#53617b" stroke-width="2" marker-end="url(#arrow)" />
+  <polyline points="977,1066 977,1114" fill="none" stroke="#53617b" stroke-width="2" marker-end="url(#arrow)" />
+  <polyline points="1334,1234 1366,1234" fill="none" stroke="#53617b" stroke-width="2" marker-end="url(#arrow)" />
+  <polyline points="307,1066 307,1114" fill="none" stroke="#53617b" stroke-width="2" marker-end="url(#arrow)" stroke-dasharray="7 5" />
+  <polyline points="32,1214 14,1214 14,480 32,480" fill="none" stroke="#53617b" stroke-width="2" marker-end="url(#arrow)" stroke-dasharray="7 5" />
+  <rect x="32" y="1435" width="1836" height="237" rx="8" fill="#f7f9fc" stroke="#53617b" />
+  <text x="50" y="1460" fill="#53617b" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="700">PATHS / NOTE</text>
+  <text x="50" y="1489" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700">Sunny-day and rainy-day paths</text>
+  <text x="50" y="1524" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">SUNNY: Meet -&gt; Program -&gt; instructions -&gt; add valid day -&gt; event/category/round -&gt; times or TBC + location -&gt; save draft -&gt; Preview -&gt; Publish -&gt; athlete views Full Program / My Schedule.</text>
+  <text x="50" y="1546" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">EVENT SHORTCUT: missing event -&gt; + Add Event -&gt; existing create workflow -&gt; return and refresh options; cancellation returns without creating an event or clearing the session form.</text>
+  <text x="50" y="1568" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">VALIDATION: reject out-of-range date, missing event/round/location, mismatched event/category, and Publish with no session; surface errors so staff can correct input.</text>
+  <text x="50" y="1590" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">DELETION: confirm removes day + its instructions/sessions from draft; cancel preserves all content. Confirm session deletion separately.</text>
+  <text x="50" y="1612" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">ISOLATION / FAILURE: edits after Publish remain draft until Republish; athletes cannot edit or read drafts. Failed saves show unsaved state and retry; stale revisions cannot silently overwrite newer</text>
+  <text x="50" y="1634" fill="#26334a" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400">changes.</text>
+</svg>

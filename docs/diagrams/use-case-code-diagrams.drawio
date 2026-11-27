@@ -455,4 +455,220 @@
       </root>
     </mxGraphModel>
   </diagram>
+  <diagram id="14-competition-programs" name="Competition Programs: Draft, Publish and Athlete Schedule">
+    <mxGraphModel grid="1" gridSize="10" page="1" pageWidth="1900" pageHeight="1704">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" value="TITLE / NOTE&#10;Competition Programs: Draft, Publish and Athlete Schedule&#10;Admin / Coach: edit and publish; nominated Athlete: published views only" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=18;fontSize=16;fontFamily=Arial;fillColor=#f7f9fc;strokeColor=#53617b;">
+          <mxGeometry x="32" y="24" width="1836" height="130" as="geometry" />
+        </mxCell>
+        <mxCell id="legend" value="LEGEND / NOTE&#10;Sprint 4 target code design&#10;E = existing source | P = proposed component/contract | EXTEND = existing code + planned changes | solid = request/data flow | dashed = response" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=18;fontSize=16;fontFamily=Arial;fillColor=#f7f9fc;strokeColor=#53617b;">
+          <mxGeometry x="32" y="168" width="1836" height="130" as="geometry" />
+        </mxCell>
+        <mxCell id="frontend" value="FRONTEND / EXTEND&#10;MeetDetailsPage / ProgramTab&#10;[E] MeetDetailsPage + existing Events workflow&#10;[P] ProgramTab, DayEditor, SessionEditor&#10;General / daily instructions; Preview; Publish&#10;+ Add Event preserves meet and session form; return or cancel without losing input&#10;Autosave status: saving / saved / failed + retry&#10;Confirm day/session deletion; Cancel preserves content&#10;Athlete: Full Program / My Schedule, read-only" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=18;fontSize=16;fontFamily=Arial;fillColor=#fff8e8;strokeColor=#966719;">
+          <mxGeometry x="32" y="330" width="450" height="325" as="geometry" />
+        </mxCell>
+        <mxCell id="api" value="API / P&#10;Program routes / target contracts&#10;ADMIN / COACH: base = /api/meets/{id}/program&#10;GET, PUT {base}/draft (autosave draft + expected revision)&#10;POST {base}/publish (publish or republish saved revision)&#10;PUT draft owns nested day/session create, update and delete&#10;ATHLETE: GET /api/portal/meets/{id}/program&#10;ATHLETE: GET /api/portal/meets/{id}/schedule&#10;[E] POST /api/events via existing Events workflow&#10;400 validation; 403 ownership; 409 stale draft; 404 unpublished" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=18;fontSize=16;fontFamily=Arial;fillColor=#f3f0ff;strokeColor=#7050a3;">
+          <mxGeometry x="514" y="330" width="820" height="325" as="geometry" />
+        </mxCell>
+        <mxCell id="scope" value="SCOPE / NOTE&#10;Proposed design / existing integration&#10;Program classes and routes are new.&#10;Reuse Meet, Event, EventCategory and EventParticipation.&#10;Nomination uses the existing active AvailabilityRequest / assignment model.&#10;No separate qualification-confirmation workflow in Sprint 4.&#10;Publish emits a durable notification trigger (notification design)." vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=18;fontSize=16;fontFamily=Arial;fillColor=#f7f9fc;strokeColor=#53617b;">
+          <mxGeometry x="1366" y="330" width="502" height="325" as="geometry" />
+        </mxCell>
+        <mxCell id="controller" value="CONTROLLER / EXTEND&#10;ProgramController / PortalProgramController&#10;[P] Read draft; validate and save aggregate; publish&#10;[E] AthleteSessionService resolves linked athlete&#10;[P] Portal checks nominated meet before either read&#10;[EXTEND] SecurityConfig: program staff rules before generic /api/** matchers&#10;[E] EventController / EventService create events and prevent duplicate meet/category events&#10;[P] Validate every day/session ID belongs to this draft" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=18;fontSize=16;fontFamily=Arial;fillColor=#fff8e8;strokeColor=#966719;">
+          <mxGeometry x="32" y="719" width="550" height="347" as="geometry" />
+        </mxCell>
+        <mxCell id="service" value="SERVICE / P&#10;ProgramService / PublishedScheduleService&#10;saveDraft(): transaction + optimistic revision check; never overwrite published snapshot&#10;Validate dates inside Meet.startDate..endDate; event belongs to selected meet; category matches event&#10;Require event, round and location; each report/start time is a value OR explicit TBC&#10;Conditional flag for qualification-dependent rounds&#10;publish(): require &gt;= 1 day with &gt;= 1 valid session; atomically store immutable snapshot + publication event&#10;mySchedule(): published sessions joined to own assignments; preserve TBC and Conditional labels" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=18;fontSize=16;fontFamily=Arial;fillColor=#f3f0ff;strokeColor=#7050a3;">
+          <mxGeometry x="620" y="719" width="714" height="347" as="geometry" />
+        </mxCell>
+        <mxCell id="response" value="RESPONSE / P&#10;DraftProgramDto / PublishedProgramDto&#10;Draft: revision, instructions, days[], sessions[]&#10;Save acknowledgment returned only after commit&#10;Preview uses the current draft after a successful save&#10;Published: version, publishedAt, days[], sessions[]&#10;MyScheduleDto filters by authenticated athlete&#10;No draft fields appear in portal responses&#10;Failed autosave keeps local edits and shows retry; publishing waits for a successful save" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=18;fontSize=16;fontFamily=Arial;fillColor=#f3f0ff;strokeColor=#7050a3;">
+          <mxGeometry x="32" y="1114" width="550" height="281" as="geometry" />
+        </mxCell>
+        <mxCell id="repository" value="REPOSITORY / EXTEND&#10;ProgramRepository / ProgramVersionRepository&#10;[P] Lock/check draft revision; persist nested days and sessions atomically&#10;[P] Day removal cascades only its draft content&#10;[P] Publish snapshot and pointer in one transaction&#10;[E] MeetRepository / EventRepository validate references&#10;[E] EventParticipationRepository + AvailabilityRequestRepository restrict athlete reads&#10;[P] Publication event outbox saved with snapshot" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=18;fontSize=16;fontFamily=Arial;fillColor=#fff8e8;strokeColor=#966719;">
+          <mxGeometry x="620" y="1114" width="714" height="281" as="geometry" />
+        </mxCell>
+        <mxCell id="data" value="DATA / EXTEND&#10;Program data / version isolation&#10;[P] ProgramDraft: meet_id UNIQUE, revision, instructions&#10;[P] ProgramDay: draft_id FK, date, instructions, displayOrder&#10;[P] ProgramSession: day_id FK, event_id FK, round, location, conditional&#10;reportTime / startTime nullable with separate TBC flags&#10;[P] ProgramVersion: meet_id, version, immutable snapshot, publishedAt&#10;UNIQUE(meet_id, version); current published version pointer&#10;Published snapshot freezes days, instructions, event/category labels and sessions&#10;[E] Meet 1 -&gt; many Event; Event -&gt; EventCategory&#10;[E] EventParticipation links Event to Athlete&#10;[E] AvailabilityRequest identifies nominated athlete/meet&#10;Snapshot retained across later draft edits or draft day deletion&#10;Version-qualified session IDs support links from published schedules" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=18;fontSize=16;fontFamily=Arial;fillColor=#fff8e8;strokeColor=#966719;">
+          <mxGeometry x="1366" y="719" width="502" height="676" as="geometry" />
+        </mxCell>
+        <mxCell id="frontend-to-api" edge="1" parent="1" source="frontend" target="api" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=open;html=0;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="api-to-controller" edge="1" parent="1" source="api" target="controller" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=open;html=0;">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="924" y="687" />
+              <mxPoint x="307" y="687" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="controller-to-service" edge="1" parent="1" source="controller" target="service" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=open;html=0;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="service-to-repository" edge="1" parent="1" source="service" target="repository" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=open;html=0;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="repository-to-data" edge="1" parent="1" source="repository" target="data" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=open;html=0;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="controller-to-response" edge="1" parent="1" source="controller" target="response" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=open;html=0;dashed=1;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="response-to-frontend" edge="1" parent="1" source="response" target="frontend" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=open;html=0;dashed=1;">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="14" y="1214" />
+              <mxPoint x="14" y="480" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="paths" value="PATHS / NOTE&#10;Sunny-day and rainy-day paths&#10;SUNNY: Meet -&gt; Program -&gt; instructions -&gt; add valid day -&gt; event/category/round -&gt; times or TBC + location -&gt; save draft -&gt; Preview -&gt; Publish -&gt; athlete views Full Program / My Schedule.&#10;EVENT SHORTCUT: missing event -&gt; + Add Event -&gt; existing create workflow -&gt; return and refresh options; cancellation returns without creating an event or clearing the session form.&#10;VALIDATION: reject out-of-range date, missing event/round/location, mismatched event/category, and Publish with no session; surface errors so staff can correct input.&#10;DELETION: confirm removes day + its instructions/sessions from draft; cancel preserves all content. Confirm session deletion separately.&#10;ISOLATION / FAILURE: edits after Publish remain draft until Republish; athletes cannot edit or read drafts. Failed saves show unsaved state and retry; stale revisions cannot silently overwrite newer changes." vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=18;fontSize=16;fontFamily=Arial;fillColor=#f7f9fc;strokeColor=#53617b;">
+          <mxGeometry x="32" y="1435" width="1836" height="237" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="15-in-app-notifications" name="In-App Notifications and Scheduled Reminders">
+    <mxGraphModel grid="1" gridSize="10" page="1" pageWidth="1900" pageHeight="1792">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" value="TITLE / NOTE&#10;In-App Notifications and Scheduled Reminders&#10;Admin / Coach / Athlete: receive and manage their own notifications" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=18;fontSize=16;fontFamily=Arial;fillColor=#f7f9fc;strokeColor=#53617b;">
+          <mxGeometry x="32" y="24" width="1836" height="130" as="geometry" />
+        </mxCell>
+        <mxCell id="legend" value="LEGEND / NOTE&#10;Sprint 4 target code design&#10;E = existing source | P = proposed component/contract | EXTEND = existing code + planned changes | solid = request/data flow | dashed = response" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=18;fontSize=16;fontFamily=Arial;fillColor=#f7f9fc;strokeColor=#53617b;">
+          <mxGeometry x="32" y="168" width="1836" height="130" as="geometry" />
+        </mxCell>
+        <mxCell id="frontend" value="FRONTEND / EXTEND&#10;Header / NotificationBell / NotificationsPage&#10;[E] Shared header.tsx + authenticated apiFetch&#10;[P] Bell: unread count + five most recent items&#10;View All -&gt; paginated history, All / Unread&#10;Open marks read; mark read/unread; mark all read&#10;Delete immediately; Undo visible for 5 seconds&#10;Undo restores previous read state; expiry keeps deletion&#10;Empty/error states; accessible desktop/mobile menu" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=18;fontSize=16;fontFamily=Arial;fillColor=#fff8e8;strokeColor=#966719;">
+          <mxGeometry x="32" y="330" width="450" height="347" as="geometry" />
+        </mxCell>
+        <mxCell id="api" value="API / P&#10;Recipient-owned notification routes&#10;GET /api/notifications?filter=ALL|UNREAD&amp;limit=5|...&amp;cursor=...&#10;GET /api/notifications/unread-count&#10;PATCH /api/notifications/{id} {read: true|false}&#10;POST /api/notifications/read-all&#10;DELETE /api/notifications/{id} -&gt; {undoUntil}&#10;POST /api/notifications/{id}/restore (before server deadline)&#10;All roles: derive recipient from session, never request user ID&#10;Reauthorize destination API when opening any notification" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=18;fontSize=16;fontFamily=Arial;fillColor=#f3f0ff;strokeColor=#7050a3;">
+          <mxGeometry x="514" y="330" width="820" height="347" as="geometry" />
+        </mxCell>
+        <mxCell id="scope" value="SCOPE / NOTE&#10;Scheduling decisions / integration gaps&#10;All notification components are proposed.&#10;Extend nomination, assignment, publication and cancellation workflows with durable triggers.&#10;Meet cancellation state is new; current delete API is not a cancellation workflow.&#10;Local time requires a configured IANA zone; day-before send time is configurable, unspecified by use case." vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=18;fontSize=16;fontFamily=Arial;fillColor=#f7f9fc;strokeColor=#53617b;">
+          <mxGeometry x="1366" y="330" width="502" height="347" as="geometry" />
+        </mxCell>
+        <mxCell id="controller" value="CONTROLLER / EXTEND&#10;NotificationController / SecurityConfig&#10;[P] Require authenticated account for every route&#10;[P] Query/mutate only principal.id-owned notifications&#10;[P] Hide deleted items; validate restore deadline&#10;[EXTEND] Explicit all-role /api/notifications rules must precede generic staff-only API rules&#10;[P] Safe destination resolver; inaccessible target -&gt; message and accessible fallback page&#10;[P] Count/list/read/delete errors show retry feedback" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=18;fontSize=16;fontFamily=Arial;fillColor=#fff8e8;strokeColor=#966719;">
+          <mxGeometry x="32" y="741" width="550" height="369" as="geometry" />
+        </mxCell>
+        <mxCell id="service" value="SERVICE / P&#10;NotificationService / ReminderScheduler&#10;RecipientPolicy: staff alert -&gt; every Admin and Coach; athlete alert -&gt; affected athletes only&#10;Domain triggers: nomination, publish/republish, assignment changes and meet cancellation&#10;Pending reminder: local 09:00 on meet.startDate minus 2 calendar days; only still-Pending responses&#10;Participation reminder: group own confirmed published sessions per participation date; send day before&#10;Exclude unconfirmed Conditional rounds; skip cancelled meets; recheck eligibility before delivery&#10;Persist event/reminder keys atomically so retries cannot duplicate recipient notifications" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=18;fontSize=16;fontFamily=Arial;fillColor=#f3f0ff;strokeColor=#7050a3;">
+          <mxGeometry x="620" y="741" width="714" height="369" as="geometry" />
+        </mxCell>
+        <mxCell id="response" value="RESPONSE / P&#10;NotificationDto / UnreadCountDto&#10;id, type, title, message, createdAt, readAt&#10;Typed destination: meet/program/availability/schedule IDs&#10;List cursor + unreadCount; deleted rows excluded&#10;Opening an already-read item stays read&#10;Delete hides item and updates count immediately&#10;Restore returns original read/unread state&#10;UI refreshes bell/list/count after mutations; failed mutations reconcile to server state" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=18;fontSize=16;fontFamily=Arial;fillColor=#f3f0ff;strokeColor=#7050a3;">
+          <mxGeometry x="32" y="1158" width="550" height="303" as="geometry" />
+        </mxCell>
+        <mxCell id="repository" value="REPOSITORY / EXTEND&#10;NotificationRepository / TriggerOutboxRepository&#10;[P] Recipient + newest-first / unread indexes&#10;[P] Atomic soft delete sets server undoUntil = now + 5s; restore only within that deadline&#10;[P] Hidden expired deletions may be purged later&#10;[P] Retry durable triggers after transient failures&#10;[E] StaffUserRepository for role recipients; AvailabilityRequestRepository for current Pending state&#10;[P] Published schedule + assignment queries; cancellation lock/recheck before reminder commit" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=18;fontSize=16;fontFamily=Arial;fillColor=#fff8e8;strokeColor=#966719;">
+          <mxGeometry x="620" y="1158" width="714" height="303" as="geometry" />
+        </mxCell>
+        <mxCell id="data" value="DATA / EXTEND&#10;Recipient data / durable deduplication&#10;[P] Notification: id, recipient_user_id FK, type, payload, destination, createdAt, readAt&#10;deletedAt + undoUntil; deletion preserves readAt&#10;[P] Delivery key UNIQUE: recipient + domainEventId&#10;[P] ReminderDelivery UNIQUE: type + athlete_id + meet_id + participationDateKey&#10;Pending key uses meet ID, independent of assignment revision; once per athlete/meet&#10;Participation key uses local participation date; once per athlete/meet/day&#10;[P] TriggerOutbox: immutable event ID + payload + retry status, persisted with source action&#10;[EXTEND] Meet.cancelledAt / status for scheduler exclusion&#10;[E] StaffUser (all roles), AvailabilityRequest, EventParticipation&#10;[P] ProgramVersion provides published sessions; Conditional alone is not confirmation" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=18;fontSize=16;fontFamily=Arial;fillColor=#fff8e8;strokeColor=#966719;">
+          <mxGeometry x="1366" y="741" width="502" height="720" as="geometry" />
+        </mxCell>
+        <mxCell id="frontend-to-api" edge="1" parent="1" source="frontend" target="api" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=open;html=0;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="api-to-controller" edge="1" parent="1" source="api" target="controller" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=open;html=0;">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="924" y="709" />
+              <mxPoint x="307" y="709" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="controller-to-service" edge="1" parent="1" source="controller" target="service" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=open;html=0;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="service-to-repository" edge="1" parent="1" source="service" target="repository" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=open;html=0;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="repository-to-data" edge="1" parent="1" source="repository" target="data" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=open;html=0;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="controller-to-response" edge="1" parent="1" source="controller" target="response" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=open;html=0;dashed=1;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="response-to-frontend" edge="1" parent="1" source="response" target="frontend" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=open;html=0;dashed=1;">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="14" y="1258" />
+              <mxPoint x="14" y="480" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="paths" value="PATHS / NOTE&#10;Sunny-day and rainy-day paths&#10;SUNNY: source action commits + outbox event -&gt; resolve recipients -&gt; persist notifications -&gt; refresh bell -&gt; open one -&gt; mark read + authorized navigation -&gt; View All -&gt; filter/manage history.&#10;REMINDERS: Pending at 09:00 local two calendar days before start -&gt; one reminder; Available/Unavailable or already-sent -&gt; skip. Confirmed events on one participation date -&gt; one consolidated day-before reminder.&#10;CONDITIONAL / CANCELLATION: exclude unconfirmed Conditional sessions; introduce no qualification workflow. Cancellation notifies affected athletes + staff and suppresses future reminders.&#10;UNDO: delete removes immediately -&gt; restore within 5 seconds returns prior read state; expired restore rejected. No notifications / no unread -&gt; appropriate empty state.&#10;FAILURE / PRIVACY: retry durable triggers without duplicates; mutation failures reconcile UI; unavailable destination shows a message. Every recipient query and destination read enforces current authorization." vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=18;fontSize=16;fontFamily=Arial;fillColor=#f7f9fc;strokeColor=#53617b;">
+          <mxGeometry x="32" y="1501" width="1836" height="259" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="16-role-based-dashboards" name="Role-Based Dashboards and Shared Navigation">
+    <mxGraphModel grid="1" gridSize="10" page="1" pageWidth="1900" pageHeight="1902">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" value="TITLE / NOTE&#10;Role-Based Dashboards and Shared Navigation&#10;Admin: organization overview; Coach: all meets; Athlete: own nominated meets" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=18;fontSize=16;fontFamily=Arial;fillColor=#f7f9fc;strokeColor=#53617b;">
+          <mxGeometry x="32" y="24" width="1836" height="130" as="geometry" />
+        </mxCell>
+        <mxCell id="legend" value="LEGEND / NOTE&#10;Sprint 4 target code design&#10;E = existing source | P = proposed component/contract | EXTEND = existing code + planned changes | solid = request/data flow | dashed = response" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=18;fontSize=16;fontFamily=Arial;fillColor=#f7f9fc;strokeColor=#53617b;">
+          <mxGeometry x="32" y="168" width="1836" height="130" as="geometry" />
+        </mxCell>
+        <mxCell id="frontend" value="FRONTEND / EXTEND&#10;DashboardPage / role-specific sections&#10;[E] AuthProvider, RequireSession, header.tsx&#10;[P] Post-login role dashboard + reusable cards&#10;Upcoming meets, outstanding actions, recent notifications&#10;[P] Role-permitted desktop nav / mobile hamburger&#10;Orange/white, Inter, desktop/tablet/mobile layout&#10;Each section: loading, empty, error + retry&#10;Existing feature links perform authorized actions" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=18;fontSize=16;fontFamily=Arial;fillColor=#fff8e8;strokeColor=#966719;">
+          <mxGeometry x="32" y="330" width="450" height="347" as="geometry" />
+        </mxCell>
+        <mxCell id="api" value="API / P&#10;Role-specific dashboard query contracts&#10;ADMIN: GET /api/dashboard/admin&#10;COACH: GET /api/dashboard/coach&#10;ATHLETE: GET /api/portal/dashboard&#10;[P] GET /api/notifications?filter=ALL&amp;limit=5 (UC-14)&#10;[E] GET /api/auth/me -&gt; role + permitted actions&#10;Server chooses data scope from principal; no athleteId parameter&#10;Independent summary/notification requests allow partial rendering&#10;401 no session; 403 wrong role; section error remains retryable" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=18;fontSize=16;fontFamily=Arial;fillColor=#f3f0ff;strokeColor=#7050a3;">
+          <mxGeometry x="514" y="330" width="820" height="347" as="geometry" />
+        </mxCell>
+        <mxCell id="scope" value="SCOPE / NOTE&#10;Proposed dashboard / reused features&#10;Dashboard classes and summary routes are new.&#10;Reuse existing meet, athlete, assignment and availability sources.&#10;Programs and UC-14 notifications depend on the companion proposed designs.&#10;Coach sees all meets; quick actions retain existing feature permissions.&#10;Admin-only links: Add Athlete, Create Meet, Manage Users. Import uses current permission." vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=18;fontSize=16;fontFamily=Arial;fillColor=#f7f9fc;strokeColor=#53617b;">
+          <mxGeometry x="1366" y="330" width="502" height="347" as="geometry" />
+        </mxCell>
+        <mxCell id="controller" value="CONTROLLER / EXTEND&#10;DashboardController / PortalDashboardController&#10;[P] Admin/Coach route guards + dashboard query service&#10;[E] AthleteSessionService.require(identity) resolves athlete&#10;[EXTEND] SecurityConfig: role summary routes before generic staff API rules&#10;[E] RequireSession and auth permissions guard feature routes&#10;[P] Destination endpoints enforce role/ownership again&#10;[P] Return section availability/error metadata where one data source fails" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=18;fontSize=16;fontFamily=Arial;fillColor=#fff8e8;strokeColor=#966719;">
+          <mxGeometry x="32" y="741" width="550" height="347" as="geometry" />
+        </mxCell>
+        <mxCell id="service" value="SERVICE / P&#10;DashboardService / AthleteDashboardService&#10;Admin: total athletes, upcoming meets, Pending responses and unpublished program drafts&#10;Coach: all upcoming meets, nominated athlete counts, Pending responses and permitted outstanding actions&#10;Athlete: only nominated meets, own availability and next scheduled event in published programs&#10;Pending availability -&gt; action links; none -&gt; All Caught Up&#10;Next event from own assigned published sessions; TBC has no invented ordering time; keep Conditional label&#10;Recent notifications fetched through recipient-owned UC-14 API; dashboard performs no duplicate notification writes" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=18;fontSize=16;fontFamily=Arial;fillColor=#f3f0ff;strokeColor=#7050a3;">
+          <mxGeometry x="620" y="741" width="714" height="347" as="geometry" />
+        </mxCell>
+        <mxCell id="response" value="RESPONSE / P&#10;Admin / Coach / AthleteDashboardDto&#10;Role-scoped stats, upcomingMeets[], outstandingActions[]&#10;Athlete: own availability + nextScheduledEvent or empty state&#10;Action links match current authorization; Manage Users hidden from Coach&#10;No nominations / no upcoming schedule -&gt; explicit empty states&#10;No outstanding staff actions / notifications -&gt; empty state&#10;Section failures show retry while other loaded sections remain usable&#10;Unauthorized destination -&gt; access denied + authorized return" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=18;fontSize=16;fontFamily=Arial;fillColor=#f3f0ff;strokeColor=#7050a3;">
+          <mxGeometry x="32" y="1136" width="550" height="391" as="geometry" />
+        </mxCell>
+        <mxCell id="repository" value="REPOSITORY / EXTEND&#10;DashboardQueries / existing repositories&#10;[P] Aggregate queries with shared upcoming/Pending definitions; count distinct nominated athletes&#10;[E] AthleteRepository, MeetRepository / MeetOverviewRepository&#10;[E] AvailabilityRequest.status() semantics include assignment revisions; do not count raw lastAnswer&#10;[E] EventParticipationRepository scopes schedule to own assignments&#10;[P] ProgramVersion query excludes drafts; owner filtering in database queries&#10;[P] No coach-specific meet ownership restriction" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=18;fontSize=16;fontFamily=Arial;fillColor=#fff8e8;strokeColor=#966719;">
+          <mxGeometry x="620" y="1136" width="714" height="391" as="geometry" />
+        </mxCell>
+        <mxCell id="data" value="DATA / EXTEND&#10;Read model / existing authoritative records&#10;[E] Athlete: organization athlete count&#10;[E] Meet: start/end dates; all-meet staff overview&#10;[E] EventParticipation: athlete/event assignments&#10;[E] AvailabilityRequest: meet/athlete nomination + computed Pending/Available/Unavailable state&#10;[E] StaffUser: role + linked athlete ID&#10;[P] ProgramDraft vs ProgramVersion for unpublished count and published personal schedule&#10;Unpublished count includes saved changes newer than the published version&#10;[P] UC-14 Notification data stays behind notification API; recipient scope always applies&#10;No new dashboard table required; read-only aggregation over authoritative sources&#10;Return only authenticated athlete's records; never accept another athlete ID for portal scope" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=18;fontSize=16;fontFamily=Arial;fillColor=#fff8e8;strokeColor=#966719;">
+          <mxGeometry x="1366" y="741" width="502" height="786" as="geometry" />
+        </mxCell>
+        <mxCell id="frontend-to-api" edge="1" parent="1" source="frontend" target="api" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=open;html=0;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="api-to-controller" edge="1" parent="1" source="api" target="controller" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=open;html=0;">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="924" y="709" />
+              <mxPoint x="307" y="709" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="controller-to-service" edge="1" parent="1" source="controller" target="service" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=open;html=0;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="service-to-repository" edge="1" parent="1" source="service" target="repository" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=open;html=0;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="repository-to-data" edge="1" parent="1" source="repository" target="data" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=open;html=0;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="controller-to-response" edge="1" parent="1" source="controller" target="response" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=open;html=0;dashed=1;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="response-to-frontend" edge="1" parent="1" source="response" target="frontend" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=open;html=0;dashed=1;">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="14" y="1236" />
+              <mxPoint x="14" y="480" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="paths" value="PATHS / NOTE&#10;Sunny-day and rainy-day paths&#10;SUNNY: login / dashboard route -&gt; session role -&gt; role summary + own notifications -&gt; cards / meets / outstanding actions -&gt; existing authorized feature. Desktop top nav or mobile hamburger uses the same permissions.&#10;ADMIN / COACH: Admin receives organization statistics and Admin quick actions; Coach monitors all meets and can assign events, record results, edit programs and review availability without Admin-only actions.&#10;ATHLETE: nominated meets + own availability + next published scheduled event. No Pending responses -&gt; All Caught Up; no nominations/schedule -&gt; clear empty state; My Profile and notifications remain accessible.&#10;EMPTY / FAILURE: no upcoming meets, no staff actions or no recent notifications -&gt; section-specific empty state. Failed section -&gt; unavailable message + retry; other accessible sections stay usable.&#10;AUTHORIZATION: wrong-role feature request -&gt; server denies; unrelated athlete records -&gt; denied using linked athlete identity. Role navigation and responsive layouts preserve the same access rules on every device." vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacing=18;fontSize=16;fontFamily=Arial;fillColor=#f7f9fc;strokeColor=#53617b;">
+          <mxGeometry x="32" y="1567" width="1836" height="303" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
 </mxfile>
